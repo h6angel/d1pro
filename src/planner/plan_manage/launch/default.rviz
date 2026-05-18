@@ -160,12 +160,38 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 1
+        Min Value: 0
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 100; 0
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Name: gazebo_obstacles
+      Position Transformer: XYZ
+      Size (Pixels): 2
+      Size (m): 0.05
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /gazebo_obstacles
+      Use Fixed Frame: true
+      Value: true
     - Class: rviz_common/Group
       Displays:
         - Class: rviz_common/Group
           Displays:
             - Class: rviz_default_plugins/Marker
-              Enabled: false
+              Enabled: true
               Name: goal_point
               Namespaces:
                 {}
@@ -178,7 +204,7 @@ Visualization Manager:
                 Value: /drone_0_plan_vis/goal_point
               Value: false
             - Class: rviz_default_plugins/Marker
-              Enabled: false
+              Enabled: true
               Name: global_path
               Namespaces:
                 {}
@@ -189,7 +215,7 @@ Visualization Manager:
                 History Policy: Keep Last
                 Reliability Policy: Reliable
                 Value: /drone_0_plan_vis/global_list
-              Value: false
+              Value: true
             - Class: rviz_default_plugins/Marker
               Enabled: true
               Name: optimal_traj
@@ -3760,7 +3786,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /goal_pose
+        Value: /move_base_simple/goal
     - Class: rviz_default_plugins/PublishPoint
       Single click: true
       Topic:

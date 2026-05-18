@@ -241,7 +241,11 @@ namespace ego_planner
 
     init_pt_ = odom_pos_;
 
-    Eigen::Vector3d end_wp(msg->pose.position.x, msg->pose.position.y, 1.0);
+    double goal_z = msg->pose.position.z;
+    if (goal_z < 0.1)
+      goal_z = 0.3;
+
+    Eigen::Vector3d end_wp(msg->pose.position.x, msg->pose.position.y, goal_z);
 
     planNextWaypoint(end_wp);
   }
