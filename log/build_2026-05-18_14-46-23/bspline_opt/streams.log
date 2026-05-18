@@ -1,0 +1,223 @@
+[0.012s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/bspline_opt': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching/lib:/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:/home/hyvonne/labpro/ego_planner/install/plan_env/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/bspline_opt -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/bspline_opt
+[0.055s] -- The C compiler identification is GNU 11.4.0
+[0.104s] -- The CXX compiler identification is GNU 11.4.0
+[0.110s] -- Detecting C compiler ABI info
+[0.166s] -- Detecting C compiler ABI info - done
+[0.174s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.174s] -- Detecting C compile features
+[0.174s] -- Detecting C compile features - done
+[0.177s] -- Detecting CXX compiler ABI info
+[0.254s] -- Detecting CXX compiler ABI info - done
+[0.259s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.259s] -- Detecting CXX compile features
+[0.259s] -- Detecting CXX compile features - done
+[0.261s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.376s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.429s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.445s] -- Found rclcpp: 16.0.19 (/opt/ros/humble/share/rclcpp/cmake)
+[0.472s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.475s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.481s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.489s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.499s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.527s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.529s] -- Found rmw_cyclonedds_cpp: 1.3.4 (/opt/ros/humble/share/rmw_cyclonedds_cpp/cmake)
+[0.543s] -- Using RMW implementation 'rmw_cyclonedds_cpp' as default
+[0.548s] -- Looking for pthread.h
+[0.613s] -- Looking for pthread.h - found
+[0.613s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[0.680s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[0.681s] -- Found Threads: TRUE  
+[0.721s] -- Found rclpy: 3.3.21 (/opt/ros/humble/share/rclpy/cmake)
+[0.722s] -- Found visualization_msgs: 4.9.1 (/opt/ros/humble/share/visualization_msgs/cmake)
+[0.765s] -- Found nav_msgs: 4.9.1 (/opt/ros/humble/share/nav_msgs/cmake)
+[0.779s] -- Found cv_bridge: 3.2.1 (/opt/ros/humble/share/cv_bridge/cmake)
+[0.788s] -- Found plan_env: 0.0.0 (/home/hyvonne/labpro/ego_planner/install/plan_env/share/plan_env/cmake)
+[0.789s] -- Found traj_utils: 0.0.0 (/home/hyvonne/labpro/ego_planner/install/traj_utils/share/traj_utils/cmake)
+[0.805s] -- Found path_searching: 0.0.0 (/home/hyvonne/labpro/ego_planner/install/path_searching/share/path_searching/cmake)
+[0.818s] -- Checking for module 'eigen3'
+[0.832s] --   Found eigen3, version 3.4.0
+[0.863s] -- Found Eigen: /usr/include/eigen3 (Required is at least version "3.1") 
+[0.863s] -- Eigen found (include: /usr/include/eigen3, version: 3.4.0)
+[0.879s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found suitable version "1.74.0", minimum required is "1.65.0") found components: system filesystem date_time iostreams serialization 
+[0.891s] -- Checking for module 'flann'
+[0.903s] --   Found flann, version 1.9.1
+[0.939s] -- Found FLANN: /usr/lib/x86_64-linux-gnu/libflann_cpp.so  
+[0.939s] -- FLANN found (include: /usr/include, lib: /usr/lib/x86_64-linux-gnu/libflann_cpp.so)
+[0.968s] -- Found GLEW: /usr/lib/x86_64-linux-gnu/libGLEW.so  
+[0.972s] -- Found OpenGL: /usr/lib/x86_64-linux-gnu/libOpenGL.so  found components: OpenGL GLX 
+[1.088s] -- Found MPI_C: /usr/lib/x86_64-linux-gnu/libmpi.so (found version "3.1") 
+[1.088s] -- Found MPI: TRUE (found version "3.1") found components: C 
+[1.090s] -- Found JsonCpp: /usr/lib/x86_64-linux-gnu/libjsoncpp.so (found suitable version "1.9.5", minimum required is "0.7.0") 
+[1.097s] -- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.2.11") 
+[1.109s] -- Found PNG: /usr/lib/x86_64-linux-gnu/libpng.so (found version "1.6.37") 
+[1.116s] -- Found Eigen3: /usr/include/eigen3 (found version "3.4.0") 
+[1.190s] -- Found X11: /usr/include   
+[1.190s] -- Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so
+[1.258s] -- Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so - found
+[1.258s] -- Looking for gethostbyname
+[1.323s] -- Looking for gethostbyname - found
+[1.324s] -- Looking for connect
+[1.383s] -- Looking for connect - found
+[1.383s] -- Looking for remove
+[1.443s] -- Looking for remove - found
+[1.443s] -- Looking for shmat
+[1.507s] -- Looking for shmat - found
+[1.507s] -- Looking for IceConnectionNumber in ICE
+[1.566s] -- Looking for IceConnectionNumber in ICE - found
+[1.635s] -- Found EXPAT: /usr/lib/x86_64-linux-gnu/libexpat.so (found version "2.4.7") 
+[1.637s] -- Found double-conversion: /usr/lib/x86_64-linux-gnu/libdouble-conversion.so  
+[1.639s] -- Found LZ4: /usr/lib/x86_64-linux-gnu/liblz4.so (found version "1.9.3") 
+[1.640s] -- Found LZMA: /usr/lib/x86_64-linux-gnu/liblzma.so (found version "5.2.5") 
+[1.650s] -- Found JPEG: /usr/lib/x86_64-linux-gnu/libjpeg.so (found version "80") 
+[1.654s] -- Found TIFF: /usr/lib/x86_64-linux-gnu/libtiff.so (found version "4.3.0")  
+[1.657s] -- Found Freetype: /usr/lib/x86_64-linux-gnu/libfreetype.so (found version "2.11.1") 
+[1.661s] -- Found utf8cpp: /usr/include/utf8cpp  
+[1.730s] -- Checking for module 'libusb-1.0'
+[1.744s] --   Found libusb-1.0, version 1.0.25
+[1.780s] -- Found libusb: /usr/lib/x86_64-linux-gnu/libusb-1.0.so  
+[1.782s] -- Found OpenNI: /usr/lib/libOpenNI.so;libusb::libusb (found version "1.5.4.0") 
+[1.782s] -- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)
+[1.835s] -- Found OpenNI2: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb (found version "2.2.0.33") 
+[1.835s] -- OpenNI2 found (version: 2.2.0.33, include: /usr/include/openni2, lib: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb)
+[1.835s] [0m** WARNING ** io features related to pcap will be disabled[0m
+[1.966s] -- Eigen found (include: /usr/include/eigen3, version: 3.4.0)
+[1.971s] -- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)
+[1.978s] -- OpenNI2 found (version: 2.2.0.33, include: /usr/include/openni2, lib: /usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb)
+[2.092s] -- Found Qhull version 8.0.2
+[2.208s] -- OpenNI found (version: 1.5.4.0, include: /usr/include/ni, lib: /usr/lib/libOpenNI.so;libusb::libusb)
+[2.318s] -- looking for PCL_COMMON
+[2.319s] -- Found PCL_COMMON: /usr/lib/x86_64-linux-gnu/libpcl_common.so  
+[2.319s] -- looking for PCL_KDTREE
+[2.319s] -- Found PCL_KDTREE: /usr/lib/x86_64-linux-gnu/libpcl_kdtree.so  
+[2.319s] -- looking for PCL_OCTREE
+[2.320s] -- Found PCL_OCTREE: /usr/lib/x86_64-linux-gnu/libpcl_octree.so  
+[2.320s] -- looking for PCL_SEARCH
+[2.320s] -- Found PCL_SEARCH: /usr/lib/x86_64-linux-gnu/libpcl_search.so  
+[2.320s] -- looking for PCL_SAMPLE_CONSENSUS
+[2.321s] -- Found PCL_SAMPLE_CONSENSUS: /usr/lib/x86_64-linux-gnu/libpcl_sample_consensus.so  
+[2.321s] -- looking for PCL_FILTERS
+[2.322s] -- Found PCL_FILTERS: /usr/lib/x86_64-linux-gnu/libpcl_filters.so  
+[2.322s] -- looking for PCL_2D
+[2.322s] -- Found PCL_2D: /usr/include/pcl-1.12  
+[2.322s] -- looking for PCL_GEOMETRY
+[2.322s] -- Found PCL_GEOMETRY: /usr/include/pcl-1.12  
+[2.322s] -- looking for PCL_IO
+[2.323s] -- Found PCL_IO: /usr/lib/x86_64-linux-gnu/libpcl_io.so  
+[2.323s] -- looking for PCL_FEATURES
+[2.324s] -- Found PCL_FEATURES: /usr/lib/x86_64-linux-gnu/libpcl_features.so  
+[2.324s] -- looking for PCL_ML
+[2.324s] -- Found PCL_ML: /usr/lib/x86_64-linux-gnu/libpcl_ml.so  
+[2.324s] -- looking for PCL_SEGMENTATION
+[2.325s] -- Found PCL_SEGMENTATION: /usr/lib/x86_64-linux-gnu/libpcl_segmentation.so  
+[2.325s] -- looking for PCL_VISUALIZATION
+[2.326s] -- Found PCL_VISUALIZATION: /usr/lib/x86_64-linux-gnu/libpcl_visualization.so  
+[2.326s] -- looking for PCL_SURFACE
+[2.326s] -- Found PCL_SURFACE: /usr/lib/x86_64-linux-gnu/libpcl_surface.so  
+[2.326s] -- looking for PCL_REGISTRATION
+[2.327s] -- Found PCL_REGISTRATION: /usr/lib/x86_64-linux-gnu/libpcl_registration.so  
+[2.327s] -- looking for PCL_KEYPOINTS
+[2.328s] -- Found PCL_KEYPOINTS: /usr/lib/x86_64-linux-gnu/libpcl_keypoints.so  
+[2.328s] -- looking for PCL_TRACKING
+[2.328s] -- Found PCL_TRACKING: /usr/lib/x86_64-linux-gnu/libpcl_tracking.so  
+[2.329s] -- looking for PCL_RECOGNITION
+[2.329s] -- Found PCL_RECOGNITION: /usr/lib/x86_64-linux-gnu/libpcl_recognition.so  
+[2.329s] -- looking for PCL_STEREO
+[2.330s] -- Found PCL_STEREO: /usr/lib/x86_64-linux-gnu/libpcl_stereo.so  
+[2.330s] -- looking for PCL_APPS
+[2.331s] -- Found PCL_APPS: /usr/lib/x86_64-linux-gnu/libpcl_apps.so  
+[2.331s] -- looking for PCL_IN_HAND_SCANNER
+[2.331s] -- Found PCL_IN_HAND_SCANNER: /usr/include/pcl-1.12  
+[2.331s] -- looking for PCL_MODELER
+[2.332s] -- Found PCL_MODELER: /usr/include/pcl-1.12  
+[2.332s] -- looking for PCL_POINT_CLOUD_EDITOR
+[2.332s] -- Found PCL_POINT_CLOUD_EDITOR: /usr/include/pcl-1.12  
+[2.332s] -- looking for PCL_OUTOFCORE
+[2.333s] -- Found PCL_OUTOFCORE: /usr/lib/x86_64-linux-gnu/libpcl_outofcore.so  
+[2.333s] -- looking for PCL_PEOPLE
+[2.334s] -- Found PCL_PEOPLE: /usr/lib/x86_64-linux-gnu/libpcl_people.so  
+[2.334s] -- Found PCL: pcl_common;pcl_kdtree;pcl_octree;pcl_search;pcl_sample_consensus;pcl_filters;pcl_io;pcl_features;pcl_ml;pcl_segmentation;pcl_visualization;pcl_surface;pcl_registration;pcl_keypoints;pcl_tracking;pcl_recognition;pcl_stereo;pcl_apps;pcl_outofcore;pcl_people;Boost::system;Boost::filesystem;Boost::date_time;Boost::iostreams;Boost::serialization;/usr/lib/libOpenNI.so;libusb::libusb;/usr/lib/x86_64-linux-gnu/libOpenNI2.so;libusb::libusb;VTK::ChartsCore;VTK::CommonColor;VTK::CommonComputationalGeometry;VTK::CommonCore;VTK::CommonDataModel;VTK::CommonExecutionModel;VTK::CommonMath;VTK::CommonMisc;VTK::CommonTransforms;VTK::FiltersCore;VTK::FiltersExtraction;VTK::FiltersGeneral;VTK::FiltersGeometry;VTK::FiltersModeling;VTK::FiltersSources;VTK::ImagingCore;VTK::ImagingSources;VTK::InteractionImage;VTK::InteractionStyle;VTK::InteractionWidgets;VTK::IOCore;VTK::IOGeometry;VTK::IOImage;VTK::IOLegacy;VTK::IOPLY;VTK::RenderingAnnotation;VTK::RenderingCore;VTK::RenderingContext2D;VTK::RenderingLOD;VTK::RenderingFreeType;VTK::ViewsCore;VTK::ViewsContext2D;VTK::RenderingOpenGL2;VTK::GUISupportQt;FLANN::FLANN;QHULL::QHULL  
+[2.335s] -- Found pcl_conversions: 2.4.5 (/opt/ros/humble/share/pcl_conversions/cmake)
+[2.358s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[2.426s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[2.426s] -- Configured cppcheck include dirs: /home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/include
+[2.426s] -- Configured cppcheck exclude dirs and/or files: 
+[2.426s] -- Added test 'lint_cmake' to check CMake code style
+[2.427s] -- Added test 'uncrustify' to check C / C++ code style
+[2.427s] -- Configured uncrustify additional arguments: 
+[2.427s] -- Added test 'xmllint' to check XML markup files
+[2.429s] -- Configuring done
+[2.448s] -- Generating done
+[2.454s] -- Build files have been written to: /home/hyvonne/labpro/ego_planner/build/bspline_opt
+[2.469s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/bspline_opt' returned '0': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching/lib:/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:/home/hyvonne/labpro/ego_planner/install/plan_env/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/bspline_opt -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/bspline_opt
+[2.470s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/bspline_opt': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching/lib:/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:/home/hyvonne/labpro/ego_planner/install/plan_env/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/bspline_opt -- -j20 -l20
+[2.516s] [ 50%] [32mBuilding CXX object CMakeFiles/bspline_opt.dir/src/uniform_bspline.cpp.o[0m
+[2.516s] [ 50%] [32mBuilding CXX object CMakeFiles/bspline_opt.dir/src/bspline_optimizer.cpp.o[0m
+[2.517s] [ 75%] [32mBuilding CXX object CMakeFiles/bspline_opt.dir/src/gradient_descent_optimizer.cpp.o[0m
+[7.517s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:[m[K In static member function ‘[01m[Kstatic int ego_planner::BsplineOptimizer::earlyExit(void*, const double*, const double*, double, double, double, double, int, int, int)[m[K’:
+[7.517s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:66:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kx[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.517s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, [01;35m[Kconst double *x[m[K, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+[7.517s]       |                                                    [01;35m[K~~~~~~~~~~~~~~^[m[K
+[7.517s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:83:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kg[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.517s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, [01;35m[Kconst double *g[m[K, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+[7.517s]       |                                                                     [01;35m[K~~~~~~~~~~~~~~^[m[K
+[7.517s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:99:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kfx[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.517s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, [01;35m[Kconst double fx[m[K, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+[7.517s]       |                                                                                      [01;35m[K~~~~~~~~~~~~~^~[m[K
+[7.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:116:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kxnorm[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.518s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, [01;35m[Kconst double xnorm[m[K, const double gnorm, const double step, int n, int k, int ls)
+[7.518s]       |                                                                                                       [01;35m[K~~~~~~~~~~~~~^~~~~[m[K
+[7.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:136:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kgnorm[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.518s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, [01;35m[Kconst double gnorm[m[K, const double step, int n, int k, int ls)
+[7.518s]       |                                                                                                                           [01;35m[K~~~~~~~~~~~~~^~~~~[m[K
+[7.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:156:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kstep[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.518s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, [01;35m[Kconst double step[m[K, int n, int k, int ls)
+[7.518s]       |                                                                                                                                               [01;35m[K~~~~~~~~~~~~~^~~~[m[K
+[7.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:166:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kn[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.518s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, [01;35m[Kint n[m[K, int k, int ls)
+[7.518s]       |                                                                                                                                                                  [01;35m[K~~~~^[m[K
+[7.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:173:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kk[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.518s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, [01;35m[Kint k[m[K, int ls)
+[7.518s]       |                                                                                                                                                                         [01;35m[K~~~~^[m[K
+[7.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:180:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kls[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[7.518s]   841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, [01;35m[Kint ls[m[K)
+[7.518s]       |                                                                                                                                                                                [01;35m[K~~~~^~[m[K
+[7.808s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:[m[K In member function ‘[01m[Kbool ego_planner::BsplineOptimizer::rebound_optimize(double&)[m[K’:
+[7.808s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:1567:14:[m[K [01;35m[Kwarning: [m[KISO C++ forbids variable length array ‘[01m[Kq[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wvla-Wvla]8;;[m[K]
+[7.808s]  1567 |       double [01;35m[Kq[m[K[variable_num_];
+[7.808s]       |              [01;35m[K^[m[K
+[7.822s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:[m[K In member function ‘[01m[Kbool ego_planner::BsplineOptimizer::refine_optimize()[m[K’:
+[7.822s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:1732:12:[m[K [01;35m[Kwarning: [m[KISO C++ forbids variable length array ‘[01m[Kq[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wvla-Wvla]8;;[m[K]
+[7.822s]  1732 |     double [01;35m[Kq[m[K[variable_num_];
+[7.822s]       |            [01;35m[K^[m[K
+[16.238s] [100%] [32m[1mLinking CXX static library libbspline_opt.a[0m
+[16.396s] [100%] Built target bspline_opt
+[16.406s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/bspline_opt' returned '0': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching/lib:/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:/home/hyvonne/labpro/ego_planner/install/plan_env/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/bspline_opt -- -j20 -l20
+[16.407s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/bspline_opt': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching/lib:/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:/home/hyvonne/labpro/ego_planner/install/plan_env/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/bspline_opt
+[16.414s] -- Install configuration: "Release"
+[16.415s] -- Execute custom install script
+[16.415s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/lib/libbspline_opt.a
+[16.422s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/include/bspline_opt/bspline_optimizer.h
+[16.429s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/include/bspline_opt/gradient_descent_optimizer.h
+[16.437s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/include/bspline_opt/lbfgs.hpp
+[16.444s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/include/bspline_opt/uniform_bspline.h
+[16.451s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/environment/library_path.sh
+[16.458s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/environment/library_path.dsv
+[16.464s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/ament_index/resource_index/package_run_dependencies/bspline_opt
+[16.471s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/ament_index/resource_index/parent_prefix_path/bspline_opt
+[16.477s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/environment/ament_prefix_path.sh
+[16.485s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/environment/ament_prefix_path.dsv
+[16.490s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/environment/path.sh
+[16.496s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/environment/path.dsv
+[16.501s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/local_setup.bash
+[16.508s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/local_setup.sh
+[16.514s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/local_setup.zsh
+[16.521s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/local_setup.dsv
+[16.526s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/package.dsv
+[16.532s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/ament_index/resource_index/packages/bspline_opt
+[16.539s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/cmake/ament_cmake_export_include_directories-extras.cmake
+[16.545s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/cmake/ament_cmake_export_libraries-extras.cmake
+[16.551s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/cmake/bspline_optConfig.cmake
+[16.557s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/cmake/bspline_optConfig-version.cmake
+[16.563s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/bspline_opt/share/bspline_opt/package.xml
+[16.572s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/bspline_opt' returned '0': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching:/home/hyvonne/labpro/ego_planner/install/traj_utils:/home/hyvonne/labpro/ego_planner/install/plan_env:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/path_searching/lib:/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:/home/hyvonne/labpro/ego_planner/install/plan_env/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/bspline_opt

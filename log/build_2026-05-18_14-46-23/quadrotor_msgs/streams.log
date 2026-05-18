@@ -1,0 +1,547 @@
+[0.009s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/quadrotor_msgs -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs
+[0.073s] -- The C compiler identification is GNU 11.4.0
+[0.141s] -- The CXX compiler identification is GNU 11.4.0
+[0.147s] -- Detecting C compiler ABI info
+[0.216s] -- Detecting C compiler ABI info - done
+[0.222s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.223s] -- Detecting C compile features
+[0.223s] -- Detecting C compile features - done
+[0.225s] -- Detecting CXX compiler ABI info
+[0.304s] -- Detecting CXX compiler ABI info - done
+[0.310s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.310s] -- Detecting CXX compile features
+[0.310s] -- Detecting CXX compile features - done
+[0.313s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.430s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.476s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.492s] -- Found geometry_msgs: 4.9.1 (/opt/ros/humble/share/geometry_msgs/cmake)
+[0.515s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.518s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.524s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.532s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.542s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.568s] -- Found nav_msgs: 4.9.1 (/opt/ros/humble/share/nav_msgs/cmake)
+[0.579s] -- Found rclcpp: 16.0.19 (/opt/ros/humble/share/rclcpp/cmake)
+[0.603s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.604s] -- Found rmw_cyclonedds_cpp: 1.3.4 (/opt/ros/humble/share/rmw_cyclonedds_cpp/cmake)
+[0.619s] -- Using RMW implementation 'rmw_cyclonedds_cpp' as default
+[0.625s] -- Looking for pthread.h
+[0.685s] -- Looking for pthread.h - found
+[0.685s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[0.750s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[0.751s] -- Found Threads: TRUE  
+[0.776s] -- Found rosidl_default_generators: 1.2.1 (/opt/ros/humble/share/rosidl_default_generators/cmake)
+[1.052s] -- Found ament_cmake_ros: 0.10.0 (/opt/ros/humble/share/ament_cmake_ros/cmake)
+[1.372s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[1.497s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.515s] -- Found PythonInterp: /usr/bin/python3 (found suitable version "3.10.12", minimum required is "3.6") 
+[1.516s] -- Found python_cmake_module: 0.10.0 (/opt/ros/humble/share/python_cmake_module/cmake)
+[1.535s] -- Found PythonLibs: /usr/lib/x86_64-linux-gnu/libpython3.10.so (found suitable version "3.10.12", minimum required is "3.5") 
+[1.535s] -- Using PYTHON_EXECUTABLE: /usr/bin/python3
+[1.535s] -- Using PYTHON_INCLUDE_DIRS: /usr/include/python3.10
+[1.535s] -- Using PYTHON_LIBRARIES: /usr/lib/x86_64-linux-gnu/libpython3.10.so
+[1.551s] -- Found PythonExtra: .so  
+[1.671s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[1.684s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[1.685s] -- Configured cppcheck include dirs: /home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/quadrotor_msgs/include
+[1.685s] -- Configured cppcheck exclude dirs and/or files: 
+[1.686s] -- Added test 'lint_cmake' to check CMake code style
+[1.686s] -- Added test 'uncrustify' to check C / C++ code style
+[1.686s] -- Configured uncrustify additional arguments: 
+[1.687s] -- Added test 'xmllint' to check XML markup files
+[1.689s] -- Configuring done
+[1.732s] -- Generating done
+[1.745s] -- Build files have been written to: /home/hyvonne/labpro/ego_planner/build/quadrotor_msgs
+[1.753s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/quadrotor_msgs -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs
+[1.754s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/quadrotor_msgs -- -j20 -l20
+[1.790s] [  1%] [34m[1mGenerating C code for ROS interfaces[0m
+[1.798s] [  2%] [34m[1mGenerating Rust code for ROS interfaces[0m
+[1.798s] [  2%] [34m[1mGenerating C++ code for ROS interfaces[0m
+[1.806s] [  2%] Built target ament_cmake_python_symlink_quadrotor_msgs
+[1.968s] running egg_info
+[1.968s] creating quadrotor_msgs.egg-info
+[1.968s] writing quadrotor_msgs.egg-info/PKG-INFO
+[1.968s] writing dependency_links to quadrotor_msgs.egg-info/dependency_links.txt
+[1.968s] writing top-level names to quadrotor_msgs.egg-info/top_level.txt
+[1.969s] writing manifest file 'quadrotor_msgs.egg-info/SOURCES.txt'
+[1.970s] reading manifest file 'quadrotor_msgs.egg-info/SOURCES.txt'
+[1.971s] writing manifest file 'quadrotor_msgs.egg-info/SOURCES.txt'
+[1.992s] [  2%] Built target ament_cmake_python_build_quadrotor_msgs_egg
+[2.439s] [  2%] Built target quadrotor_msgs__rs
+[2.712s] [  3%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/position_command__functions.c.o[0m
+[2.712s] [  3%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/gains__functions.c.o[0m
+[2.713s] [  4%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/serial__functions.c.o[0m
+[2.713s] [  5%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/corrections__functions.c.o[0m
+[2.713s] [  5%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/aux_command__functions.c.o[0m
+[2.713s] [  5%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/status_data__functions.c.o[0m
+[2.713s] [  6%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/lqr_trajectory__functions.c.o[0m
+[2.713s] [  7%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/odometry__functions.c.o[0m
+[2.714s] [  8%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/ppr_output_data__functions.c.o[0m
+[2.715s] [  9%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/polynomial_trajectory__functions.c.o[0m
+[2.715s] [ 10%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/so3_command__functions.c.o[0m
+[2.716s] [ 12%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/trpy_command__functions.c.o[0m
+[2.716s] [ 12%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_c.dir/rosidl_generator_c/quadrotor_msgs/msg/detail/output_data__functions.c.o[0m
+[2.784s] [ 12%] [32m[1mLinking C shared library libquadrotor_msgs__rosidl_generator_c.so[0m
+[2.804s] [ 12%] Built target quadrotor_msgs__cpp
+[2.813s] [ 13%] [34m[1mGenerating C++ type support for eProsima Fast-RTPS[0m
+[2.813s] [ 14%] [34m[1mGenerating C++ introspection for ROS interfaces[0m
+[2.814s] [ 15%] [34m[1mGenerating C++ type support dispatch for ROS interfaces[0m
+[2.826s] [ 15%] Built target quadrotor_msgs__rosidl_generator_c
+[2.836s] [ 15%] [34m[1mGenerating C introspection for ROS interfaces[0m
+[2.837s] [ 16%] [34m[1mGenerating C type support dispatch for ROS interfaces[0m
+[2.838s] [ 17%] [34m[1mGenerating C type support for eProsima Fast-RTPS[0m
+[3.504s] [ 18%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/gains__type_support.cpp.o[0m
+[3.506s] [ 18%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/output_data__type_support.cpp.o[0m
+[3.506s] [ 20%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/ppr_output_data__type_support.cpp.o[0m
+[3.506s] [ 20%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/corrections__type_support.cpp.o[0m
+[3.506s] [ 21%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/lqr_trajectory__type_support.cpp.o[0m
+[3.508s] [ 21%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/aux_command__type_support.cpp.o[0m
+[3.508s] [ 22%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/position_command__type_support.cpp.o[0m
+[3.508s] [ 23%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/trpy_command__type_support.cpp.o[0m
+[3.508s] [ 25%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/serial__type_support.cpp.o[0m
+[3.508s] [ 25%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/odometry__type_support.cpp.o[0m
+[3.508s] [ 26%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/status_data__type_support.cpp.o[0m
+[3.509s] [ 26%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/so3_command__type_support.cpp.o[0m
+[3.509s] [ 27%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_cpp.dir/rosidl_typesupport_cpp/quadrotor_msgs/msg/polynomial_trajectory__type_support.cpp.o[0m
+[3.597s] [ 28%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/aux_command__type_support.cpp.o[0m
+[3.598s] [ 28%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/corrections__type_support.cpp.o[0m
+[3.601s] [ 29%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/gains__type_support.cpp.o[0m
+[3.639s] [ 30%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/lqr_trajectory__type_support.cpp.o[0m
+[3.649s] [ 31%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/output_data__type_support.cpp.o[0m
+[3.653s] [ 30%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/position_command__type_support.cpp.o[0m
+[3.691s] [ 32%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/ppr_output_data__type_support.cpp.o[0m
+[3.704s] [ 33%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/serial__type_support.cpp.o[0m
+[3.717s] [ 34%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/so3_command__type_support.cpp.o[0m
+[3.761s] [ 34%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/status_data__type_support.cpp.o[0m
+[3.783s] [ 35%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/trpy_command__type_support.cpp.o[0m
+[3.813s] [ 36%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/odometry__type_support.cpp.o[0m
+[3.858s] [ 37%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c.dir/rosidl_typesupport_c/quadrotor_msgs/msg/polynomial_trajectory__type_support.cpp.o[0m
+[3.905s] [ 37%] [32m[1mLinking CXX shared library libquadrotor_msgs__rosidl_typesupport_c.so[0m
+[3.920s] [ 38%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/lqr_trajectory__type_support.cpp.o[0m
+[3.920s] [ 38%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/gains__type_support.cpp.o[0m
+[3.921s] [ 39%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/output_data__type_support.cpp.o[0m
+[3.924s] [ 39%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/ppr_output_data__type_support.cpp.o[0m
+[3.925s] [ 40%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/corrections__type_support.cpp.o[0m
+[3.925s] [ 41%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/serial__type_support.cpp.o[0m
+[3.925s] [ 42%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/aux_command__type_support.cpp.o[0m
+[3.930s] [ 43%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/status_data__type_support.cpp.o[0m
+[3.931s] [ 44%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/position_command__type_support.cpp.o[0m
+[3.931s] [ 45%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/so3_command__type_support.cpp.o[0m
+[3.931s] [ 45%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/trpy_command__type_support.cpp.o[0m
+[3.934s] [ 46%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/aux_command__type_support.cpp.o[0m
+[3.942s] [ 46%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/corrections__type_support.cpp.o[0m
+[3.944s] [ 47%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/aux_command__type_support.c.o[0m
+[3.987s] [ 48%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/odometry__type_support.cpp.o[0m
+[4.004s] [ 48%] Built target quadrotor_msgs__rosidl_typesupport_c
+[4.004s] [ 49%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/lqr_trajectory__type_support.cpp.o[0m
+[4.004s] [ 50%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/corrections__type_support.c.o[0m
+[4.007s] [ 50%] [32m[1mLinking CXX shared library libquadrotor_msgs__rosidl_typesupport_cpp.so[0m
+[4.016s] [ 51%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/gains__type_support.cpp.o[0m
+[4.042s] [ 52%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/output_data__type_support.cpp.o[0m
+[4.058s] [ 53%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/gains__type_support.c.o[0m
+[4.137s] [ 53%] Built target quadrotor_msgs__rosidl_typesupport_cpp
+[4.160s] [ 53%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/lqr_trajectory__type_support.c.o[0m
+[4.163s] [ 54%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/output_data__type_support.c.o[0m
+[4.266s] [ 54%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/position_command__type_support.cpp.o[0m
+[4.289s] [ 55%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/position_command__type_support.c.o[0m
+[4.382s] [ 56%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/ppr_output_data__type_support.c.o[0m
+[4.452s] [ 56%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/serial__type_support.c.o[0m
+[4.505s] [ 57%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/so3_command__type_support.c.o[0m
+[4.527s] [ 58%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_cpp.dir/rosidl_typesupport_introspection_cpp/quadrotor_msgs/msg/detail/polynomial_trajectory__type_support.cpp.o[0m
+[4.549s] [ 58%] [32mBuilding CXX object CMakeFiles/decode_msgs.dir/src/decode_msgs.cpp.o[0m
+[4.568s] [ 59%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/ppr_output_data__type_support.cpp.o[0m
+[4.582s] [ 60%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/status_data__type_support.c.o[0m
+[4.601s] [ 61%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/trpy_command__type_support.c.o[0m
+[4.607s] [ 62%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/serial__type_support.cpp.o[0m
+[4.623s] [ 62%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/odometry__type_support.c.o[0m
+[4.634s] [ 63%] [32mBuilding CXX object CMakeFiles/encode_msgs.dir/src/encode_msgs.cpp.o[0m
+[4.637s] [ 64%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/so3_command__type_support.cpp.o[0m
+[4.646s] [ 65%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c.dir/rosidl_typesupport_introspection_c/quadrotor_msgs/msg/detail/polynomial_trajectory__type_support.c.o[0m
+[4.657s] [ 66%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/trpy_command__type_support.cpp.o[0m
+[4.660s] [ 66%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/status_data__type_support.cpp.o[0m
+[4.660s] [ 67%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/odometry__type_support.cpp.o[0m
+[4.673s] [ 68%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_cpp.dir/rosidl_typesupport_fastrtps_cpp/quadrotor_msgs/msg/detail/dds_fastrtps/polynomial_trajectory__type_support.cpp.o[0m
+[4.715s] [ 69%] [32m[1mLinking C shared library libquadrotor_msgs__rosidl_typesupport_introspection_c.so[0m
+[4.762s] [ 70%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/gains__type_support_c.cpp.o[0m
+[4.763s] [ 71%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/corrections__type_support_c.cpp.o[0m
+[4.763s] [ 71%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/aux_command__type_support_c.cpp.o[0m
+[4.768s] [ 73%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/position_command__type_support_c.cpp.o[0m
+[4.772s] [ 73%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/output_data__type_support_c.cpp.o[0m
+[4.772s] [ 73%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/ppr_output_data__type_support_c.cpp.o[0m
+[4.773s] [ 74%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/lqr_trajectory__type_support_c.cpp.o[0m
+[4.773s] [ 74%] Built target quadrotor_msgs__rosidl_typesupport_introspection_c
+[4.815s] [ 76%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/so3_command__type_support_c.cpp.o[0m
+[4.820s] [ 76%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/serial__type_support_c.cpp.o[0m
+[4.973s] [ 77%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/status_data__type_support_c.cpp.o[0m
+[5.255s] [ 78%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/odometry__type_support_c.cpp.o[0m
+[5.273s] [ 78%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/trpy_command__type_support_c.cpp.o[0m
+[5.283s] [ 79%] [32mBuilding CXX object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c.dir/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/polynomial_trajectory__type_support_c.cpp.o[0m
+[5.354s] [ 80%] [32m[1mLinking CXX shared library libquadrotor_msgs__rosidl_typesupport_introspection_cpp.so[0m
+[5.473s] [ 80%] Built target quadrotor_msgs__rosidl_typesupport_introspection_cpp
+[5.537s] [ 81%] [32m[1mLinking CXX shared library libencode_msgs.so[0m
+[5.546s] [ 82%] [32m[1mLinking CXX shared library libquadrotor_msgs__rosidl_typesupport_fastrtps_cpp.so[0m
+[5.671s] [ 82%] Built target quadrotor_msgs__rosidl_typesupport_fastrtps_cpp
+[5.676s] [ 82%] Built target encode_msgs
+[5.734s] [ 83%] [32m[1mLinking CXX shared library libquadrotor_msgs__rosidl_typesupport_fastrtps_c.so[0m
+[5.848s] [ 83%] Built target quadrotor_msgs__rosidl_typesupport_fastrtps_c
+[5.869s] [ 83%] Built target quadrotor_msgs
+[5.891s] [ 84%] [34m[1mGenerating Python code for ROS interfaces[0m
+[6.229s] [ 85%] [32m[1mLinking CXX shared library libdecode_msgs.so[0m
+[6.356s] [ 85%] Built target decode_msgs
+[7.486s] [ 85%] Built target quadrotor_msgs__py
+[7.509s] [ 86%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_output_data_s.c.o[0m
+[7.509s] [ 88%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_ppr_output_data_s.c.o[0m
+[7.509s] [ 89%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_gains_s.c.o[0m
+[7.510s] [ 90%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_corrections_s.c.o[0m
+[7.510s] [ 90%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_lqr_trajectory_s.c.o[0m
+[7.510s] [ 90%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_serial_s.c.o[0m
+[7.510s] [ 88%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_aux_command_s.c.o[0m
+[7.510s] [ 91%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_status_data_s.c.o[0m
+[7.510s] [ 92%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_so3_command_s.c.o[0m
+[7.510s] [ 93%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_position_command_s.c.o[0m
+[7.511s] [ 93%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_polynomial_trajectory_s.c.o[0m
+[7.511s] [ 94%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_odometry_s.c.o[0m
+[7.512s] [ 95%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_generator_py.dir/rosidl_generator_py/quadrotor_msgs/msg/_trpy_command_s.c.o[0m
+[7.692s] [ 96%] [32m[1mLinking C shared library rosidl_generator_py/quadrotor_msgs/libquadrotor_msgs__rosidl_generator_py.so[0m
+[7.735s] [ 96%] Built target quadrotor_msgs__rosidl_generator_py
+[7.756s] [ 97%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_introspection_c__pyext.dir/rosidl_generator_py/quadrotor_msgs/_quadrotor_msgs_s.ep.rosidl_typesupport_introspection_c.c.o[0m
+[7.757s] [ 98%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_c__pyext.dir/rosidl_generator_py/quadrotor_msgs/_quadrotor_msgs_s.ep.rosidl_typesupport_c.c.o[0m
+[7.757s] [ 98%] [32mBuilding C object CMakeFiles/quadrotor_msgs__rosidl_typesupport_fastrtps_c__pyext.dir/rosidl_generator_py/quadrotor_msgs/_quadrotor_msgs_s.ep.rosidl_typesupport_fastrtps_c.c.o[0m
+[7.857s] [ 98%] [32m[1mLinking C shared library rosidl_generator_py/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so[0m
+[7.858s] [ 99%] [32m[1mLinking C shared library rosidl_generator_py/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so[0m
+[7.862s] [100%] [32m[1mLinking C shared library rosidl_generator_py/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so[0m
+[7.899s] [100%] Built target quadrotor_msgs__rosidl_typesupport_introspection_c__pyext
+[7.906s] [100%] Built target quadrotor_msgs__rosidl_typesupport_fastrtps_c__pyext
+[7.908s] [100%] Built target quadrotor_msgs__rosidl_typesupport_c__pyext
+[7.920s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/quadrotor_msgs -- -j20 -l20
+[7.922s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/quadrotor_msgs
+[7.928s] -- Install configuration: ""
+[7.928s] -- Execute custom install script
+[7.928s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/ament_index/resource_index/rosidl_interfaces/quadrotor_msgs
+[7.936s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/aux_command.h
+[7.943s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/corrections.h
+[7.950s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__functions.h
+[7.956s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__struct.h
+[7.962s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__type_support.h
+[7.969s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__functions.h
+[7.975s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__struct.h
+[7.981s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__type_support.h
+[7.989s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__functions.h
+[7.997s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__struct.h
+[8.003s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__type_support.h
+[8.013s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__functions.h
+[8.024s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__struct.h
+[8.036s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__type_support.h
+[8.044s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__functions.h
+[8.054s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__struct.h
+[8.062s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__type_support.h
+[8.069s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__functions.h
+[8.076s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__struct.h
+[8.082s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__type_support.h
+[8.089s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__functions.h
+[8.096s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__struct.h
+[8.103s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__type_support.h
+[8.109s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__functions.h
+[8.118s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__struct.h
+[8.125s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__type_support.h
+[8.132s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__functions.h
+[8.141s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__struct.h
+[8.149s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__type_support.h
+[8.158s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__functions.h
+[8.166s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__struct.h
+[8.174s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__type_support.h
+[8.181s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__functions.h
+[8.189s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__struct.h
+[8.197s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__type_support.h
+[8.206s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__functions.h
+[8.212s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__struct.h
+[8.220s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__type_support.h
+[8.227s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__functions.h
+[8.233s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__struct.h
+[8.242s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__type_support.h
+[8.248s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/gains.h
+[8.257s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/lqr_trajectory.h
+[8.264s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/odometry.h
+[8.272s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/output_data.h
+[8.278s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/polynomial_trajectory.h
+[8.285s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/position_command.h
+[8.293s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/ppr_output_data.h
+[8.300s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/rosidl_generator_c__visibility_control.h
+[8.308s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/serial.h
+[8.314s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/so3_command.h
+[8.323s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/status_data.h
+[8.331s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/trpy_command.h
+[8.339s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/library_path.sh
+[8.345s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/library_path.dsv
+[8.355s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__rosidl_typesupport_fastrtps_c.h
+[8.362s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__rosidl_typesupport_fastrtps_c.h
+[8.368s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__rosidl_typesupport_fastrtps_c.h
+[8.376s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__rosidl_typesupport_fastrtps_c.h
+[8.384s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__rosidl_typesupport_fastrtps_c.h
+[8.391s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__rosidl_typesupport_fastrtps_c.h
+[8.400s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__rosidl_typesupport_fastrtps_c.h
+[8.407s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__rosidl_typesupport_fastrtps_c.h
+[8.416s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__rosidl_typesupport_fastrtps_c.h
+[8.424s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__rosidl_typesupport_fastrtps_c.h
+[8.432s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__rosidl_typesupport_fastrtps_c.h
+[8.441s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__rosidl_typesupport_fastrtps_c.h
+[8.448s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__rosidl_typesupport_fastrtps_c.h
+[8.456s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/rosidl_typesupport_fastrtps_c__visibility_control.h
+[8.464s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/aux_command.hpp
+[8.471s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/corrections.hpp
+[8.478s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__builder.hpp
+[8.486s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__struct.hpp
+[8.493s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__traits.hpp
+[8.500s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__type_support.hpp
+[8.508s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__builder.hpp
+[8.514s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__struct.hpp
+[8.521s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__traits.hpp
+[8.528s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__type_support.hpp
+[8.537s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__builder.hpp
+[8.544s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__struct.hpp
+[8.550s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__traits.hpp
+[8.559s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__type_support.hpp
+[8.565s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__builder.hpp
+[8.573s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__struct.hpp
+[8.582s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__traits.hpp
+[8.590s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__type_support.hpp
+[8.598s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__builder.hpp
+[8.605s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__struct.hpp
+[8.613s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__traits.hpp
+[8.620s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__type_support.hpp
+[8.629s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__builder.hpp
+[8.639s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__struct.hpp
+[8.646s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__traits.hpp
+[8.654s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__type_support.hpp
+[8.662s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__builder.hpp
+[8.671s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__struct.hpp
+[8.681s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__traits.hpp
+[8.691s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__type_support.hpp
+[8.701s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__builder.hpp
+[8.711s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__struct.hpp
+[8.719s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__traits.hpp
+[8.726s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__type_support.hpp
+[8.735s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__builder.hpp
+[8.742s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__struct.hpp
+[8.750s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__traits.hpp
+[8.759s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__type_support.hpp
+[8.766s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__builder.hpp
+[8.776s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__struct.hpp
+[8.784s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__traits.hpp
+[8.793s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__type_support.hpp
+[8.802s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__builder.hpp
+[8.810s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__struct.hpp
+[8.819s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__traits.hpp
+[8.828s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__type_support.hpp
+[8.838s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__builder.hpp
+[8.845s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__struct.hpp
+[8.853s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__traits.hpp
+[8.859s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__type_support.hpp
+[8.866s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__builder.hpp
+[8.873s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__struct.hpp
+[8.882s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__traits.hpp
+[8.888s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__type_support.hpp
+[8.896s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/gains.hpp
+[8.904s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/lqr_trajectory.hpp
+[8.911s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/odometry.hpp
+[8.918s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/output_data.hpp
+[8.926s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/polynomial_trajectory.hpp
+[8.934s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/position_command.hpp
+[8.943s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/ppr_output_data.hpp
+[8.950s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/rosidl_generator_cpp__visibility_control.hpp
+[8.957s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/serial.hpp
+[8.964s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/so3_command.hpp
+[8.971s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/status_data.hpp
+[8.977s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/trpy_command.hpp
+[8.986s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__rosidl_typesupport_fastrtps_cpp.hpp
+[8.993s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__rosidl_typesupport_fastrtps_cpp.hpp
+[8.999s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__rosidl_typesupport_fastrtps_cpp.hpp
+[9.006s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__rosidl_typesupport_fastrtps_cpp.hpp
+[9.014s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__rosidl_typesupport_fastrtps_cpp.hpp
+[9.022s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__rosidl_typesupport_fastrtps_cpp.hpp
+[9.030s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__rosidl_typesupport_fastrtps_cpp.hpp
+[9.040s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__rosidl_typesupport_fastrtps_cpp.hpp
+[9.047s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__rosidl_typesupport_fastrtps_cpp.hpp
+[9.055s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__rosidl_typesupport_fastrtps_cpp.hpp
+[9.062s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__rosidl_typesupport_fastrtps_cpp.hpp
+[9.069s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__rosidl_typesupport_fastrtps_cpp.hpp
+[9.081s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__rosidl_typesupport_fastrtps_cpp.hpp
+[9.092s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/rosidl_typesupport_fastrtps_cpp__visibility_control.h
+[9.100s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__rosidl_typesupport_introspection_c.h
+[9.109s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__rosidl_typesupport_introspection_c.h
+[9.118s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__rosidl_typesupport_introspection_c.h
+[9.125s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__rosidl_typesupport_introspection_c.h
+[9.133s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__rosidl_typesupport_introspection_c.h
+[9.143s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__rosidl_typesupport_introspection_c.h
+[9.151s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__rosidl_typesupport_introspection_c.h
+[9.159s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__rosidl_typesupport_introspection_c.h
+[9.167s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__rosidl_typesupport_introspection_c.h
+[9.175s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__rosidl_typesupport_introspection_c.h
+[9.183s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__rosidl_typesupport_introspection_c.h
+[9.192s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__rosidl_typesupport_introspection_c.h
+[9.200s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__rosidl_typesupport_introspection_c.h
+[9.206s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/rosidl_typesupport_introspection_c__visibility_control.h
+[9.213s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/aux_command__rosidl_typesupport_introspection_cpp.hpp
+[9.221s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/corrections__rosidl_typesupport_introspection_cpp.hpp
+[9.229s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/gains__rosidl_typesupport_introspection_cpp.hpp
+[9.237s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/lqr_trajectory__rosidl_typesupport_introspection_cpp.hpp
+[9.243s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/odometry__rosidl_typesupport_introspection_cpp.hpp
+[9.252s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/output_data__rosidl_typesupport_introspection_cpp.hpp
+[9.259s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/polynomial_trajectory__rosidl_typesupport_introspection_cpp.hpp
+[9.265s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/position_command__rosidl_typesupport_introspection_cpp.hpp
+[9.273s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/ppr_output_data__rosidl_typesupport_introspection_cpp.hpp
+[9.280s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/serial__rosidl_typesupport_introspection_cpp.hpp
+[9.288s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/so3_command__rosidl_typesupport_introspection_cpp.hpp
+[9.295s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/status_data__rosidl_typesupport_introspection_cpp.hpp
+[9.302s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/include/quadrotor_msgs/quadrotor_msgs/msg/detail/trpy_command__rosidl_typesupport_introspection_cpp.hpp
+[9.309s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/pythonpath.sh
+[9.315s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/pythonpath.dsv
+[9.323s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs-0.0.0-py3.10.egg-info/PKG-INFO
+[9.331s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs-0.0.0-py3.10.egg-info/SOURCES.txt
+[9.338s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs-0.0.0-py3.10.egg-info/dependency_links.txt
+[9.345s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs-0.0.0-py3.10.egg-info/top_level.txt
+[9.362s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/__init__.py
+[9.371s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/_quadrotor_msgs_s.ep.rosidl_typesupport_c.c
+[9.380s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/_quadrotor_msgs_s.ep.rosidl_typesupport_fastrtps_c.c
+[9.388s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/_quadrotor_msgs_s.ep.rosidl_typesupport_introspection_c.c
+[9.395s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/libquadrotor_msgs__rosidl_generator_py.so
+[9.402s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/__init__.py
+[9.409s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_aux_command.py
+[9.418s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_aux_command_s.c
+[9.425s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_corrections.py
+[9.434s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_corrections_s.c
+[9.442s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_gains.py
+[9.449s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_gains_s.c
+[9.457s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_lqr_trajectory.py
+[9.466s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_lqr_trajectory_s.c
+[9.478s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_odometry.py
+[9.485s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_odometry_s.c
+[9.493s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_output_data.py
+[9.503s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_output_data_s.c
+[9.511s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_polynomial_trajectory.py
+[9.517s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_polynomial_trajectory_s.c
+[9.526s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_position_command.py
+[9.535s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_position_command_s.c
+[9.544s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_ppr_output_data.py
+[9.553s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_ppr_output_data_s.c
+[9.561s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_serial.py
+[9.568s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_serial_s.c
+[9.576s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_so3_command.py
+[9.583s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_so3_command_s.c
+[9.589s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_status_data.py
+[9.596s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_status_data_s.c
+[9.603s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_trpy_command.py
+[9.610s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_trpy_command_s.c
+[9.616s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+[9.625s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+[9.632s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+[9.642s] -- Up-to-date symlink: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+[9.642s] -- Up-to-date symlink: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+[9.642s] -- Up-to-date symlink: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/quadrotor_msgs_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+[9.642s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/ament_index/resource_index/rust_packages/quadrotor_msgs
+[9.650s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/rust/Cargo.toml
+[9.657s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/rust/build.rs
+[9.665s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/rust/src/lib.rs
+[9.671s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/rust/src/msg.rs
+[9.678s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/rust/src/msg/rmw.rs
+[9.685s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/AuxCommand.idl
+[9.693s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Corrections.idl
+[9.700s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Gains.idl
+[9.707s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/LQRTrajectory.idl
+[9.714s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/OutputData.idl
+[9.721s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/PositionCommand.idl
+[9.730s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/PPROutputData.idl
+[9.737s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Serial.idl
+[9.744s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/SO3Command.idl
+[9.751s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/StatusData.idl
+[9.757s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/TRPYCommand.idl
+[9.763s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Odometry.idl
+[9.769s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/PolynomialTrajectory.idl
+[9.776s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/AuxCommand.msg
+[9.782s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Corrections.msg
+[9.791s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Gains.msg
+[9.798s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/LQRTrajectory.msg
+[9.805s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/OutputData.msg
+[9.814s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/PositionCommand.msg
+[9.820s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/PPROutputData.msg
+[9.829s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Serial.msg
+[9.836s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/SO3Command.msg
+[9.843s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/StatusData.msg
+[9.851s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/TRPYCommand.msg
+[9.859s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/Odometry.msg
+[9.866s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/msg/PolynomialTrajectory.msg
+[9.874s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libdecode_msgs.so
+[9.889s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libencode_msgs.so
+[9.898s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/ament_index/resource_index/package_run_dependencies/quadrotor_msgs
+[9.907s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/ament_index/resource_index/parent_prefix_path/quadrotor_msgs
+[9.916s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/ament_prefix_path.sh
+[9.925s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/ament_prefix_path.dsv
+[9.934s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/path.sh
+[9.941s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/environment/path.dsv
+[9.949s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/local_setup.bash
+[9.956s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/local_setup.sh
+[9.963s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/local_setup.zsh
+[9.970s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/local_setup.dsv
+[9.978s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/package.dsv
+[9.986s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/ament_index/resource_index/packages/quadrotor_msgs
+[9.995s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/rosidl_cmake-extras.cmake
+[10.001s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/ament_cmake_export_dependencies-extras.cmake
+[10.010s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/ament_cmake_export_include_directories-extras.cmake
+[10.018s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/ament_cmake_export_libraries-extras.cmake
+[10.027s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/ament_cmake_export_targets-extras.cmake
+[10.035s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/rosidl_cmake_export_typesupport_targets-extras.cmake
+[10.045s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake
+[10.054s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgsConfig.cmake
+[10.063s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgsConfig-version.cmake
+[10.072s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/package.xml
+[10.080s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_generator_c.so
+[10.080s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_generator_c.so" to ""
+[10.080s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_fastrtps_c.so
+[10.080s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_fastrtps_c.so" to ""
+[10.081s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_fastrtps_cpp.so
+[10.081s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_fastrtps_cpp.so" to ""
+[10.081s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_introspection_c.so
+[10.081s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_introspection_c.so" to ""
+[10.081s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_c.so
+[10.082s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_c.so" to ""
+[10.082s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_introspection_cpp.so
+[10.082s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_introspection_cpp.so" to ""
+[10.082s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_cpp.so
+[10.082s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_typesupport_cpp.so" to ""
+[10.132s] Listing '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/__init__.py'...
+[10.133s] Listing '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/__init__.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_aux_command.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_corrections.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_gains.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_lqr_trajectory.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_odometry.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_output_data.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_polynomial_trajectory.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_position_command.py'...
+[10.133s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_ppr_output_data.py'...
+[10.134s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_serial.py'...
+[10.134s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_so3_command.py'...
+[10.134s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_status_data.py'...
+[10.134s] Compiling '/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/local/lib/python3.10/dist-packages/quadrotor_msgs/msg/_trpy_command.py'...
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_generator_py.so
+[10.137s] -- Set runtime path of "/home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/lib/libquadrotor_msgs__rosidl_generator_py.so" to ""
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_generator_cExport.cmake
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_generator_cExport-noconfig.cmake
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_typesupport_fastrtps_cExport.cmake
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_typesupport_fastrtps_cExport-noconfig.cmake
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_generator_cppExport.cmake
+[10.137s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_typesupport_fastrtps_cppExport.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_typesupport_fastrtps_cppExport-noconfig.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_introspection_cExport.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_introspection_cExport-noconfig.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_cExport.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_cExport-noconfig.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_introspection_cppExport.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_introspection_cppExport-noconfig.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_cppExport.cmake
+[10.138s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/quadrotor_msgs__rosidl_typesupport_cppExport-noconfig.cmake
+[10.139s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_generator_pyExport.cmake
+[10.139s] -- Installing: /home/hyvonne/labpro/ego_planner/install/quadrotor_msgs/share/quadrotor_msgs/cmake/export_quadrotor_msgs__rosidl_generator_pyExport-noconfig.cmake
+[10.141s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/quadrotor_msgs

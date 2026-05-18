@@ -1,0 +1,6 @@
+Invoking command in '/home/hyvonne/labpro/ego_planner/build/plan_env': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/plan_env -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/plan_env
+Invoked command in '/home/hyvonne/labpro/ego_planner/build/plan_env' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/plan_env -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/plan_env
+Invoking command in '/home/hyvonne/labpro/ego_planner/build/plan_env': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/plan_env -- -j20 -l20
+Invoked command in '/home/hyvonne/labpro/ego_planner/build/plan_env' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/plan_env -- -j20 -l20
+Invoking command in '/home/hyvonne/labpro/ego_planner/build/plan_env': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/plan_env
+Invoked command in '/home/hyvonne/labpro/ego_planner/build/plan_env' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/plan_env

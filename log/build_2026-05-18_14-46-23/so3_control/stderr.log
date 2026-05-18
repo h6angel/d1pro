@@ -1,0 +1,74 @@
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/SO3Control.cpp:[m[K In member function ‘[01m[Kvoid SO3Control::calculateControl(const Vector3d&, const Vector3d&, const Vector3d&, double, double, const Vector3d&, const Vector3d&)[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/SO3Control.cpp:38:70:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kdes_yaw_dot[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+   38 |                               const double des_yaw, [01;35m[Kconst double des_yaw_dot[m[K,
+      |                                                     [01;35m[K~~~~~~~~~~~~~^~~~~~~~~~~[m[K
+
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:30:89:[m[K [01;35m[Kwarning: [m[K‘[01m[Kquadrotor_msgs::msg::PositionCommand_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   30 | ion_cmd_callback(const quadrotor_msgs::msg::PositionCommand::ConstPtr &cmd[01;35m[K)[m[K;
+      |                                                                           [01;35m[K^[m[K
+
+In file included from [01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/position_command.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:5[m[K:
+[01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/detail/position_command__struct.hpp:229:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  229 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:31:69:[m[K [01;35m[Kwarning: [m[K‘[01m[Knav_msgs::msg::Odometry_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   31 |     void odom_callback(const nav_msgs::msg::Odometry::ConstPtr &odom[01;35m[K)[m[K;
+      |                                                                     [01;35m[K^[m[K
+In file included from [01m[K/opt/ros/humble/include/nav_msgs/nav_msgs/msg/odometry.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:2[m[K:
+[01m[K/opt/ros/humble/include/nav_msgs/nav_msgs/msg/detail/odometry__struct.hpp:147:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  147 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:32:73:[m[K [01;35m[Kwarning: [m[K‘[01m[Kstd_msgs::msg::Bool_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   32 |     void enable_motors_callback(const std_msgs::msg::Bool::ConstPtr &msg[01;35m[K)[m[K;
+      |                                                                         [01;35m[K^[m[K
+In file included from [01m[K/opt/ros/humble/include/std_msgs/std_msgs/msg/bool.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:10[m[K:
+[01m[K/opt/ros/humble/include/std_msgs/std_msgs/msg/detail/bool__struct.hpp:106:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  106 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:33:84:[m[K [01;35m[Kwarning: [m[K‘[01m[Kquadrotor_msgs::msg::Corrections_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   33 | corrections_callback(const quadrotor_msgs::msg::Corrections::ConstPtr &msg[01;35m[K)[m[K;
+      |                                                                           [01;35m[K^[m[K
+
+In file included from [01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/corrections.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:4[m[K:
+[01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/detail/corrections__struct.hpp:117:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  117 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:97:106:[m[K [01;35m[Kwarning: [m[K‘[01m[Kquadrotor_msgs::msg::PositionCommand_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   97 | tion_cmd_callback(const quadrotor_msgs::msg::PositionCommand::ConstPtr &cmd[01;35m[K)[m[K
+      |                                                                            [01;35m[K^[m[K
+
+In file included from [01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/position_command.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:5[m[K:
+[01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/detail/position_command__struct.hpp:229:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  229 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:121:86:[m[K [01;35m[Kwarning: [m[K‘[01m[Knav_msgs::msg::Odometry_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+  121 | ntrolComponent::odom_callback(const nav_msgs::msg::Odometry::ConstPtr &odom[01;35m[K)[m[K
+      |                                                                            [01;35m[K^[m[K
+
+In file included from [01m[K/opt/ros/humble/include/nav_msgs/nav_msgs/msg/odometry.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:2[m[K:
+[01m[K/opt/ros/humble/include/nav_msgs/nav_msgs/msg/detail/odometry__struct.hpp:147:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  147 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:172:90:[m[K [01;35m[Kwarning: [m[K‘[01m[Kstd_msgs::msg::Bool_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+  172 | lComponent::enable_motors_callback(const std_msgs::msg::Bool::ConstPtr &msg[01;35m[K)[m[K
+      |                                                                            [01;35m[K^[m[K
+
+In file included from [01m[K/opt/ros/humble/include/std_msgs/std_msgs/msg/bool.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:10[m[K:
+[01m[K/opt/ros/humble/include/std_msgs/std_msgs/msg/detail/bool__struct.hpp:106:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  106 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:183:58:[m[K [01;35m[Kwarning: [m[K‘[01m[Kquadrotor_msgs::msg::Corrections_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+  183 |     const quadrotor_msgs::msg::Corrections::ConstPtr &msg[01;35m[K)[m[K
+      |                                                          [01;35m[K^[m[K
+In file included from [01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/corrections.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_control/src/so3_control_component.cpp:4[m[K:
+[01m[K/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_cpp/quadrotor_msgs/msg/detail/corrections__struct.hpp:117:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  117 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K

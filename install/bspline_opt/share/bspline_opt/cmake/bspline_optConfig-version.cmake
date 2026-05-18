@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/build/bspline_opt/ament_cmake_core/bspline_optConfig-version.cmake

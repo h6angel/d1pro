@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/build/waypoint_generator/ament_cmake_environment_hooks/local_setup.bash

@@ -1,0 +1,37 @@
+[0m** WARNING ** io features related to pcap will be disabled[0m
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:[m[K In static member function ‘[01m[Kstatic int ego_planner::BsplineOptimizer::earlyExit(void*, const double*, const double*, double, double, double, double, int, int, int)[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:66:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kx[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, [01;35m[Kconst double *x[m[K, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+      |                                                    [01;35m[K~~~~~~~~~~~~~~^[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:83:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kg[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, [01;35m[Kconst double *g[m[K, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+      |                                                                     [01;35m[K~~~~~~~~~~~~~~^[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:99:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kfx[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, [01;35m[Kconst double fx[m[K, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
+      |                                                                                      [01;35m[K~~~~~~~~~~~~~^~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:116:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kxnorm[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, [01;35m[Kconst double xnorm[m[K, const double gnorm, const double step, int n, int k, int ls)
+      |                                                                                                       [01;35m[K~~~~~~~~~~~~~^~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:136:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kgnorm[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, [01;35m[Kconst double gnorm[m[K, const double step, int n, int k, int ls)
+      |                                                                                                                           [01;35m[K~~~~~~~~~~~~~^~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:156:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kstep[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, [01;35m[Kconst double step[m[K, int n, int k, int ls)
+      |                                                                                                                                               [01;35m[K~~~~~~~~~~~~~^~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:166:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kn[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, [01;35m[Kint n[m[K, int k, int ls)
+      |                                                                                                                                                                  [01;35m[K~~~~^[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:173:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kk[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, [01;35m[Kint k[m[K, int ls)
+      |                                                                                                                                                                         [01;35m[K~~~~^[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:841:180:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kls[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  841 |   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, [01;35m[Kint ls[m[K)
+      |                                                                                                                                                                                [01;35m[K~~~~^~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:[m[K In member function ‘[01m[Kbool ego_planner::BsplineOptimizer::rebound_optimize(double&)[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:1567:14:[m[K [01;35m[Kwarning: [m[KISO C++ forbids variable length array ‘[01m[Kq[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wvla-Wvla]8;;[m[K]
+ 1567 |       double [01;35m[Kq[m[K[variable_num_];
+      |              [01;35m[K^[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:[m[K In member function ‘[01m[Kbool ego_planner::BsplineOptimizer::refine_optimize()[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/src/bspline_optimizer.cpp:1732:12:[m[K [01;35m[Kwarning: [m[KISO C++ forbids variable length array ‘[01m[Kq[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wvla-Wvla]8;;[m[K]
+ 1732 |     double [01;35m[Kq[m[K[variable_num_];
+      |            [01;35m[K^[m[K

@@ -1,0 +1,9 @@
+[0m** WARNING ** io features related to pcap will be disabled[0m
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/traj_utils/src/planning_visualization.cpp:[m[K In member function ‘[01m[Kvoid ego_planner::PlanningVisualization::displayMarkerList(rclcpp::Publisher<visualization_msgs::msg::Marker_<std::allocator<void> > >::SharedPtr&, const std::vector<Eigen::Matrix<double, 3, 1> >&, double, Eigen::Vector4d, int, bool)[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/traj_utils/src/planning_visualization.cpp:11:85:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kshow_sphere[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+   11 |                                                 Eigen::Vector4d color, int id, [01;35m[Kbool show_sphere[m[K /* = true */)
+      |                                                                                [01;35m[K~~~~~^~~~~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/traj_utils/src/planning_visualization.cpp:[m[K In member function ‘[01m[Kvoid ego_planner::PlanningVisualization::displayMultiInitPathList(std::vector<std::vector<Eigen::Matrix<double, 3, 1> > >, double)[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/planner/traj_utils/src/planning_visualization.cpp:177:25:[m[K [01;35m[Kwarning: [m[Kcomparison of integer expressions of different signedness: ‘[01m[Kint[m[K’ and ‘[01m[Kstd::vector<std::vector<Eigen::Matrix<double, 3, 1> > >::size_type[m[K’ {aka ‘[01m[Klong unsigned int[m[K’} [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wsign-compare-Wsign-compare]8;;[m[K]
+  177 |     for (int id = 0; [01;35m[Kid < init_trajs.size()[m[K; id++)
+      |                      [01;35m[K~~~^~~~~~~~~~~~~~~~~~~[m[K

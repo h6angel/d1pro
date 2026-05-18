@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/include/bspline_opt/uniform_bspline.h

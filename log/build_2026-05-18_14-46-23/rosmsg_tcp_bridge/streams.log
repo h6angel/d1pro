@@ -1,0 +1,86 @@
+[0.008s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge
+[0.049s] -- The C compiler identification is GNU 11.4.0
+[0.090s] -- The CXX compiler identification is GNU 11.4.0
+[0.095s] -- Detecting C compiler ABI info
+[0.153s] -- Detecting C compiler ABI info - done
+[0.158s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.158s] -- Detecting C compile features
+[0.158s] -- Detecting C compile features - done
+[0.161s] -- Detecting CXX compiler ABI info
+[0.222s] -- Detecting CXX compiler ABI info - done
+[0.227s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.227s] -- Detecting CXX compile features
+[0.228s] -- Detecting CXX compile features - done
+[0.230s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.352s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.394s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.410s] -- Found rclcpp: 16.0.19 (/opt/ros/humble/share/rclcpp/cmake)
+[0.435s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.438s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.444s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.451s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.461s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.487s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.489s] -- Found rmw_cyclonedds_cpp: 1.3.4 (/opt/ros/humble/share/rmw_cyclonedds_cpp/cmake)
+[0.502s] -- Using RMW implementation 'rmw_cyclonedds_cpp' as default
+[0.507s] -- Looking for pthread.h
+[0.567s] -- Looking for pthread.h - found
+[0.567s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[0.630s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[0.632s] -- Found Threads: TRUE  
+[0.671s] -- Found geometry_msgs: 4.9.1 (/opt/ros/humble/share/geometry_msgs/cmake)
+[0.681s] -- Found nav_msgs: 4.9.1 (/opt/ros/humble/share/nav_msgs/cmake)
+[0.693s] -- Found traj_utils: 0.0.0 (/home/hyvonne/labpro/ego_planner/install/traj_utils/share/traj_utils/cmake)
+[0.726s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: thread 
+[0.731s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[0.792s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[0.792s] -- Configured cppcheck include dirs: /home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/include
+[0.792s] -- Configured cppcheck exclude dirs and/or files: 
+[0.793s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.793s] -- Added test 'lint_cmake' to check CMake code style
+[0.793s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[0.793s] -- Added test 'uncrustify' to check C / C++ code style
+[0.793s] -- Configured uncrustify additional arguments: 
+[0.794s] -- Added test 'xmllint' to check XML markup files
+[0.794s] -- Configuring done
+[0.802s] -- Generating done
+[0.804s] -- Build files have been written to: /home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge
+[0.811s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge' returned '0': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge
+[0.812s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge -- -j20 -l20
+[0.854s] [ 50%] [32mBuilding CXX object CMakeFiles/bridge_node.dir/src/bridge_node.cpp.o[0m
+[3.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/src/bridge_node.cpp:[m[K In function ‘[01m[Kint wait_connection_from_previous_drone(int, int&, int&)[m[K’:
+[3.518s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/src/bridge_node.cpp:118:51:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kport[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[3.518s]   118 | int wait_connection_from_previous_drone([01;35m[Kconst int port[m[K, int &server_fd, int &new_socket)
+[3.518s]       |                                         [01;35m[K~~~~~~~~~~^~~~[m[K
+[3.527s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/src/bridge_node.cpp:[m[K In function ‘[01m[Kint serializeStop(const std::shared_ptr<const std_msgs::msg::Empty_<std::allocator<void> > >&)[m[K’:
+[3.527s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/src/bridge_node.cpp:362:70:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kmsg[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[3.527s]   362 | int serializeStop([01;35m[Kconst std::shared_ptr<const std_msgs::msg::Empty> &msg[m[K)
+[3.527s]       |                   [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~[m[K
+[3.529s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/src/bridge_node.cpp:[m[K In function ‘[01m[Kint deserializeStop(std::shared_ptr<std_msgs::msg::Empty_<std::allocator<void> > >&)[m[K’:
+[3.530s] [01m[K/home/hyvonne/labpro/ego_planner/src/planner/rosmsg_tcp_bridge/src/bridge_node.cpp:483:60:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kmsg[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[3.530s]   483 | int deserializeStop([01;35m[Kstd::shared_ptr<std_msgs::msg::Empty> &msg[m[K)
+[3.530s]       |                     [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~[m[K
+[22.657s] [100%] [32m[1mLinking CXX executable bridge_node[0m
+[22.975s] [100%] Built target bridge_node
+[22.986s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge' returned '0': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge -- -j20 -l20
+[22.987s] Invoking command in '/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge
+[22.992s] -- Install configuration: "Release"
+[22.992s] -- Execute custom install script
+[22.993s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/lib/rosmsg_tcp_bridge/bridge_node
+[22.999s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/launch/bridge.launch.py
+[23.008s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/ament_index/resource_index/package_run_dependencies/rosmsg_tcp_bridge
+[23.016s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/ament_index/resource_index/parent_prefix_path/rosmsg_tcp_bridge
+[23.023s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/environment/ament_prefix_path.sh
+[23.031s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/environment/ament_prefix_path.dsv
+[23.037s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/environment/path.sh
+[23.043s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/environment/path.dsv
+[23.051s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/local_setup.bash
+[23.057s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/local_setup.sh
+[23.064s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/local_setup.zsh
+[23.070s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/local_setup.dsv
+[23.078s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/package.dsv
+[23.084s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/ament_index/resource_index/packages/rosmsg_tcp_bridge
+[23.091s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/cmake/rosmsg_tcp_bridgeConfig.cmake
+[23.096s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/cmake/rosmsg_tcp_bridgeConfig-version.cmake
+[23.105s] -- Symlinking: /home/hyvonne/labpro/ego_planner/install/rosmsg_tcp_bridge/share/rosmsg_tcp_bridge/package.xml
+[23.114s] Invoked command in '/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge' returned '0': AMENT_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:${AMENT_PREFIX_PATH} CMAKE_PREFIX_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils:/opt/ros/humble LD_LIBRARY_PATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/lib:${LD_LIBRARY_PATH} PYTHONPATH=/home/hyvonne/labpro/ego_planner/install/traj_utils/local/lib/python3.10/dist-packages:${PYTHONPATH} /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge

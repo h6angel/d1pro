@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/src/planner/plan_manage/launch/advanced_param.launch.py

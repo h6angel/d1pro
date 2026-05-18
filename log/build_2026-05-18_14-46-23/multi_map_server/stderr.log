@@ -1,0 +1,16 @@
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/multi_map_server/src/multi_map_visualization.cc:18:84:[m[K [01;35m[Kwarning: [m[K‘[01m[Kmulti_map_server::msg::MultiOccupancyGrid_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   18 | void maps2d_callback(const multi_map_server::msg::MultiOccupancyGrid::ConstPtr &msg[01;35m[K)[m[K
+      |                                                                                    [01;35m[K^[m[K
+In file included from [01m[K/home/hyvonne/labpro/ego_planner/build/multi_map_server/rosidl_generator_cpp/multi_map_server/msg/multi_occupancy_grid.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/multi_map_server/src/multi_map_visualization.cc:5[m[K:
+[01m[K/home/hyvonne/labpro/ego_planner/build/multi_map_server/rosidl_generator_cpp/multi_map_server/msg/detail/multi_occupancy_grid__struct.hpp:113:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  113 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/multi_map_server/src/multi_map_visualization.cc:37:82:[m[K [01;35m[Kwarning: [m[K‘[01m[Kmulti_map_server::msg::MultiSparseMap3D_<std::allocator<void> >::ConstPtr[m[K’ is deprecated [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wdeprecated-declarations-Wdeprecated-declarations]8;;[m[K]
+   37 | void maps3d_callback(const multi_map_server::msg::MultiSparseMap3D::ConstPtr &msg[01;35m[K)[m[K
+      |                                                                                  [01;35m[K^[m[K
+In file included from [01m[K/home/hyvonne/labpro/ego_planner/build/multi_map_server/rosidl_generator_cpp/multi_map_server/msg/multi_sparse_map3_d.hpp:7[m[K,
+                 from [01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/multi_map_server/src/multi_map_visualization.cc:6[m[K:
+[01m[K/home/hyvonne/labpro/ego_planner/build/multi_map_server/rosidl_generator_cpp/multi_map_server/msg/detail/multi_sparse_map3_d__struct.hpp:113:5:[m[K [01;36m[Knote: [m[Kdeclared here
+  113 |     [01;36m[KConstPtr[m[K;
+      |     [01;36m[K^~~~~~~~[m[K

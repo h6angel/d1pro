@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/src/uav_simulator/so3_quadrotor_simulator/launch/simulator_example.launch.py

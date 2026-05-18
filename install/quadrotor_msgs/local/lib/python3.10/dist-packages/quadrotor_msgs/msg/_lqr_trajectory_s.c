@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_py/quadrotor_msgs/msg/_lqr_trajectory_s.c

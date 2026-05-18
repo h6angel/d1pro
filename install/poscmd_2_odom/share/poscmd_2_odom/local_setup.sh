@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/build/poscmd_2_odom/ament_cmake_environment_hooks/local_setup.sh

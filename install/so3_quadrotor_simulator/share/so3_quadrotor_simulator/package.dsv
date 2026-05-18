@@ -1,0 +1,8 @@
+source;share/so3_quadrotor_simulator/hook/cmake_prefix_path.ps1
+source;share/so3_quadrotor_simulator/hook/cmake_prefix_path.dsv
+source;share/so3_quadrotor_simulator/hook/cmake_prefix_path.sh
+source;share/so3_quadrotor_simulator/local_setup.bash
+source;share/so3_quadrotor_simulator/local_setup.dsv
+source;share/so3_quadrotor_simulator/local_setup.ps1
+source;share/so3_quadrotor_simulator/local_setup.sh
+source;share/so3_quadrotor_simulator/local_setup.zsh

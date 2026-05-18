@@ -1,0 +1,4 @@
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/local_sensing/src/pointcloud_render_node.cpp:[m[K In function ‘[01m[Kvoid rcvLocalPointCloudCallBack(sensor_msgs::msg::PointCloud2_<std::allocator<void> >::SharedPtr)[m[K’:
+[01m[K/home/hyvonne/labpro/ego_planner/src/uav_simulator/local_sensing/src/pointcloud_render_node.cpp:167:52:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kpointcloud_map[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+  167 |     [01;35m[Kconst sensor_msgs::msg::PointCloud2::SharedPtr pointcloud_map[m[K) {
+      |     [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~[m[K

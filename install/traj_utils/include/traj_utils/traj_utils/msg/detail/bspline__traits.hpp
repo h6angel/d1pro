@@ -1,0 +1,1 @@
+/home/hyvonne/labpro/ego_planner/build/traj_utils/rosidl_generator_cpp/traj_utils/msg/detail/bspline__traits.hpp

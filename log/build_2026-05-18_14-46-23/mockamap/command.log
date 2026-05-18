@@ -1,0 +1,6 @@
+Invoking command in '/home/hyvonne/labpro/ego_planner/build/mockamap': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/uav_simulator/mockamap -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/mockamap
+Invoked command in '/home/hyvonne/labpro/ego_planner/build/mockamap' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/uav_simulator/mockamap -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/mockamap
+Invoking command in '/home/hyvonne/labpro/ego_planner/build/mockamap': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/mockamap -- -j20 -l20
+Invoked command in '/home/hyvonne/labpro/ego_planner/build/mockamap' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/mockamap -- -j20 -l20
+Invoking command in '/home/hyvonne/labpro/ego_planner/build/mockamap': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/mockamap
+Invoked command in '/home/hyvonne/labpro/ego_planner/build/mockamap' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/mockamap
