@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/traj_utils/ament_cmake_python/traj_utils/traj_utils.egg-info/SOURCES.txt

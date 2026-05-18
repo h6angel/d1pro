@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/drone_detect/ament_cmake_environment_hooks/local_setup.bash

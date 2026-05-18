@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/odom_visualization/ament_cmake_environment_hooks/local_setup.sh

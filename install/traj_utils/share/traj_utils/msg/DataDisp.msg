@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/planner/traj_utils/msg/DataDisp.msg

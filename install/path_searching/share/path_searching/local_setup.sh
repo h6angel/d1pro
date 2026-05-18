@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/path_searching/ament_cmake_environment_hooks/local_setup.sh

@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_typesupport_fastrtps_c/quadrotor_msgs/msg/detail/output_data__rosidl_typesupport_fastrtps_c.h

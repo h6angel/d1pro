@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/planner/plan_manage/launch/single_run_in_sim.launch.py

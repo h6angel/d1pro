@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/planner/bspline_opt/include/bspline_opt/gradient_descent_optimizer.h

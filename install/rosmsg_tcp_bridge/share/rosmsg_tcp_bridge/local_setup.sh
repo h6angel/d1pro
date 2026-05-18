@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/rosmsg_tcp_bridge/ament_cmake_environment_hooks/local_setup.sh

@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/traj_utils/rosidl_generator_c/traj_utils/msg/detail/data_disp__type_support.h

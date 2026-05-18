@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/drone_detect/ament_cmake_core/drone_detectConfig.cmake

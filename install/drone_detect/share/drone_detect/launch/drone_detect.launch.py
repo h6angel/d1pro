@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/planner/drone_detect/launch/drone_detect.launch.py

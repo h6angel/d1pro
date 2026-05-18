@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/mockamap/ament_cmake_core/mockamapConfig-version.cmake

@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_c/quadrotor_msgs/msg/detail/polynomial_trajectory__type_support.h

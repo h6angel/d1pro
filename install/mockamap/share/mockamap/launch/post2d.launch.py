@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/uav_simulator/mockamap/launch/post2d.launch.py

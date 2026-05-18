@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/multi_map_server/ament_cmake_environment_hooks/pythonpath.sh

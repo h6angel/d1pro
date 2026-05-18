@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/rosidl_generator_c/quadrotor_msgs/msg/serial.h

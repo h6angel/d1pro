@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/planner/traj_utils/include/traj_utils/polynomial_traj.h

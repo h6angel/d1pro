@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/so3_control/ament_cmake_environment_hooks/local_setup.zsh

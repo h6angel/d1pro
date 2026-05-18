@@ -1,6 +1,0 @@
-Invoking command in '/home/hyvonne/labpro/ego_planner/build/traj_utils': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/traj_utils -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/traj_utils
-Invoked command in '/home/hyvonne/labpro/ego_planner/build/traj_utils' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/hyvonne/labpro/ego_planner/src/planner/traj_utils -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/hyvonne/labpro/ego_planner/install/traj_utils
-Invoking command in '/home/hyvonne/labpro/ego_planner/build/traj_utils': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/traj_utils -- -j20 -l20
-Invoked command in '/home/hyvonne/labpro/ego_planner/build/traj_utils' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/hyvonne/labpro/ego_planner/build/traj_utils -- -j20 -l20
-Invoking command in '/home/hyvonne/labpro/ego_planner/build/traj_utils': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/traj_utils
-Invoked command in '/home/hyvonne/labpro/ego_planner/build/traj_utils' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/hyvonne/labpro/ego_planner/build/traj_utils

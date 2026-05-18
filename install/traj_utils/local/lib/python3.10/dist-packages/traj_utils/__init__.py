@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/traj_utils/rosidl_generator_py/traj_utils/__init__.py

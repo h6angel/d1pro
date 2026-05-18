@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/src/uav_simulator/Utils/multi_map_server/msg/VerticalOccupancyGridList.msg

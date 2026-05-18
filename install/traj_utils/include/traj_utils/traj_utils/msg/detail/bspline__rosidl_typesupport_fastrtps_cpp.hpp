@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/traj_utils/rosidl_typesupport_fastrtps_cpp/traj_utils/msg/detail/bspline__rosidl_typesupport_fastrtps_cpp.hpp

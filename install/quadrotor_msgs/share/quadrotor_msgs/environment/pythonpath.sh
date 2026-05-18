@@ -1,1 +1,0 @@
-/home/hyvonne/labpro/ego_planner/build/quadrotor_msgs/ament_cmake_environment_hooks/pythonpath.sh
