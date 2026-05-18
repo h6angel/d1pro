@@ -43,10 +43,10 @@ ros2 launch ego_planner swarm.launch.py
 ros2 launch ego_planner swarm_large.launch.py  
 ```
 * Additional parameters (optional):
-    * use_mockamap:Map generation method. Default: False (uses Random Forest), True uses mockamap.
     * use_dynamic:Whether to consider dynamics. Default: False (disabled), True enables dynamics.
+    * cloud_topic / depth_topic / camera_pose_topic: External perception topic suffixes (remapped under `/drone_<id>_`).
 ```
-ros2 launch ego_planner single_run_in_sim.launch.py use_mockamap:=True use_dynamic:=False
+ros2 launch ego_planner single_run_in_sim.launch.py use_dynamic:=False cloud_topic:=points
 ```
 # 使用方法
 ## 1. 需要的库 
@@ -92,9 +92,9 @@ ros2 launch ego_planner swarm.launch.py
 ```
 ros2 launch ego_planner swarm_large.launch.py  
 ```
-* 附加参数，可以选择地图生成模式以及是否考虑动力学
-    * use_mockamap:地图生成方式，默认为False，False时使用Random Forest, True时使用mockamap
+* 附加参数：是否考虑动力学，以及外部感知话题后缀
     * use_dynamic:是否考虑动力学，默认为False, False时不考虑, True时考虑
+    * cloud_topic / depth_topic / camera_pose_topic: 外部点云/深度/相机位姿话题后缀（会 remap 到 `/drone_<id>_` 下）
 ```
-ros2 launch ego_planner single_run_in_sim.launch.py use_mockamap:=True use_dynamic:=False
+ros2 launch ego_planner single_run_in_sim.launch.py use_dynamic:=False cloud_topic:=points
 ```

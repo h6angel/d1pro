@@ -19,6 +19,9 @@ def generate_launch_description():
     target_z = LaunchConfiguration('target_z', default=1.0)
     drone_id = LaunchConfiguration('drone_id', default=0)
     odom_topic = LaunchConfiguration('odom_topic', default='visual_slam/odom')
+    cloud_topic = LaunchConfiguration('cloud_topic', default='cloud')
+    depth_topic = LaunchConfiguration('depth_topic', default='depth')
+    camera_pose_topic = LaunchConfiguration('camera_pose_topic', default='camera_pose')
     obj_num = LaunchConfiguration('obj_num', default=10)
 
     # DeclareLaunchArgument definitions
@@ -49,9 +52,9 @@ def generate_launch_description():
             'map_size_z_': map_size_z,
             'odometry_topic': odom_topic,
             'obj_num_set': obj_num,
-            'camera_pose_topic': 'pcl_render_node/camera_pose',
-            'depth_topic': 'pcl_render_node/depth',
-            'cloud_topic': 'pcl_render_node/cloud',
+            'camera_pose_topic': camera_pose_topic,
+            'depth_topic': depth_topic,
+            'cloud_topic': cloud_topic,
             'cx': str(321.04638671875),
             'cy': str(243.44969177246094),
             'fx': str(387.229248046875),
@@ -103,11 +106,8 @@ def generate_launch_description():
     simulator_include = IncludeLaunchDescription(PythonLaunchDescriptionSource(
         os.path.join(get_package_share_directory('ego_planner'), 'launch', 'simulator.launch.py')),
         launch_arguments={
-            'use_dynamic_cmd': use_dynamic,
+            'use_dynamic': use_dynamic,
             'drone_id': drone_id,
-            'map_size_x_': map_size_x,
-            'map_size_y_': map_size_y,
-            'map_size_z_': map_size_z,
             'init_x_': init_x,
             'init_y_': init_y,
             'init_z_': init_z,
