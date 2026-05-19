@@ -28,26 +28,23 @@ If the output shows rmw_cyclonedds_cpp, the modification is successful.
 ```
 ros2 launch ego_planner rviz.launch.py 
 ```
-### 3.2 Run the planning program
+### 3.2 Run the planning program (single robot / D1 + Gazebo)
 Open a new terminal and execute:
-* Single drone
 ```
-ros2 launch ego_planner single_run_in_sim.launch.py 
+ros2 launch ego_planner single_run_in_sim.launch.py
 ```
-* swarm
+Defaults: subscribe `/odom` (robot pose) and `/gazebo_obstacles` (world-frame obstacle cloud); publish trajectory commands on `/drone_0_planning/pos_cmd`.
+
+Optional parameters:
 ```
-ros2 launch ego_planner swarm.launch.py 
+ros2 launch ego_planner single_run_in_sim.launch.py \
+  odom_topic:=/odom \
+  cloud_topic:=/gazebo_obstacles \
+  pos_cmd_topic:=/your_d1_cmd_topic \
+  flight_type:=1
 ```
-* large swarm
-```
-ros2 launch ego_planner swarm_large.launch.py  
-```
-* Additional parameters (optional):
-    * use_dynamic:Whether to consider dynamics. Default: False (disabled), True enables dynamics.
-    * cloud_topic / depth_topic / camera_pose_topic: External perception topic suffixes (remapped under `/drone_<id>_`).
-```
-ros2 launch ego_planner single_run_in_sim.launch.py use_dynamic:=False cloud_topic:=points
-```
+* `flight_type:=1` — set goal in RViz (2D Goal Pose)
+* `flight_type:=2` — use preset waypoints from launch file
 # 使用方法
 ## 1. 需要的库 
 * vtk(是安装PCL的依赖库，编译时需要勾选Qt)
@@ -78,23 +75,20 @@ ros2 doctor --report | grep "RMW middleware"
 ```
 ros2 launch ego_planner rviz.launch.py 
 ```
-### 3.2 运行规划程序
-新开一个终端，输入以下指令
-* 单机
+### 3.2 运行规划程序（单机 D1 + Gazebo）
+新开一个终端：
 ```
-ros2 launch ego_planner single_run_in_sim.launch.py 
+ros2 launch ego_planner single_run_in_sim.launch.py
 ```
-* swarm
+默认订阅 `/odom`（机体位姿）与 `/gazebo_obstacles`（世界系障碍点云），输出轨迹指令 `/drone_0_planning/pos_cmd`。
+
+可选参数示例：
 ```
-ros2 launch ego_planner swarm.launch.py 
+ros2 launch ego_planner single_run_in_sim.launch.py \
+  odom_topic:=/odom \
+  cloud_topic:=/gazebo_obstacles \
+  pos_cmd_topic:=/your_d1_cmd_topic \
+  flight_type:=1
 ```
-* large swarm
-```
-ros2 launch ego_planner swarm_large.launch.py  
-```
-* 附加参数：是否考虑动力学，以及外部感知话题后缀
-    * use_dynamic:是否考虑动力学，默认为False, False时不考虑, True时考虑
-    * cloud_topic / depth_topic / camera_pose_topic: 外部点云/深度/相机位姿话题后缀（会 remap 到 `/drone_<id>_` 下）
-```
-ros2 launch ego_planner single_run_in_sim.launch.py use_dynamic:=False cloud_topic:=points
-```
+* `flight_type:=1` — 在 RViz 用 2D Goal 设目标点
+* `flight_type:=2` — 使用 launch 里预设航点
