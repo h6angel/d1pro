@@ -1,25 +1,18 @@
 d1_planner_bridge_node:
   ros__parameters:
-    # EGO-Planner output (from traj_server)
     pos_cmd_topic: "/drone_0_planning/pos_cmd"
     odom_topic: "/odom"
-
-    # D1 velocity command (only linear.x and angular.z are used by the robot)
     cmd_vel_topic: "/command/cmd_twist"
 
     control_rate_hz: 100.0
-    pos_cmd_timeout_sec: 0.5
 
+    # Clamp only; no goal stop / no position pursuit
     max_vx: 0.6
     max_wz: 1.0
 
-    # XY-only arrival (ignore z)
-    goal_xy_tolerance: 0.25
-    stop_vel_threshold: 0.05
-
-    # wz = yaw_kp * wrap(cmd.yaw - robot_yaw) + yaw_rate_ff * cmd.yaw_dot
+    # wz = yaw_kp * (cmd.yaw - robot_yaw) + yaw_rate_ff * cmd.yaw_dot
     yaw_kp: 1.5
     yaw_rate_ff: 1.0
 
-    # If true, use world-frame velocity projected to body forward; else use cmd.velocity.x only
+    # World (vx,vy) -> body linear.x; needs /odom yaw
     project_velocity_to_body: true

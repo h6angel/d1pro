@@ -33,6 +33,12 @@ Open a new terminal and execute:
 ```
 ros2 launch ego_planner single_run_in_sim.launch.py
 ```
+For a **real D1** (slow ground robot), prefer:
+```
+ros2 launch ego_planner single_run_d1.launch.py
+```
+(`max_vel:=0.6`, position-based goal finish; also run `d1_planner_bridge`)
+
 Defaults: subscribe `/odom` (robot pose) and `/gazebo_obstacles` (world-frame obstacle cloud); publish trajectory commands on `/drone_0_planning/pos_cmd`.
 
 Optional parameters:
@@ -80,6 +86,14 @@ ros2 launch ego_planner rviz.launch.py
 ```
 ros2 launch ego_planner single_run_in_sim.launch.py
 ```
+**真机 D1** 建议使用（规划速度与机体一致、到点才结束）：
+```
+ros2 launch ego_planner single_run_d1.launch.py
+```
+并同时运行 `d1_planner_bridge`。
+
+**问题与修复（D1）**：规划线按“时钟”走完但车未到时，使用 `single_run_d1.launch.py`（`traj_server` 按 `/odom` 在轨迹上推进，FSM 按 odom 判到达）。
+
 默认订阅 `/odom`（机体位姿）与 `/gazebo_obstacles`（世界系障碍点云），输出轨迹指令 `/drone_0_planning/pos_cmd`。
 
 可选参数示例：

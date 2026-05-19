@@ -4,6 +4,28 @@
 namespace ego_planner
 {
 
+namespace
+{
+double closestTimeOnTrajXY(
+  UniformBspline & pos_traj, const double duration, const Eigen::Vector2d & query_xy)
+{
+  double best_t = 0.0;
+  double best_d2 = 1e18;
+  constexpr double dt = 0.05;
+  for (double t = 0.0; t <= duration + 1e-6; t += dt)
+  {
+    const Eigen::Vector3d p = pos_traj.evaluateDeBoorT(t);
+    const double d2 = (p.head<2>() - query_xy).squaredNorm();
+    if (d2 < best_d2)
+    {
+      best_d2 = d2;
+      best_t = t;
+    }
+  }
+  return best_t;
+}
+}  // namespace
+
   void EGOReplanFSM::init(rclcpp::Node::SharedPtr &node)
   {
     node_ = node;
@@ -17,6 +39,7 @@ namespace ego_planner
     node_->declare_parameter("fsm/flight_type", -1);
     node_->declare_parameter("fsm/thresh_replan_time", -1.0);
     node_->declare_parameter("fsm/thresh_no_replan_meter", -1.0);
+    node_->declare_parameter("fsm/thresh_goal_reach_meter", -1.0);
     node_->declare_parameter("fsm/planning_horizon", -1.0);
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
@@ -26,6 +49,9 @@ namespace ego_planner
     node_->get_parameter("fsm/flight_type", target_type_);
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
     node_->get_parameter("fsm/thresh_no_replan_meter", no_replan_thresh_);
+    node_->get_parameter("fsm/thresh_goal_reach_meter", goal_reach_thresh_);
+    if (goal_reach_thresh_ < 0.0)
+      goal_reach_thresh_ = no_replan_thresh_;
     node_->get_parameter("fsm/planning_horizon", planning_horizen_);
     node_->get_parameter("fsm/planning_horizen_time", planning_horizen_time_);
     node_->get_parameter("fsm/emergency_time", emergency_time_);
@@ -204,18 +230,11 @@ namespace ego_planner
       have_target_ = true;
       have_new_target_ = true;
 
-      /*** FSM状态转换 ***/
+      /*** FSM: schedule replan on next exec tick (never spin node from a callback) ***/
       if (exec_state_ == WAIT_TARGET)
         changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
       else
-      {
-        while (exec_state_ != EXEC_TRAJ)
-        {
-          rclcpp::spin_some(node_);
-          std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
         changeFSMExecState(REPLAN_TRAJ, "TRIG");
-      }
 
       visualization_->displayGlobalPathList(gloabl_traj, 0.1, 0);
     }
@@ -559,7 +578,23 @@ namespace ego_planner
       }
       else
       {
-        changeFSMExecState(REPLAN_TRAJ, "FSM");
+        const double dist_to_goal = (end_pt_ - odom_pos_).norm();
+        if (dist_to_goal < goal_reach_thresh_)
+        {
+          have_target_ = false;
+          have_trigger_ = false;
+          changeFSMExecState(WAIT_TARGET, "FSM");
+        }
+        else if (planFromGlobalTraj(1))
+        {
+          // Traj reference may be at goal while odom lags; replan from true robot pose.
+          changeFSMExecState(EXEC_TRAJ, "FSM");
+          publishSwarmTrajs(false);
+        }
+        else
+        {
+          changeFSMExecState(REPLAN_TRAJ, "FSM");
+        }
       }
 
       break;
@@ -585,21 +620,32 @@ namespace ego_planner
       }
       else if ((local_target_pt_ - end_pt_).norm() < 1e-3) // close to the global target
       {
+        const double dist_to_goal = (end_pt_ - odom_pos_).norm();
+        const bool at_goal = dist_to_goal < goal_reach_thresh_;
+
         if (t_cur > info->duration_ - 1e-2)
         {
-          have_target_ = false;
-          have_trigger_ = false;
-
-          if (target_type_ == TARGET_TYPE::PRESET_TARGET)
+          if (at_goal)
           {
-            wp_id_ = 0;
-            planNextWaypoint(wps_[wp_id_]);
-          }
+            have_target_ = false;
+            have_trigger_ = false;
 
-          changeFSMExecState(WAIT_TARGET, "FSM");
-          goto force_return;
+            if (target_type_ == TARGET_TYPE::PRESET_TARGET)
+            {
+              wp_id_ = 0;
+              planNextWaypoint(wps_[wp_id_]);
+            }
+
+            changeFSMExecState(WAIT_TARGET, "FSM");
+            goto force_return;
+          }
+          else
+          {
+            // Planned time elapsed but robot has not reached goal — keep replanning.
+            changeFSMExecState(REPLAN_TRAJ, "FSM");
+          }
         }
-        else if ((end_pt_ - pos).norm() > no_replan_thresh_ && t_cur > replan_thresh_)
+        else if (!at_goal && t_cur > replan_thresh_)
         {
           changeFSMExecState(REPLAN_TRAJ, "FSM");
         }
@@ -668,14 +714,34 @@ namespace ego_planner
   {
 
     LocalTrajData *info = &planner_manager_->local_data_;
-    // ros::Time time_now = ros::Time::now();
     auto time_now = rclcpp::Clock().now();
-    // double t_cur = (time_now - info->start_time_).toSec();
     double t_cur = (time_now - info->start_time_).seconds();
+
+    // D1 / slow robot: replan from odom progress on the current traj (same idea as traj_server).
+    if (have_odom_ && info->duration_ > 1e-3)
+    {
+      const double t_odom =
+        closestTimeOnTrajXY(info->position_traj_, info->duration_, odom_pos_.head<2>());
+      t_cur = std::min(std::max(t_odom, 0.0), info->duration_);
+    }
 
     start_pt_ = info->position_traj_.evaluateDeBoorT(t_cur);
     start_vel_ = info->velocity_traj_.evaluateDeBoorT(t_cur);
     start_acc_ = info->acceleration_traj_.evaluateDeBoorT(t_cur);
+
+    // Large tracking error: start from measured pose.
+    if (have_odom_ && (start_pt_ - odom_pos_).head<2>().norm() > 0.5)
+    {
+      start_pt_ = odom_pos_;
+      start_vel_ = odom_vel_;
+      start_acc_.setZero();
+    }
+    else if (have_odom_ && (start_pt_ - end_pt_).norm() < 0.2 && (odom_pos_ - end_pt_).norm() > 0.2)
+    {
+      start_pt_ = odom_pos_;
+      start_vel_ = odom_vel_;
+      start_acc_.setZero();
+    }
 
     bool success = callReboundReplan(false, false);
 

@@ -42,6 +42,10 @@ def generate_launch_description():
     point4_z = LaunchConfiguration('point4_z', default=1.0)
 
     flight_type = LaunchConfiguration('flight_type', default='1')
+    goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
+    thresh_replan_time = LaunchConfiguration('thresh_replan_time', default='1.0')
+    obstacles_inflation = LaunchConfiguration('obstacles_inflation', default='0.099')
+    optimization_dist0 = LaunchConfiguration('optimization_dist0', default='0.5')
     use_distinctive_trajs = LaunchConfiguration('use_distinctive_trajs', default=False)
 
     map_size_x_arg = DeclareLaunchArgument('map_size_x_', default_value=map_size_x, description='Map size along X')
@@ -77,6 +81,18 @@ def generate_launch_description():
     point4_z_arg = DeclareLaunchArgument('point4_z', default_value=point4_z, description='Waypoint 4 Z coordinate')
 
     flight_type_arg = DeclareLaunchArgument('flight_type', default_value=flight_type, description='1=RViz 2D Goal, 2=preset waypoints')
+    goal_reach_thresh_arg = DeclareLaunchArgument(
+        'goal_reach_thresh', default_value=goal_reach_thresh,
+        description='FSM: odom within this distance of goal before finishing (m)')
+    thresh_replan_time_arg = DeclareLaunchArgument(
+        'thresh_replan_time', default_value=thresh_replan_time,
+        description='FSM: minimum EXEC time before replan (s); use 2.0 for slow D1')
+    obstacles_inflation_arg = DeclareLaunchArgument(
+        'obstacles_inflation', default_value=obstacles_inflation,
+        description='Grid map obstacle inflation radius (m); use 0.35+ for D1 body')
+    optimization_dist0_arg = DeclareLaunchArgument(
+        'optimization_dist0', default_value=optimization_dist0,
+        description='B-spline optimizer clearance from obstacles (m)')
     use_distinctive_trajs_arg = DeclareLaunchArgument('use_distinctive_trajs', default_value=use_distinctive_trajs, description='Distinctive trajectories (multi-agent only)')
 
     ego_planner_node = Node(
@@ -103,8 +119,9 @@ def generate_launch_description():
         ],
         parameters=[
             {'fsm/flight_type': flight_type},
-            {'fsm/thresh_replan_time': 1.0},
+            {'fsm/thresh_replan_time': thresh_replan_time},
             {'fsm/thresh_no_replan_meter': 1.0},
+            {'fsm/thresh_goal_reach_meter': goal_reach_thresh},
             {'fsm/planning_horizon': planning_horizon},
             {'fsm/planning_horizen_time': 3.0},
             {'fsm/emergency_time': 1.0},
@@ -135,7 +152,7 @@ def generate_launch_description():
             {'grid_map/local_update_range_x': 12.0},
             {'grid_map/local_update_range_y': 8.0},
             {'grid_map/local_update_range_z': 4.5},
-            {'grid_map/obstacles_inflation': 0.099},
+            {'grid_map/obstacles_inflation': obstacles_inflation},
             {'grid_map/local_map_margin': 10},
             {'grid_map/ground_height': -0.01},
             {'grid_map/cx': cx},
@@ -175,7 +192,7 @@ def generate_launch_description():
             {'optimization/lambda_collision': 0.5},
             {'optimization/lambda_feasibility': 0.1},
             {'optimization/lambda_fitness': 1.0},
-            {'optimization/dist0': 0.5},
+            {'optimization/dist0': optimization_dist0},
             {'optimization/swarm_clearance': 0.5},
             {'optimization/max_vel': max_vel},
             {'optimization/max_acc': max_acc},
@@ -222,6 +239,10 @@ def generate_launch_description():
     ld.add_action(point4_y_arg)
     ld.add_action(point4_z_arg)
     ld.add_action(flight_type_arg)
+    ld.add_action(goal_reach_thresh_arg)
+    ld.add_action(thresh_replan_time_arg)
+    ld.add_action(obstacles_inflation_arg)
+    ld.add_action(optimization_dist0_arg)
     ld.add_action(use_distinctive_trajs_arg)
     ld.add_action(ego_planner_node)
 

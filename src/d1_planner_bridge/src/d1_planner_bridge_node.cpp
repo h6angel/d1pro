@@ -13,7 +13,6 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
   pos_cmd_topic_ = declare_parameter<std::string>("pos_cmd_topic", "/drone_0_planning/pos_cmd");
   odom_topic_ = declare_parameter<std::string>("odom_topic", "/odom");
   cmd_vel_topic_ = declare_parameter<std::string>("cmd_vel_topic", "/command/cmd_twist");
-  pos_cmd_timeout_sec_ = declare_parameter<double>("pos_cmd_timeout_sec", 0.5);
 
   const double control_rate_hz = declare_parameter<double>("control_rate_hz", 100.0);
 
@@ -34,8 +33,8 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
 
   RCLCPP_INFO(
     get_logger(),
-    "d1_planner_bridge: pos_cmd=%s odom=%s cmd_twist=%s (linear.x, angular.z only; D1 mode switch is external)",
-    pos_cmd_topic_.c_str(), odom_topic_.c_str(), cmd_vel_topic_.c_str());
+    "d1_planner_bridge: direct pos_cmd velocity -> %s (no stale stop / no goal stop)",
+    cmd_vel_topic_.c_str());
 }
 
 TrackerParams D1PlannerBridgeNode::loadTrackerParams()
@@ -43,8 +42,6 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
   TrackerParams p;
   p.max_vx = declare_parameter<double>("max_vx", 0.6);
   p.max_wz = declare_parameter<double>("max_wz", 1.0);
-  p.goal_xy_tolerance = declare_parameter<double>("goal_xy_tolerance", 0.25);
-  p.stop_vel_threshold = declare_parameter<double>("stop_vel_threshold", 0.05);
   p.yaw_kp = declare_parameter<double>("yaw_kp", 1.5);
   p.yaw_rate_ff = declare_parameter<double>("yaw_rate_ff", 1.0);
   p.project_velocity_to_body = declare_parameter<bool>("project_velocity_to_body", true);
@@ -56,7 +53,6 @@ void D1PlannerBridgeNode::posCmdCallback(
 {
   std::lock_guard<std::mutex> lock(mutex_);
   last_pos_cmd_ = msg;
-  last_pos_cmd_time_ = now();
 }
 
 void D1PlannerBridgeNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -69,34 +65,26 @@ void D1PlannerBridgeNode::controlTimerCallback()
 {
   quadrotor_msgs::msg::PositionCommand::SharedPtr cmd;
   nav_msgs::msg::Odometry::SharedPtr odom;
-  rclcpp::Time cmd_stamp;
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
     cmd = last_pos_cmd_;
     odom = last_odom_;
-    cmd_stamp = last_pos_cmd_time_;
   }
 
   geometry_msgs::msg::Twist twist;
   twist.linear.x = 0.0;
   twist.angular.z = 0.0;
 
-  if (!odom) {
-    cmd_vel_pub_->publish(twist);
-    return;
-  }
-
-  const double age = (now() - cmd_stamp).seconds();
-  if (!cmd || age > pos_cmd_timeout_sec_) {
+  if (!cmd) {
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000,
-      "No fresh pos_cmd (age=%.2fs), publishing zero twist", age);
+      "No pos_cmd on '%s' yet", pos_cmd_topic_.c_str());
     cmd_vel_pub_->publish(twist);
     return;
   }
 
-  const GroundTwist ground = tracker_.compute(*cmd, *odom);
+  const GroundTwist ground = tracker_.compute(*cmd, odom ? odom.get() : nullptr);
   if (ground.valid) {
     twist = tracker_.toTwistMsg(ground);
   }

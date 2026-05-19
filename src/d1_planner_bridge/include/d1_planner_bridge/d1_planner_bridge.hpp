@@ -13,9 +13,7 @@
 namespace d1_planner_bridge
 {
 
-/// Subscribes to EGO pos_cmd + odom, publishes geometry_msgs/Twist on /command/cmd_twist
-/// (linear.x forward, angular.z yaw rate; other components are zero).
-/// Gait / mode switching is NOT handled here (done in your D1 stack).
+/// Forwards EGO pos_cmd velocity to D1 /command/cmd_twist (linear.x, angular.z).
 class D1PlannerBridgeNode : public rclcpp::Node
 {
 public:
@@ -31,7 +29,6 @@ private:
   std::mutex mutex_;
   quadrotor_msgs::msg::PositionCommand::SharedPtr last_pos_cmd_;
   nav_msgs::msg::Odometry::SharedPtr last_odom_;
-  rclcpp::Time last_pos_cmd_time_{0, 0, RCL_ROS_TIME};
 
   TrajectoryTracker tracker_;
 
@@ -43,7 +40,6 @@ private:
   std::string pos_cmd_topic_;
   std::string odom_topic_;
   std::string cmd_vel_topic_;
-  double pos_cmd_timeout_sec_{0.5};
 };
 
 }  // namespace d1_planner_bridge

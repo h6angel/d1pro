@@ -37,7 +37,7 @@ double TrajectoryTracker::yawFromOdom(const nav_msgs::msg::Odometry & odom)
 
 GroundTwist TrajectoryTracker::compute(
   const quadrotor_msgs::msg::PositionCommand & cmd,
-  const nav_msgs::msg::Odometry & odom) const
+  const nav_msgs::msg::Odometry * odom) const
 {
   GroundTwist out;
 
@@ -45,52 +45,25 @@ GroundTwist TrajectoryTracker::compute(
     return out;
   }
 
-  const double robot_x = odom.pose.pose.position.x;
-  const double robot_y = odom.pose.pose.position.y;
-  const double robot_yaw = yawFromOdom(odom);
+  double vx = cmd.velocity.x;
+  double wz = params_.yaw_rate_ff * cmd.yaw_dot;
 
-  const double dx = cmd.position.x - robot_x;
-  const double dy = cmd.position.y - robot_y;
-  const double dist_xy = std::hypot(dx, dy);
-
-  const double vel_xy = std::hypot(cmd.velocity.x, cmd.velocity.y);
-
-  out.at_goal_xy =
-    (dist_xy < params_.goal_xy_tolerance) &&
-    (vel_xy < params_.stop_vel_threshold);
-
-  if (out.at_goal_xy) {
-    out.valid = true;
-    out.vx = 0.0;
-    out.wz = params_.yaw_kp * wrapPi(cmd.yaw - robot_yaw);
-    out.wz = std::clamp(out.wz, -params_.max_wz, params_.max_wz);
-    return out;
-  }
-
-  double vx = 0.0;
-  if (params_.project_velocity_to_body) {
+  if (odom != nullptr && params_.project_velocity_to_body) {
+    const double robot_yaw = yawFromOdom(*odom);
     const double cos_yaw = std::cos(robot_yaw);
     const double sin_yaw = std::sin(robot_yaw);
     vx = cos_yaw * cmd.velocity.x + sin_yaw * cmd.velocity.y;
-  } else {
-    vx = cmd.velocity.x;
+    wz += params_.yaw_kp * wrapPi(cmd.yaw - robot_yaw);
   }
 
-  const double yaw_err = wrapPi(cmd.yaw - robot_yaw);
-  double wz = params_.yaw_kp * yaw_err + params_.yaw_rate_ff * cmd.yaw_dot;
-
-  vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
-  wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
-
-  out.vx = vx;
-  out.wz = wz;
+  out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
+  out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
   out.valid = true;
   return out;
 }
 
 geometry_msgs::msg::Twist TrajectoryTracker::toTwistMsg(const GroundTwist & g) const
 {
-  // D1 /command/cmd_twist: only linear.x (forward) and angular.z (yaw rate) are actuated.
   geometry_msgs::msg::Twist twist;
   twist.linear.x = g.vx;
   twist.linear.y = 0.0;
