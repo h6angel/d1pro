@@ -98,8 +98,6 @@ def generate_launch_description():
             {'traj_server/time_forward': 1.0},
             {'traj_server/use_odom_progress': True},
             {'traj_server/odom_lookahead_time': 0.4},
-            {'traj_server/cmd_speed_max': 0.6},
-            {'traj_server/min_vel_fill_dist': 0.2},
         ],
     )
 

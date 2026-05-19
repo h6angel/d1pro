@@ -30,31 +30,6 @@ bool have_odom_ = false;
 Eigen::Vector3d odom_pos_ = Eigen::Vector3d::Zero();
 double t_progress_ = 0.0;
 double odom_lookahead_time_ = 0.4;
-double cmd_speed_max_ = 0.6;
-double min_vel_fill_dist_ = 0.2;
-double min_vel_fill_threshold_ = 0.08;
-
-/// If spline vel≈0 but robot is still far from commanded pos, emit world-frame XY velocity toward pos.
-void ensureVelocityTowardCommand(Eigen::Vector3d & vel, const Eigen::Vector3d & pos)
-{
-  if (!use_odom_progress_ || !have_odom_)
-    return;
-
-  const double dist_xy = (odom_pos_.head<2>() - pos.head<2>()).norm();
-  if (dist_xy < min_vel_fill_dist_ || vel.head<2>().norm() > min_vel_fill_threshold_)
-    return;
-
-  Eigen::Vector2d dir = pos.head<2>() - odom_pos_.head<2>();
-  const double n = dir.norm();
-  if (n < 1e-3)
-    return;
-  dir /= n;
-
-  const double speed = std::min(cmd_speed_max_, std::max(0.15, 0.5 * dist_xy));
-  vel(0) = dir(0) * speed;
-  vel(1) = dir(1) * speed;
-  vel(2) = 0.0;
-}
 
 double closestTimeOnTrajXY(const Eigen::Vector2d & query_xy)
 {
@@ -257,7 +232,6 @@ void cmdCallback()
     pos = traj_[0].evaluateDeBoorT(traj_duration_);
     vel = traj_[1].evaluateDeBoorT(std::max(traj_duration_ - 1e-3, 0.0));
     acc.setZero();
-    ensureVelocityTowardCommand(vel, pos);
 
     yaw_yawdot.first = last_yaw_;
     yaw_yawdot.second = 0;
@@ -268,8 +242,6 @@ void cmdCallback()
   {
     cout << "[Traj server]: invalid time." << endl;
   }
-
-  ensureVelocityTowardCommand(vel, pos);
 
   time_last = time_now;
 
@@ -306,13 +278,9 @@ int main(int argc, char **argv)
   node->declare_parameter("traj_server/time_forward", 1.0);
   node->declare_parameter("traj_server/use_odom_progress", false);
   node->declare_parameter("traj_server/odom_lookahead_time", 0.4);
-  node->declare_parameter("traj_server/cmd_speed_max", 0.6);
-  node->declare_parameter("traj_server/min_vel_fill_dist", 0.2);
   node->get_parameter("traj_server/time_forward", time_forward_);
   node->get_parameter("traj_server/use_odom_progress", use_odom_progress_);
   node->get_parameter("traj_server/odom_lookahead_time", odom_lookahead_time_);
-  node->get_parameter("traj_server/cmd_speed_max", cmd_speed_max_);
-  node->get_parameter("traj_server/min_vel_fill_dist", min_vel_fill_dist_);
 
   auto bspline_sub = node->create_subscription<traj_utils::msg::Bspline>(
       "planning/bspline",
