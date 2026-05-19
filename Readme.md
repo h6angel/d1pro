@@ -23,27 +23,25 @@ ros2 doctor --report | grep "RMW middleware"
 ```
 If the output shows rmw_cyclonedds_cpp, the modification is successful.
 
-## 3. Running the Code
+## 3. Running the Code (D1 + Gazebo)
 ### 3.1 Launch Rviz
 ```
 ros2 launch ego_planner rviz.launch.py 
 ```
-### 3.2 Run the planning program (single robot / D1 + Gazebo)
-Open a new terminal and execute:
-```
-ros2 launch ego_planner single_run_in_sim.launch.py
-```
-For a **real D1** (slow ground robot), prefer:
+### 3.2 Run the planner
 ```
 ros2 launch ego_planner single_run_d1.launch.py
 ```
-(`max_vel:=0.6`, position-based goal finish; also run `d1_planner_bridge`)
+### 3.3 Run the D1 bridge
+```
+ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
+```
 
-Defaults: subscribe `/odom` (robot pose) and `/gazebo_obstacles` (world-frame obstacle cloud); publish trajectory commands on `/drone_0_planning/pos_cmd`.
+Defaults: subscribe `/odom` (robot pose) and `/gazebo_obstacles` (world-frame obstacle cloud); publish trajectory commands on `/drone_0_planning/pos_cmd`; bridge outputs `/command/cmd_twist`.
 
 Optional parameters:
 ```
-ros2 launch ego_planner single_run_in_sim.launch.py \
+ros2 launch ego_planner single_run_d1.launch.py \
   odom_topic:=/odom \
   cloud_topic:=/gazebo_obstacles \
   pos_cmd_topic:=/your_d1_cmd_topic \
@@ -51,6 +49,9 @@ ros2 launch ego_planner single_run_in_sim.launch.py \
 ```
 * `flight_type:=1` — set goal in RViz (2D Goal Pose)
 * `flight_type:=2` — use preset waypoints from launch file
+
+**Note:** `traj_server` uses odom-synced playback and the FSM uses odom-based goal reach (see `single_run_d1.launch.py`).
+
 # 使用方法
 ## 1. 需要的库 
 * vtk(是安装PCL的依赖库，编译时需要勾选Qt)
@@ -76,29 +77,25 @@ ros2 doctor --report | grep "RMW middleware"
 ```
 输出显示rmw_cyclonedds_cpp则说明修改成功
 
-## 3. 代码运行
+## 3. 代码运行（D1 + Gazebo）
 ### 3.1 运行Rviz
 ```
 ros2 launch ego_planner rviz.launch.py 
 ```
-### 3.2 运行规划程序（单机 D1 + Gazebo）
-新开一个终端：
-```
-ros2 launch ego_planner single_run_in_sim.launch.py
-```
-**真机 D1** 建议使用（规划速度与机体一致、到点才结束）：
+### 3.2 运行规划程序
 ```
 ros2 launch ego_planner single_run_d1.launch.py
 ```
-并同时运行 `d1_planner_bridge`。
+### 3.3 运行 D1 桥接
+```
+ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
+```
 
-**问题与修复（D1）**：规划线按“时钟”走完但车未到时，使用 `single_run_d1.launch.py`（`traj_server` 按 `/odom` 在轨迹上推进，FSM 按 odom 判到达）。
-
-默认订阅 `/odom`（机体位姿）与 `/gazebo_obstacles`（世界系障碍点云），输出轨迹指令 `/drone_0_planning/pos_cmd`。
+默认订阅 `/odom`（机体位姿）与 `/gazebo_obstacles`（世界系障碍点云），输出轨迹指令 `/drone_0_planning/pos_cmd`，桥接节点发布 `/command/cmd_twist`。
 
 可选参数示例：
 ```
-ros2 launch ego_planner single_run_in_sim.launch.py \
+ros2 launch ego_planner single_run_d1.launch.py \
   odom_topic:=/odom \
   cloud_topic:=/gazebo_obstacles \
   pos_cmd_topic:=/your_d1_cmd_topic \
@@ -106,3 +103,5 @@ ros2 launch ego_planner single_run_in_sim.launch.py \
 ```
 * `flight_type:=1` — 在 RViz 用 2D Goal 设目标点
 * `flight_type:=2` — 使用 launch 里预设航点
+
+**说明：** 使用 `single_run_d1.launch.py` 时，`traj_server` 按 `/odom` 在轨迹上推进，FSM 按 odom 判到达。

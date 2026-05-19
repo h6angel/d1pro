@@ -65,17 +65,8 @@ target_link_libraries( plan_env
   ${OpenCV_LIBS}
 )  
 
-add_executable(obj_generator
-    src/obj_generator.cpp 
-)
-ament_target_dependencies(obj_generator std_msgs visualization_msgs geometry_msgs nav_msgs rclcpp Eigen3 PCL cv_bridge message_filters pcl_conversions)
-
 install(TARGETS plan_env
         DESTINATION lib
-)
-
-install(TARGETS obj_generator
-        DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/${PROJECT_NAME}/
