@@ -6,13 +6,23 @@ d1_planner_bridge_node:
 
     control_rate_hz: 100.0
 
-    # Clamp only; no goal stop / no position pursuit
-    max_vx: 3.0
-    max_wz: 1.5
+    log_cmd_vel: true
+    log_cmd_vel_period_ms: 500
 
-    # wz = yaw_kp * (cmd.yaw - robot_yaw) + yaw_rate_ff * cmd.yaw_dot
-    yaw_kp: 1.5
+    # Match ego single_run_d1 max_vel
+    max_vx: 0.6
+    max_wz: 1.0
+
+    # Lower yaw_kp: avoid slow crawl + large turn-in-place (stutter in logs)
+    yaw_kp: 0.4
     yaw_rate_ff: 1.0
+    max_wz_yaw_p: 0.35
 
-    # World (vx,vy) -> body linear.x; needs /odom yaw
+    # Boost tiny planner vx so D1 clears static friction (set 0 to disable)
+    min_vx: 0.08
+    vx_deadband: 0.01
+
+    # Smooth cmd_vel jumps from replan / odom projection (0 = off, 1 = no memory)
+    cmd_vel_ema_alpha: 0.35
+
     project_velocity_to_body: true

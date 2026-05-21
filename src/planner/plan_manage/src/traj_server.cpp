@@ -1,5 +1,6 @@
 #include "bspline_opt/uniform_bspline.h"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
 #include "traj_utils/msg/bspline.hpp"
 #include "quadrotor_msgs/msg/position_command.hpp"
 #include "std_msgs/msg/empty.hpp"
@@ -7,6 +8,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 rclcpp::Publisher<quadrotor_msgs::msg::PositionCommand>::SharedPtr pos_cmd_pub;
+rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr exec_bspline_path_pub;
 
 quadrotor_msgs::msg::PositionCommand cmd;
 double pos_gain[3] = {0, 0, 0};
@@ -49,6 +51,31 @@ double closestTimeOnTrajXY(const Eigen::Vector2d & query_xy)
   return best_t;
 }
 
+void publishExecBsplinePath(const rclcpp::Time & stamp)
+{
+  if (!exec_bspline_path_pub || !receive_traj_)
+    return;
+
+  nav_msgs::msg::Path path;
+  path.header.stamp = stamp;
+  path.header.frame_id = "world";
+
+  constexpr double dt = 0.05;
+  for (double t = 0.0; t <= traj_duration_ + 1e-6; t += dt)
+  {
+    const Eigen::Vector3d p = traj_[0].evaluateDeBoorT(t);
+    geometry_msgs::msg::PoseStamped ps;
+    ps.header = path.header;
+    ps.pose.position.x = p(0);
+    ps.pose.position.y = p(1);
+    ps.pose.position.z = p(2);
+    ps.pose.orientation.w = 1.0;
+    path.poses.push_back(ps);
+  }
+
+  exec_bspline_path_pub->publish(path);
+}
+
 void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
 {
   Eigen::MatrixXd pos_pts(3, msg->pos_pts.size());
@@ -83,6 +110,7 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
     t_progress_ = closestTimeOnTrajXY(odom_pos_.head<2>());
 
   receive_traj_ = true;
+  publishExecBsplinePath(rclcpp::Time(msg->start_time.sec, msg->start_time.nanosec));
 }
 
 void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -294,6 +322,10 @@ int main(int argc, char **argv)
   pos_cmd_pub = node->create_publisher<quadrotor_msgs::msg::PositionCommand>(
       "position_cmd",
       50);
+
+  exec_bspline_path_pub = node->create_publisher<nav_msgs::msg::Path>(
+      "planning/exec_bspline_path",
+      1);
 
   auto cmd_timer = node->create_wall_timer(
       std::chrono::milliseconds(10),

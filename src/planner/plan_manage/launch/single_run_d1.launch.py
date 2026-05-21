@@ -62,7 +62,7 @@ def generate_launch_description():
             'use_distinctive_trajs': 'False',
             'flight_type': flight_type,
             'goal_reach_thresh': goal_reach_thresh,
-            'thresh_replan_time': '2.0',
+            'thresh_replan_time': '4.0',
             'obstacles_inflation': '0.35',
             'optimization_dist0': '0.7',
             'point_num': str(1),
@@ -92,12 +92,13 @@ def generate_launch_description():
         remappings=[
             ('position_cmd', pos_cmd_topic),
             ('planning/bspline', 'drone_0_planning/bspline'),
+            ('planning/exec_bspline_path', 'drone_0_planning/exec_bspline_path'),
             ('odom', odom_topic),
         ],
         parameters=[
             {'traj_server/time_forward': 1.0},
             {'traj_server/use_odom_progress': True},
-            {'traj_server/odom_lookahead_time': 0.4},
+            {'traj_server/odom_lookahead_time': 0.7},
         ],
     )
 

@@ -40,6 +40,14 @@ private:
   std::string pos_cmd_topic_;
   std::string odom_topic_;
   std::string cmd_vel_topic_;
+
+  bool log_cmd_vel_{true};
+  int log_cmd_vel_period_ms_{0};
+
+  double cmd_vel_ema_alpha_{0.35};
+  bool cmd_vel_filter_init_{false};
+  double filt_vx_{0.0};
+  double filt_wz_{0.0};
 };
 
 }  // namespace d1_planner_bridge

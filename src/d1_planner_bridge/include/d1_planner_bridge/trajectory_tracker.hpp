@@ -15,6 +15,11 @@ struct TrackerParams
   double yaw_kp{1.5};
   double yaw_rate_ff{1.0};
   bool project_velocity_to_body{true};
+  /// If |vx| is in (vx_deadband, min_vx), boost to min_vx (quadruped static friction).
+  double min_vx{0.0};
+  double vx_deadband{0.01};
+  /// Cap on |yaw_kp * yaw_err| so turn-in-place does not dominate slow forward motion.
+  double max_wz_yaw_p{1.0};
 };
 
 struct GroundTwist

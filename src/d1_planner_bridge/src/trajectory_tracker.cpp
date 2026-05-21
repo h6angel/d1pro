@@ -53,7 +53,15 @@ GroundTwist TrajectoryTracker::compute(
     const double cos_yaw = std::cos(robot_yaw);
     const double sin_yaw = std::sin(robot_yaw);
     vx = cos_yaw * cmd.velocity.x + sin_yaw * cmd.velocity.y;
-    wz += params_.yaw_kp * wrapPi(cmd.yaw - robot_yaw);
+    const double wz_yaw = params_.yaw_kp * wrapPi(cmd.yaw - robot_yaw);
+    wz += std::clamp(wz_yaw, -params_.max_wz_yaw_p, params_.max_wz_yaw_p);
+  }
+
+  if (params_.min_vx > 0.0) {
+    const double av = std::abs(vx);
+    if (av > params_.vx_deadband && av < params_.min_vx) {
+      vx = (vx > 0.0 ? 1.0 : -1.0) * params_.min_vx;
+    }
   }
 
   out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
