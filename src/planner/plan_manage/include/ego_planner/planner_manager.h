@@ -42,6 +42,8 @@ namespace ego_planner
 
     void setDroneIdtoOpt(void) { bspline_optimizer_->setDroneId(pp_.drone_id); }
 
+    void setRobotPlanningZ(double z);
+
     double getSwarmClearance(void) { return bspline_optimizer_->getSwarmClearance(); }
 
     bool checkCollision(int drone_id);
@@ -63,6 +65,7 @@ namespace ego_planner
     BsplineOptimizer::Ptr bspline_optimizer_;
 
     int continous_failures_count_{0};
+    bool use_robot_z_planning_{true};
 
     void updateTrajInfo(const UniformBspline &position_traj, const rclcpp::Time time_now);
 

@@ -190,11 +190,14 @@ namespace ego_planner
   void EGOReplanFSM::planNextWaypoint(const Eigen::Vector3d next_wp)
   {
     bool success = false;
-    success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), next_wp, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+    planner_manager_->setRobotPlanningZ(odom_pos_(2));
+    Eigen::Vector3d wp = next_wp;
+    wp(2) = odom_pos_(2);
+    success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), wp, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
     if (success)
     {
-      end_pt_ = next_wp;
+      end_pt_ = wp;
 
       constexpr double step_size_t = 0.1;
       int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
@@ -238,9 +241,7 @@ namespace ego_planner
 
     init_pt_ = odom_pos_;
 
-    double goal_z = msg->pose.position.z;
-    if (goal_z < 0.1)
-      goal_z = 0.3;
+    const double goal_z = odom_pos_(2);
 
     Eigen::Vector3d end_wp(msg->pose.position.x, msg->pose.position.y, goal_z);
 
@@ -744,7 +745,9 @@ namespace ego_planner
         break;
 
       bool occ = false;
-      occ |= map->getInflateOccupancy(info->position_traj_.evaluateDeBoorT(t));
+      Eigen::Vector3d p_chk = info->position_traj_.evaluateDeBoorT(t);
+      p_chk(2) = odom_pos_(2);
+      occ |= map->getInflateOccupancy(p_chk);
 
       for (size_t id = 0; id < planner_manager_->swarm_trajs_buf_.size(); id++)
       {
@@ -797,6 +800,13 @@ namespace ego_planner
   {
 
     getLocalTarget();
+
+    planner_manager_->setRobotPlanningZ(odom_pos_(2));
+    start_pt_(2) = odom_pos_(2);
+    start_vel_(2) = 0.0;
+    start_acc_(2) = 0.0;
+    local_target_pt_(2) = odom_pos_(2);
+    local_target_vel_(2) = 0.0;
 
     bool plan_and_refine_success =
         planner_manager_->reboundReplan(start_pt_, start_vel_, start_acc_, local_target_pt_, local_target_vel_, (have_new_target_ || flag_use_poly_init), flag_randomPolyTraj);

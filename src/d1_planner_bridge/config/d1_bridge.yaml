@@ -10,7 +10,7 @@ d1_planner_bridge_node:
     log_cmd_vel_period_ms: 500
 
     # Match ego single_run_d1 max_vel
-    max_vx: 0.6
+    max_vx: 2.6
     max_wz: 1.0
 
     # Lower yaw_kp: avoid slow crawl + large turn-in-place (stutter in logs)

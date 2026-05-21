@@ -44,6 +44,45 @@ namespace ego_planner
     this->moving_objs_ = mov_obj;
   }
 
+  int BsplineOptimizer::checkOccupancy(const Eigen::Vector3d &pos) const
+  {
+    Eigen::Vector3d q = pos;
+    if (use_planning_z_)
+      q(2) = planning_z_;
+    return grid_map_->getInflateOccupancy(q);
+  }
+
+  void BsplineOptimizer::enforcePlanningZOnControlPoints()
+  {
+    if (!use_planning_z_)
+      return;
+    for (int i = 0; i < cps_.points.cols(); ++i)
+      cps_.points(2, i) = planning_z_;
+  }
+
+  void BsplineOptimizer::enforcePlanningZOnGradient(Eigen::MatrixXd &grad)
+  {
+    if (!use_planning_z_)
+      return;
+    grad.row(2).setZero();
+  }
+
+  void BsplineOptimizer::enforcePlanningZOnSolverGrad(double *grad, int n)
+  {
+    if (!use_planning_z_)
+      return;
+    for (int i = 2; i < n; i += 3)
+      grad[i] = 0.0;
+  }
+
+  void BsplineOptimizer::enforcePlanningZOnSolverVars(double *q, int n)
+  {
+    if (!use_planning_z_)
+      return;
+    for (int i = 2; i < n; i += 3)
+      q[i] = planning_z_;
+  }
+
   void BsplineOptimizer::setControlPoints(const Eigen::MatrixXd &points)
   {
     cps_.points = points;
@@ -115,9 +154,9 @@ namespace ego_planner
           for (double a = 1; a > 0; a -= step_size)
           {
             Eigen::Vector3d pt(a * RichInfoSegs[i].first.points.col(j) + (1 - a) * RichInfoSegs[i].first.points.col(j + 1));
-            // cout << " " << grid_map_->getInflateOccupancy(pt) << " pt=" << pt.transpose() << endl;
+            // cout << " " << checkOccupancy(pt) << " pt=" << pt.transpose() << endl;
             //  如果检测到在障碍物内，则存储对应数据
-            if (grid_map_->getInflateOccupancy(pt))
+            if (checkOccupancy(pt))
             {
               occ_start_id = j;
               occ_start_pt = pt;
@@ -137,9 +176,9 @@ namespace ego_planner
           for (double a = 1; a > 0; a -= step_size)
           {
             Eigen::Vector3d pt(a * RichInfoSegs[i].first.points.col(j) + (1 - a) * RichInfoSegs[i].first.points.col(j - 1));
-            // cout << " " << grid_map_->getInflateOccupancy(pt) << " pt=" << pt.transpose() << endl;
+            // cout << " " << checkOccupancy(pt) << " pt=" << pt.transpose() << endl;
             ;
-            if (grid_map_->getInflateOccupancy(pt))
+            if (checkOccupancy(pt))
             {
               occ_end_id = j;
               occ_end_pt = pt;
@@ -227,7 +266,7 @@ namespace ego_planner
           }
 
           // 检查base_pt_reverse是否在障碍物中
-          if (grid_map_->getInflateOccupancy(base_pt_reverse)) // Search outward.
+          if (checkOccupancy(base_pt_reverse)) // Search outward.
           {
             // 最大搜索范围
             double l_upbound = 5 * CTRL_PT_DIST; // "5" is the threshold.
@@ -237,7 +276,7 @@ namespace ego_planner
               // 不断将控制点向外移动，寻找不在障碍物中的控制点
               Eigen::Vector3d base_pt_temp = base_pt_reverse + l * base_vec_reverse;
               // cout << base_pt_temp.transpose() << endl;
-              if (!grid_map_->getInflateOccupancy(base_pt_temp))
+              if (!checkOccupancy(base_pt_temp))
               {
                 RichInfoSegs[i].second.base_point[j][0] = base_pt_temp;
                 RichInfoSegs[i].second.direction[j][0] = base_vec_reverse;
@@ -309,7 +348,7 @@ namespace ego_planner
         Eigen::Vector3d base_vec_reverse = -RichInfoSegs[i].first.direction[0][0];
         Eigen::Vector3d base_pt_reverse = RichInfoSegs[i].first.points.col(0) + base_vec_reverse * (RichInfoSegs[i].first.base_point[0][0] - RichInfoSegs[i].first.points.col(0)).norm();
 
-        if (grid_map_->getInflateOccupancy(base_pt_reverse)) // Search outward.
+        if (checkOccupancy(base_pt_reverse)) // Search outward.
         {
           double l_upbound = 5 * CTRL_PT_DIST; // "5" is the threshold.
           double l = RESOLUTION;
@@ -317,7 +356,7 @@ namespace ego_planner
           {
             Eigen::Vector3d base_pt_temp = base_pt_reverse + l * base_vec_reverse;
             // cout << base_pt_temp.transpose() << endl;
-            if (!grid_map_->getInflateOccupancy(base_pt_temp))
+            if (!checkOccupancy(base_pt_temp))
             {
               RichInfoSegs[i].second.base_point[0][0] = base_pt_temp;
               RichInfoSegs[i].second.direction[0][0] = base_vec_reverse;
@@ -490,6 +529,13 @@ namespace ego_planner
       cps_.points = init_points;
     }
 
+    if (use_planning_z_)
+    {
+      for (int i = 0; i < init_points.cols(); ++i)
+        init_points(2, i) = planning_z_;
+      enforcePlanningZOnControlPoints();
+    }
+
     /*** Segment the initial trajectory according to obstacles ***/
     // 进入或离开障碍物稳定的时间间隔
     constexpr int ENOUGH_INTERVAL = 2;
@@ -510,7 +556,7 @@ namespace ego_planner
       for (double a = 1.0; a > 0.0; a -= step_size)
       {
         // TODO:没搞懂这是干嘛的
-        occ = grid_map_->getInflateOccupancy(a * init_points.col(i - 1) + (1 - a) * init_points.col(i));
+        occ = checkOccupancy(a * init_points.col(i - 1) + (1 - a) * init_points.col(i));
         // cout << " " << occ;
         //  cout << setprecision(5);
         //  cout << (a * init_points.col(i-1) + (1-a) * init_points.col(i)).transpose() << " occ1=" << occ << endl;
@@ -737,7 +783,7 @@ namespace ego_planner
             for (double a = length; a >= 0.0; a -= grid_map_->getResolution())
             {
               // 通过线性插值计算采样点位置
-              occ = grid_map_->getInflateOccupancy((a / length) * intersection_point + (1 - a / length) * init_points.col(j));
+              occ = checkOccupancy((a / length) * intersection_point + (1 - a / length) * init_points.col(j));
 
               if (occ || a < grid_map_->getResolution())
               {
@@ -1308,7 +1354,7 @@ namespace ego_planner
     for (int i = order_ - 1; i <= i_end; ++i)
     {
 
-      bool occ = grid_map_->getInflateOccupancy(cps_.points.col(i));
+      bool occ = checkOccupancy(cps_.points.col(i));
 
       /*** check if the new collision will be valid ***/
       if (occ)
@@ -1331,7 +1377,7 @@ namespace ego_planner
         int j;
         for (j = i - 1; j >= 0; --j)
         {
-          occ = grid_map_->getInflateOccupancy(cps_.points.col(j));
+          occ = checkOccupancy(cps_.points.col(j));
           if (!occ)
           {
             in_id = j;
@@ -1346,7 +1392,7 @@ namespace ego_planner
 
         for (j = i + 1; j < cps_.size; ++j)
         {
-          occ = grid_map_->getInflateOccupancy(cps_.points.col(j));
+          occ = checkOccupancy(cps_.points.col(j));
 
           if (!occ)
           {
@@ -1446,7 +1492,7 @@ namespace ego_planner
               cps_.flag_temp[j] = true;
               for (double a = length; a >= 0.0; a -= grid_map_->getResolution())
               {
-                bool occ = grid_map_->getInflateOccupancy((a / length) * intersection_point + (1 - a / length) * cps_.points.col(j));
+                bool occ = checkOccupancy((a / length) * intersection_point + (1 - a / length) * cps_.points.col(j));
 
                 if (occ || a < grid_map_->getResolution())
                 {
@@ -1566,6 +1612,7 @@ namespace ego_planner
       // 控制点数组初始化
       double q[variable_num_];
       memcpy(q, cps_.points.data() + 3 * start_id, variable_num_ * sizeof(q[0]));
+      enforcePlanningZOnSolverVars(q, variable_num_);
 
       // 初始化L-BFGS算法的参数
       lbfgs::lbfgs_parameter_t lbfgs_params;
@@ -1578,6 +1625,8 @@ namespace ego_planner
       t1 = rclcpp::Clock().now();
       // 执行优化
       int result = lbfgs::lbfgs_optimize(variable_num_, q, &final_cost, BsplineOptimizer::costFunctionRebound, NULL, BsplineOptimizer::earlyExit, this, &lbfgs_params);
+      memcpy(cps_.points.data() + 3 * start_id, q, variable_num_ * sizeof(q[0]));
+      enforcePlanningZOnControlPoints();
       t2 = rclcpp::Clock().now();
       double time_ms = (t2 - t1).seconds() * 1000;
       double total_time_ms = (t2 - t0).seconds() * 1000;
@@ -1616,7 +1665,7 @@ namespace ego_planner
         // 遍历轨迹的前2/3部分进行障碍物检测
         for (double t = tm; t < tmp * 2 / 3; t += t_step) // Only check the closest 2/3 partition of the whole trajectory.
         {
-          flag_occ = grid_map_->getInflateOccupancy(traj.evaluateDeBoorT(t));
+          flag_occ = checkOccupancy(traj.evaluateDeBoorT(t));
           if (flag_occ)
           {
             // cout << "hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
@@ -1733,6 +1782,7 @@ namespace ego_planner
     double final_cost;
 
     memcpy(q, cps_.points.data() + 3 * start_id, variable_num_ * sizeof(q[0]));
+    enforcePlanningZOnSolverVars(q, variable_num_);
 
     double origin_lambda4 = lambda4_;
     bool flag_safe = true;
@@ -1746,6 +1796,8 @@ namespace ego_planner
       lbfgs_params.g_epsilon = 0.001;
 
       int result = lbfgs::lbfgs_optimize(variable_num_, q, &final_cost, BsplineOptimizer::costFunctionRefine, NULL, NULL, this, &lbfgs_params);
+      memcpy(cps_.points.data() + 3 * start_id, q, variable_num_ * sizeof(q[0]));
+      enforcePlanningZOnControlPoints();
       if (result == lbfgs::LBFGS_CONVERGENCE ||
           result == lbfgs::LBFGSERR_MAXIMUMITERATION ||
           result == lbfgs::LBFGS_ALREADY_MINIMIZED ||
@@ -1766,7 +1818,7 @@ namespace ego_planner
       double t_step = (tmp - tm) / ((traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm)).norm() / grid_map_->getResolution()); // Step size is defined as the maximum size that can passes throgth every gird.
       for (double t = tm; t < tmp * 2 / 3; t += t_step)
       {
-        if (grid_map_->getInflateOccupancy(traj.evaluateDeBoorT(t)))
+        if (checkOccupancy(traj.evaluateDeBoorT(t)))
         {
           // cout << "Refined traj hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
 
@@ -1805,6 +1857,7 @@ namespace ego_planner
     // cout << "sizeof(x[0])=" << sizeof(x[0]) << endl;
 
     memcpy(cps_.points.data() + 3 * order_, x, n * sizeof(x[0]));
+    enforcePlanningZOnControlPoints();
 
     /* ---------- evaluate cost and gradient ---------- */
     double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_swarm, f_terminal;
@@ -1828,8 +1881,10 @@ namespace ego_planner
     // printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
     Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
+    enforcePlanningZOnGradient(grad_3D);
     // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;
     memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
+    enforcePlanningZOnSolverGrad(grad, n);
   }
 
   // 计算优化后的损失
@@ -1837,6 +1892,7 @@ namespace ego_planner
   {
 
     memcpy(cps_.points.data() + 3 * order_, x, n * sizeof(x[0]));
+    enforcePlanningZOnControlPoints();
 
     /* ---------- evaluate cost and gradient ---------- */
     double f_smoothness, f_fitness, f_feasibility;
@@ -1856,7 +1912,9 @@ namespace ego_planner
     // printf("origin %f %f %f %f\n", f_smoothness, f_fitness, f_feasibility, f_combine);
 
     Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + lambda4_ * g_fitness + lambda3_ * g_feasibility;
+    enforcePlanningZOnGradient(grad_3D);
     memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
+    enforcePlanningZOnSolverGrad(grad, n);
   }
 
 } // namespace ego_planner

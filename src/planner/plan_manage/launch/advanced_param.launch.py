@@ -187,6 +187,7 @@ def generate_launch_description():
             {'manager/planning_horizon': planning_horizon},
             {'manager/use_distinctive_trajs': use_distinctive_trajs},
             {'manager/drone_id': -1},
+            {'manager/use_robot_z_planning': True},
 
             {'optimization/lambda_smooth': 1.0},
             {'optimization/lambda_collision': 0.5},

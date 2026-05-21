@@ -6,6 +6,30 @@
 namespace ego_planner
 {
 
+namespace
+{
+void flattenStateZ(const double z_ref, Eigen::Vector3d &pos, Eigen::Vector3d &vel, Eigen::Vector3d &acc)
+{
+  pos(2) = z_ref;
+  vel(2) = 0.0;
+  acc(2) = 0.0;
+}
+
+void flattenPointZ(const double z_ref, Eigen::Vector3d &p) { p(2) = z_ref; }
+
+void flattenPointSetZ(const double z_ref, std::vector<Eigen::Vector3d> &pts)
+{
+  for (auto &p : pts)
+    p(2) = z_ref;
+}
+
+void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
+{
+  for (int i = 0; i < ctrl_pts.cols(); ++i)
+    ctrl_pts(2, i) = z_ref;
+}
+} // namespace
+
   EGOPlannerManager::EGOPlannerManager() {}
 
   EGOPlannerManager::~EGOPlannerManager() {}
@@ -20,6 +44,7 @@ namespace ego_planner
     node->declare_parameter("manager/planning_horizon", 5.0);
     node->declare_parameter("manager/use_distinctive_trajs", false);
     node->declare_parameter("manager/drone_id", -1);
+    node->declare_parameter("manager/use_robot_z_planning", true);
 
     node->get_parameter("manager/max_vel", pp_.max_vel_);
     node->get_parameter("manager/max_acc", pp_.max_acc_);
@@ -29,6 +54,7 @@ namespace ego_planner
     node->get_parameter("manager/planning_horizon", pp_.planning_horizen_);
     node->get_parameter("manager/use_distinctive_trajs", pp_.use_distinctive_trajs);
     node->get_parameter("manager/drone_id", pp_.drone_id);
+    node->get_parameter("manager/use_robot_z_planning", use_robot_z_planning_);
 
     local_data_.traj_id_ = 0;
     grid_map_.reset(new GridMap);
@@ -45,6 +71,16 @@ namespace ego_planner
     visualization_ = vis;
   }
 
+  void EGOPlannerManager::setRobotPlanningZ(double z)
+  {
+    if (!use_robot_z_planning_)
+    {
+      bspline_optimizer_->clearPlanningZ();
+      return;
+    }
+    bspline_optimizer_->setPlanningZ(z);
+  }
+
   bool EGOPlannerManager::reboundReplan(Eigen::Vector3d start_pt, Eigen::Vector3d start_vel,
                                         Eigen::Vector3d start_acc, Eigen::Vector3d local_target_pt,
                                         Eigen::Vector3d local_target_vel, bool flag_polyInit, bool flag_randomPolyTraj)
@@ -57,6 +93,15 @@ namespace ego_planner
       cout << "Close to goal" << endl;
       continous_failures_count_++;
       return false;
+    }
+
+    if (bspline_optimizer_->usePlanningZ())
+    {
+      const double z_ref = bspline_optimizer_->getPlanningZ();
+      flattenStateZ(z_ref, start_pt, start_vel, start_acc);
+      flattenPointZ(z_ref, local_target_pt);
+      local_target_vel(2) = 0.0;
+      flag_randomPolyTraj = false;
     }
 
     bspline_optimizer_->setLocalTargetPt(local_target_pt);
@@ -96,11 +141,18 @@ namespace ego_planner
         }
         else
         {
-          Eigen::Vector3d horizen_dir = ((start_pt - local_target_pt).cross(Eigen::Vector3d(0, 0, 1))).normalized();
-          Eigen::Vector3d vertical_dir = ((start_pt - local_target_pt).cross(horizen_dir)).normalized();
-          Eigen::Vector3d random_inserted_pt = (start_pt + local_target_pt) / 2 +
-                                               (((double)rand()) / RAND_MAX - 0.5) * (start_pt - local_target_pt).norm() * horizen_dir * 0.8 * (-0.978 / (continous_failures_count_ + 0.989) + 0.989) +
-                                               (((double)rand()) / RAND_MAX - 0.5) * (start_pt - local_target_pt).norm() * vertical_dir * 0.4 * (-0.978 / (continous_failures_count_ + 0.989) + 0.989);
+          const double z_ref = bspline_optimizer_->usePlanningZ() ? bspline_optimizer_->getPlanningZ() : start_pt(2);
+          Eigen::Vector3d mid = (start_pt + local_target_pt) / 2;
+          Eigen::Vector2d seg_xy = (local_target_pt - start_pt).head<2>();
+          if (seg_xy.norm() < 1e-3)
+            seg_xy = Eigen::Vector2d(1.0, 0.0);
+          else
+            seg_xy.normalize();
+          const Eigen::Vector3d horizen_dir(-seg_xy(1), seg_xy(0), 0.0);
+          const double rand_scale = (((double)rand()) / RAND_MAX - 0.5) * (start_pt - local_target_pt).norm() * 0.8 *
+                                    (-0.978 / (continous_failures_count_ + 0.989) + 0.989);
+          Eigen::Vector3d random_inserted_pt = mid + horizen_dir * rand_scale;
+          random_inserted_pt(2) = z_ref;
           Eigen::MatrixXd pos(3, 3);
           pos.col(0) = start_pt;
           pos.col(1) = random_inserted_pt;
@@ -216,6 +268,9 @@ namespace ego_planner
       }
     } while (flag_regenerate);
 
+    if (bspline_optimizer_->usePlanningZ())
+      flattenPointSetZ(bspline_optimizer_->getPlanningZ(), point_set);
+
     // 将轨迹变为B样条轨迹
     Eigen::MatrixXd ctrl_pts, ctrl_pts_temp;
     UniformBspline::parameterizeToBspline(ts, point_set, start_end_derivatives, ctrl_pts);
@@ -227,6 +282,9 @@ namespace ego_planner
       for (int i = 0; i < k_pin_start_cps && i < ctrl_pts.cols(); ++i)
         ctrl_pts.col(i) = start_pt + start_vel * (static_cast<double>(i) * ts);
     }
+
+    if (bspline_optimizer_->usePlanningZ())
+      flattenControlPointsZ(bspline_optimizer_->getPlanningZ(), ctrl_pts);
 
     vector<std::pair<int, int>> segments;
     segments = bspline_optimizer_->initControlPoints(ctrl_pts, true);
@@ -294,6 +352,9 @@ namespace ego_planner
       continous_failures_count_++;
       return false;
     }
+
+    if (bspline_optimizer_->usePlanningZ())
+      flattenControlPointsZ(bspline_optimizer_->getPlanningZ(), ctrl_pts);
 
     t_start = rclcpp::Clock().now();
 
@@ -474,9 +535,26 @@ namespace ego_planner
 
     // generate global reference trajectory
 
+    Eigen::Vector3d start = start_pos;
+    Eigen::Vector3d end = end_pos;
+    Eigen::Vector3d sv = start_vel;
+    Eigen::Vector3d ev = end_vel;
+    Eigen::Vector3d sa = start_acc;
+    Eigen::Vector3d ea = end_acc;
+    if (bspline_optimizer_->usePlanningZ())
+    {
+      const double z_ref = bspline_optimizer_->getPlanningZ();
+      flattenPointZ(z_ref, start);
+      flattenPointZ(z_ref, end);
+      sv(2) = 0.0;
+      ev(2) = 0.0;
+      sa(2) = 0.0;
+      ea(2) = 0.0;
+    }
+
     vector<Eigen::Vector3d> points;
-    points.push_back(start_pos);
-    points.push_back(end_pos);
+    points.push_back(start);
+    points.push_back(end);
 
     // insert intermediate points if too far
     vector<Eigen::Vector3d> inter_points;
@@ -522,9 +600,9 @@ namespace ego_planner
 
     PolynomialTraj gl_traj;
     if (pos.cols() >= 3)
-      gl_traj = PolynomialTraj::minSnapTraj(pos, start_vel, end_vel, start_acc, end_acc, time);
+      gl_traj = PolynomialTraj::minSnapTraj(pos, sv, ev, sa, ea, time);
     else if (pos.cols() == 2)
-      gl_traj = PolynomialTraj::one_segment_traj_gen(start_pos, start_vel, start_acc, end_pos, end_vel, end_acc, time(0));
+      gl_traj = PolynomialTraj::one_segment_traj_gen(start, sv, sa, end, ev, ea, time(0));
     else
       return false;
 

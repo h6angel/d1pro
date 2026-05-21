@@ -140,6 +140,9 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
     GridNodePtr startPtr = GridNodeMap_[start_idx(0)][start_idx(1)][start_idx(2)];
     GridNodePtr endPtr = GridNodeMap_[end_idx(0)][end_idx(1)][end_idx(2)];
 
+    const bool search_planar = std::abs(start_pt(2) - end_pt(2)) < 1e-4;
+    const int fixed_z_idx = start_idx(2);
+
     std::priority_queue<GridNodePtr, std::vector<GridNodePtr>, NodeComparator> empty;
     openSet_.swap(empty);
 
@@ -185,11 +188,13 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
                 {
                     if (dx == 0 && dy == 0 && dz == 0)
                         continue;
+                    if (search_planar && dz != 0)
+                        continue;
 
                     Vector3i neighborIdx;
                     neighborIdx(0) = (current->index)(0) + dx;
                     neighborIdx(1) = (current->index)(1) + dy;
-                    neighborIdx(2) = (current->index)(2) + dz;
+                    neighborIdx(2) = search_planar ? fixed_z_idx : (current->index)(2) + dz;
 
                     if (neighborIdx(0) < 1 || neighborIdx(0) >= POOL_SIZE_(0) - 1 || neighborIdx(1) < 1 || neighborIdx(1) >= POOL_SIZE_(1) - 1 || neighborIdx(2) < 1 || neighborIdx(2) >= POOL_SIZE_(2) - 1)
                     {

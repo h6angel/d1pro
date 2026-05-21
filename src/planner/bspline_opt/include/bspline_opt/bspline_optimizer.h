@@ -110,6 +110,16 @@ namespace ego_planner
                       const vector<int> &waypt_idx); // N-2 constraints at most
     void setLocalTargetPt(const Eigen::Vector3d local_target_pt) { local_target_pt_ = local_target_pt; };
 
+    /** Ground robot: plan in XY; collision queries use (x,y,planning_z_). */
+    void setPlanningZ(double z)
+    {
+      planning_z_ = z;
+      use_planning_z_ = true;
+    }
+    void clearPlanningZ() { use_planning_z_ = false; }
+    bool usePlanningZ() const { return use_planning_z_; }
+    double getPlanningZ() const { return planning_z_; }
+
     void optimize();
 
     ControlPoints getControlPoints() { return cps_; };
@@ -170,7 +180,16 @@ namespace ego_planner
     Eigen::VectorXd best_variable_; //
     double min_cost_;               //
 
-    Eigen::Vector3d local_target_pt_; 
+    Eigen::Vector3d local_target_pt_;
+
+    double planning_z_{0.0};
+    bool use_planning_z_{false};
+
+    int checkOccupancy(const Eigen::Vector3d &pos) const;
+    void enforcePlanningZOnControlPoints();
+    void enforcePlanningZOnGradient(Eigen::MatrixXd &grad);
+    void enforcePlanningZOnSolverGrad(double *grad, int n);
+    void enforcePlanningZOnSolverVars(double *q, int n);
 
 #define INIT_min_ellip_dist_ 123456789.0123456789
     double min_ellip_dist_;
