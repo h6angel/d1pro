@@ -35,6 +35,25 @@ double TrajectoryTracker::yawFromOdom(const nav_msgs::msg::Odometry & odom)
   return std::atan2(siny_cosp, cosy_cosp);
 }
 
+double TrajectoryTracker::pathYawFromCmd(const quadrotor_msgs::msg::PositionCommand & cmd)
+{
+  const double vxy = std::hypot(cmd.velocity.x, cmd.velocity.y);
+  if (vxy > 0.05) {
+    return std::atan2(cmd.velocity.y, cmd.velocity.x);
+  }
+  return cmd.yaw;
+}
+
+double TrajectoryTracker::signedLateralError(
+  double robot_x, double robot_y, double ref_x, double ref_y, double path_yaw)
+{
+  const double ex = robot_x - ref_x;
+  const double ey = robot_y - ref_y;
+  const double ux = std::cos(path_yaw);
+  const double uy = std::sin(path_yaw);
+  return uy * ex - ux * ey;
+}
+
 GroundTwist TrajectoryTracker::compute(
   const quadrotor_msgs::msg::PositionCommand & cmd,
   const nav_msgs::msg::Odometry * odom) const
@@ -47,6 +66,7 @@ GroundTwist TrajectoryTracker::compute(
 
   double vx = cmd.velocity.x;
   double wz = params_.yaw_rate_ff * cmd.yaw_dot;
+  out.lateral_error = 0.0;
 
   if (odom != nullptr && params_.project_velocity_to_body) {
     const double robot_yaw = yawFromOdom(*odom);
@@ -55,6 +75,29 @@ GroundTwist TrajectoryTracker::compute(
     vx = cos_yaw * cmd.velocity.x + sin_yaw * cmd.velocity.y;
     const double wz_yaw = params_.yaw_kp * wrapPi(cmd.yaw - robot_yaw);
     wz += std::clamp(wz_yaw, -params_.max_wz_yaw_p, params_.max_wz_yaw_p);
+
+    if (params_.enable_lateral_correction) {
+      const double path_yaw = pathYawFromCmd(cmd);
+      const auto & p = odom->pose.pose.position;
+      out.lateral_error = signedLateralError(
+        p.x, p.y, cmd.position.x, cmd.position.y, path_yaw);
+
+      double e_lat = out.lateral_error;
+      if (std::abs(e_lat) < params_.lateral_error_deadband) {
+        e_lat = 0.0;
+      }
+
+      // Robot left of path (e_lat > 0) -> turn right (negative wz in REP-103).
+      const double wz_lat = -params_.lateral_kp * e_lat;
+      wz += std::clamp(wz_lat, -params_.max_wz_lateral_p, params_.max_wz_lateral_p);
+
+      if (params_.vx_lat_damp_gain > 0.0 && params_.lateral_slowdown_dist > 1e-3) {
+        const double lat_ratio = std::min(
+          std::abs(out.lateral_error) / params_.lateral_slowdown_dist, 1.0);
+        const double scale = 1.0 - params_.vx_lat_damp_gain * lat_ratio;
+        vx *= std::max(0.0, scale);
+      }
+    }
   }
 
   if (params_.min_vx > 0.0) {

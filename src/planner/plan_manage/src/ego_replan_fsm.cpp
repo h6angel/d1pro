@@ -4,28 +4,6 @@
 namespace ego_planner
 {
 
-namespace
-{
-double closestTimeOnTrajXY(
-  UniformBspline & pos_traj, const double duration, const Eigen::Vector2d & query_xy)
-{
-  double best_t = 0.0;
-  double best_d2 = 1e18;
-  constexpr double dt = 0.05;
-  for (double t = 0.0; t <= duration + 1e-6; t += dt)
-  {
-    const Eigen::Vector3d p = pos_traj.evaluateDeBoorT(t);
-    const double d2 = (p.head<2>() - query_xy).squaredNorm();
-    if (d2 < best_d2)
-    {
-      best_d2 = d2;
-      best_t = t;
-    }
-  }
-  return best_t;
-}
-}  // namespace
-
   void EGOReplanFSM::init(rclcpp::Node::SharedPtr &node)
   {
     node_ = node;
@@ -570,8 +548,8 @@ double closestTimeOnTrajXY(
 
     case REPLAN_TRAJ:
     {
-
-      if (planFromCurrentTraj(1))
+      // Local B-spline always starts from current /odom (D1 / slow ground robot).
+      if (planFromGlobalTraj(1))
       {
         changeFSMExecState(EXEC_TRAJ, "FSM");
         publishSwarmTrajs(false);
@@ -584,12 +562,6 @@ double closestTimeOnTrajXY(
           have_target_ = false;
           have_trigger_ = false;
           changeFSMExecState(WAIT_TARGET, "FSM");
-        }
-        else if (planFromGlobalTraj(1))
-        {
-          // Traj reference may be at goal while odom lags; replan from true robot pose.
-          changeFSMExecState(EXEC_TRAJ, "FSM");
-          publishSwarmTrajs(false);
         }
         else
         {
@@ -712,58 +684,10 @@ double closestTimeOnTrajXY(
 
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
   {
-
-    LocalTrajData *info = &planner_manager_->local_data_;
-    auto time_now = rclcpp::Clock().now();
-    double t_cur = (time_now - info->start_time_).seconds();
-
-    // D1 / slow robot: replan from odom progress on the current traj (same idea as traj_server).
-    if (have_odom_ && info->duration_ > 1e-3)
-    {
-      const double t_odom =
-        closestTimeOnTrajXY(info->position_traj_, info->duration_, odom_pos_.head<2>());
-      t_cur = std::min(std::max(t_odom, 0.0), info->duration_);
-    }
-
-    start_pt_ = info->position_traj_.evaluateDeBoorT(t_cur);
-    start_vel_ = info->velocity_traj_.evaluateDeBoorT(t_cur);
-    start_acc_ = info->acceleration_traj_.evaluateDeBoorT(t_cur);
-
-    // Large tracking error: start from measured pose.
-    if (have_odom_ && (start_pt_ - odom_pos_).head<2>().norm() > 0.5)
-    {
-      start_pt_ = odom_pos_;
-      start_vel_ = odom_vel_;
-      start_acc_.setZero();
-    }
-    else if (have_odom_ && (start_pt_ - end_pt_).norm() < 0.2 && (odom_pos_ - end_pt_).norm() > 0.2)
-    {
-      start_pt_ = odom_pos_;
-      start_vel_ = odom_vel_;
-      start_acc_.setZero();
-    }
-
-    bool success = callReboundReplan(false, false);
-
-    if (!success)
-    {
-      success = callReboundReplan(true, false);
-      if (!success)
-      {
-        for (int i = 0; i < trial_times; i++)
-        {
-          success = callReboundReplan(true, true);
-          if (success)
-            break;
-        }
-        if (!success)
-        {
-          return false;
-        }
-      }
-    }
-
-    return true;
+    // Same as planFromGlobalTraj: local replan from measured pose, not from the previous B-spline.
+    if (!have_odom_)
+      return false;
+    return planFromGlobalTraj(trial_times);
   }
 
   void EGOReplanFSM::checkCollisionCallback()

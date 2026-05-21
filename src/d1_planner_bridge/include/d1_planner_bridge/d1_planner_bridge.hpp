@@ -13,7 +13,7 @@
 namespace d1_planner_bridge
 {
 
-/// Forwards EGO pos_cmd velocity to D1 /command/cmd_twist (linear.x, angular.z).
+/// EGO pos_cmd -> D1 cmd_twist: velocity feedforward + yaw/lateral error feedback.
 class D1PlannerBridgeNode : public rclcpp::Node
 {
 public:

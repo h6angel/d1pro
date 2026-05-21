@@ -20,6 +20,15 @@ struct TrackerParams
   double vx_deadband{0.01};
   /// Cap on |yaw_kp * yaw_err| so turn-in-place does not dominate slow forward motion.
   double max_wz_yaw_p{1.0};
+
+  /// Cross-track correction: pos_cmd.position vs odom (carrot on traj_server lookahead point).
+  bool enable_lateral_correction{true};
+  double lateral_kp{0.9};
+  double lateral_error_deadband{0.05};
+  double max_wz_lateral_p{0.35};
+  /// Reduce |vx| when lateral error is large (0 = off).
+  double vx_lat_damp_gain{0.4};
+  double lateral_slowdown_dist{0.4};
 };
 
 struct GroundTwist
@@ -27,9 +36,11 @@ struct GroundTwist
   double vx{0.0};
   double wz{0.0};
   bool valid{false};
+  /// Signed lateral offset (m): robot left of path heading is positive.
+  double lateral_error{0.0};
 };
 
-/// Maps EGO pos_cmd velocity (+ optional body projection) to D1 cmd_twist (vx, wz).
+/// Maps EGO pos_cmd to D1 cmd_twist: velocity feedforward + yaw & lateral error feedback.
 class TrajectoryTracker
 {
 public:
@@ -47,6 +58,9 @@ public:
 private:
   static double wrapPi(double a);
   static double yawFromOdom(const nav_msgs::msg::Odometry & odom);
+  static double pathYawFromCmd(const quadrotor_msgs::msg::PositionCommand & cmd);
+  static double signedLateralError(
+    double robot_x, double robot_y, double ref_x, double ref_y, double path_yaw);
 
   TrackerParams params_;
 };

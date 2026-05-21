@@ -72,7 +72,8 @@ stateDiagram-v2
 补充说明：
 
 - **目标从哪来**：`flight_type=1` 时在 RViz 点 **2D Goal**（`/move_base_simple/goal`）；`flight_type=2` 用 launch 里预设航点。
-- **何时重规划**：执行中若超过 `thresh_replan_time`（D1 默认约 2 s）、或离全局目标还很远、或安全定时器发现前方障碍，会切到 `REPLAN_TRAJ`。
+- **何时重规划**：执行中若超过 `thresh_replan_time`（D1 默认约 4 s）、或离全局目标还很远、或安全定时器发现前方障碍，会切到 `REPLAN_TRAJ`。
+- **局部 B-spline 起点**：`REPLAN_TRAJ` 与碰撞重规划均走 `planFromGlobalTraj`，即 **`start_pt = /odom` 位姿**（不再从上一段 B-spline 接续）；局部目标仍在全局多项式上向前截取。
 - **何时算到达**：不只看轨迹时间，还会比较 `**/odom` 位置与目标距离** 是否小于 `goal_reach_thresh`（默认 0.3 m），这对慢速地面机器人很重要。
 
 规划成功后，FSM 通过 `planning/bspline`（重映射为 `drone_0_planning/bspline`）把 **B 样条轨迹** 发给下游。
@@ -111,9 +112,10 @@ flowchart LR
 - 发布：`/command/cmd_twist`（`geometry_msgs/Twist`，只用 `**linear.x`** 和 `**angular.z**`）
 - 逻辑概要（`trajectory_tracker`）：
   - 仅当 `trajectory_flag == TRAJECTORY_STATUS_READY` 才输出非零速度
-  - 前进速度：把 `pos_cmd` 里的世界系 `(vx, vy)` 用当前 `/odom` 的 yaw **投影到车体前向** → `linear.x`
-  - 转向：`wz = yaw_rate_ff * yaw_dot + yaw_kp * (cmd.yaw - robot_yaw)`
-  - 再按 `max_vx`、`max_wz` 限幅（与规划器 `max_vel` 对齐，默认约 0.6 m/s）
+  - **前馈**：把 `pos_cmd` 世界系 `(vx, vy)` 用 `/odom` yaw 投影到车体 → `linear.x`
+  - **航向反馈**：`wz += yaw_kp * (cmd.yaw - robot_yaw)`（及 `yaw_dot` 前馈）
+  - **横向反馈**：`pos_cmd.position`（traj_server lookahead 点）相对 `/odom` 的横向偏差 → 修正 `angular.z`；偏差大时略减 `linear.x`（`lateral_kp` 等见 `d1_bridge.yaml`）
+  - 再按 `max_vx`、`max_wz` 限幅
 
 ### 第三步：Gazebo 执行
 

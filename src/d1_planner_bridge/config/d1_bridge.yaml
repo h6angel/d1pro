@@ -22,6 +22,14 @@ d1_planner_bridge_node:
     min_vx: 0.08
     vx_deadband: 0.01
 
+    # Cross-track: pos_cmd.position (lookahead) vs /odom; feedforward vx unchanged in spirit
+    enable_lateral_correction: true
+    lateral_kp: 0.9
+    lateral_error_deadband: 0.05
+    max_wz_lateral_p: 0.35
+    vx_lat_damp_gain: 0.4
+    lateral_slowdown_dist: 0.4
+
     # Smooth cmd_vel jumps from replan / odom projection (0 = off, 1 = no memory)
     cmd_vel_ema_alpha: 0.35
 

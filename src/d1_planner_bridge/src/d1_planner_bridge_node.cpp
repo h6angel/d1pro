@@ -37,7 +37,7 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
 
   RCLCPP_INFO(
     get_logger(),
-    "d1_planner_bridge: direct pos_cmd velocity -> %s (no stale stop / no goal stop)",
+    "d1_planner_bridge: pos_cmd vel feedforward + yaw/lateral feedback -> %s",
     cmd_vel_topic_.c_str());
   if (log_cmd_vel_) {
     RCLCPP_INFO(
@@ -58,6 +58,12 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
   p.min_vx = declare_parameter<double>("min_vx", 0.08);
   p.vx_deadband = declare_parameter<double>("vx_deadband", 0.01);
   p.max_wz_yaw_p = declare_parameter<double>("max_wz_yaw_p", 0.35);
+  p.enable_lateral_correction = declare_parameter<bool>("enable_lateral_correction", true);
+  p.lateral_kp = declare_parameter<double>("lateral_kp", 0.9);
+  p.lateral_error_deadband = declare_parameter<double>("lateral_error_deadband", 0.05);
+  p.max_wz_lateral_p = declare_parameter<double>("max_wz_lateral_p", 0.35);
+  p.vx_lat_damp_gain = declare_parameter<double>("vx_lat_damp_gain", 0.4);
+  p.lateral_slowdown_dist = declare_parameter<double>("lateral_slowdown_dist", 0.4);
   return p;
 }
 
@@ -126,10 +132,10 @@ void D1PlannerBridgeNode::controlTimerCallback()
     if (ground.valid) {
       RCLCPP_INFO_THROTTLE(
         get_logger(), *get_clock(), throttle_ms,
-        "D1 %s: linear.x=%.4f angular.z=%.4f | planner vel (%.4f, %.4f, %.4f) yaw_dot=%.4f",
+        "D1 %s: linear.x=%.4f angular.z=%.4f | vel (%.4f, %.4f) yaw_dot=%.4f e_lat=%.3f",
         cmd_vel_topic_.c_str(),
         twist.linear.x, twist.angular.z,
-        cmd->velocity.x, cmd->velocity.y, cmd->velocity.z, cmd->yaw_dot);
+        cmd->velocity.x, cmd->velocity.y, cmd->yaw_dot, ground.lateral_error);
     } else {
       RCLCPP_INFO_THROTTLE(
         get_logger(), *get_clock(), throttle_ms,
