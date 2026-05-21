@@ -100,9 +100,9 @@ namespace ego_planner
     /* helper functions */
     bool callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj); // front-end and back-end method
     bool callEmergencyStop(Eigen::Vector3d stop_pos);                          // front-end and back-end method
-    /// Local B-spline from /odom pose + global-line local target (polynomial init).
+    /// First plan / emergency: polynomial init from /odom to local target.
     bool planFromGlobalTraj(const int trial_times = 1);
-    /// Alias: always delegates to planFromGlobalTraj (no stitch from previous B-spline).
+    /// Local replan: warm-start from previous B-spline at t_cur; pin first ctrl pts to /odom.
     bool planFromCurrentTraj(const int trial_times = 1);
 
     /* return value: std::pair< Times of the same state be continuously called, current continuously called state > */

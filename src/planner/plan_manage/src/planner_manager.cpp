@@ -203,9 +203,9 @@ namespace ego_planner
           point_set.push_back(local_target_pt);
         } while (point_set.size() < 7); // If the start point is very close to end point, this will help
 
-        start_end_derivatives.push_back(local_data_.velocity_traj_.evaluateDeBoorT(t_cur));
+        start_end_derivatives.push_back(start_vel);
         start_end_derivatives.push_back(local_target_vel);
-        start_end_derivatives.push_back(local_data_.acceleration_traj_.evaluateDeBoorT(t_cur));
+        start_end_derivatives.push_back(start_acc);
         start_end_derivatives.push_back(Eigen::Vector3d::Zero());
 
         if (point_set.size() > pp_.planning_horizen_ / pp_.ctrl_pt_dist * 3) // The initial path is unnormally too long!
@@ -219,6 +219,14 @@ namespace ego_planner
     // 将轨迹变为B样条轨迹
     Eigen::MatrixXd ctrl_pts, ctrl_pts_temp;
     UniformBspline::parameterizeToBspline(ts, point_set, start_end_derivatives, ctrl_pts);
+
+    // Hybrid warm-start: stitch from previous traj, anchor start to measured odom (fixed during L-BFGS).
+    if (!flag_polyInit)
+    {
+      constexpr int k_pin_start_cps = 3;
+      for (int i = 0; i < k_pin_start_cps && i < ctrl_pts.cols(); ++i)
+        ctrl_pts.col(i) = start_pt + start_vel * (static_cast<double>(i) * ts);
+    }
 
     vector<std::pair<int, int>> segments;
     segments = bspline_optimizer_->initControlPoints(ctrl_pts, true);

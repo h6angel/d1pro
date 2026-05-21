@@ -73,7 +73,7 @@ stateDiagram-v2
 
 - **目标从哪来**：`flight_type=1` 时在 RViz 点 **2D Goal**（`/move_base_simple/goal`）；`flight_type=2` 用 launch 里预设航点。
 - **何时重规划**：执行中若超过 `thresh_replan_time`（D1 默认约 4 s）、或离全局目标还很远、或安全定时器发现前方障碍，会切到 `REPLAN_TRAJ`。
-- **局部 B-spline 起点**：`REPLAN_TRAJ` 与碰撞重规划均走 `planFromGlobalTraj`，即 **`start_pt = /odom` 位姿**（不再从上一段 B-spline 接续）；局部目标仍在全局多项式上向前截取。
+- **局部 B-spline 起点（混合 warm-start）**：`REPLAN_TRAJ` / 碰撞重规划走 `planFromCurrentTraj`：`flag_polyInit=false` 时从**上一段 B-spline 的 `t_cur` 往后**截取初值；`getLocalTarget` 与边界仍用 **`/odom` 位姿/速度**；参数化后**前 3 个控制点**钉在 odom（按 `odom_vel` 外推）。首次规划 / 无旧轨迹时仍用 `planFromGlobalTraj`（多项式初值）。
 - **何时算到达**：不只看轨迹时间，还会比较 `**/odom` 位置与目标距离** 是否小于 `goal_reach_thresh`（默认 0.3 m），这对慢速地面机器人很重要。
 
 规划成功后，FSM 通过 `planning/bspline`（重映射为 `drone_0_planning/bspline`）把 **B 样条轨迹** 发给下游。

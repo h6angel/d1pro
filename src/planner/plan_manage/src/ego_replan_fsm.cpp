@@ -548,8 +548,8 @@ namespace ego_planner
 
     case REPLAN_TRAJ:
     {
-      // Local B-spline always starts from current /odom (D1 / slow ground robot).
-      if (planFromGlobalTraj(1))
+      // Warm-start from previous B-spline; pin first control points to /odom (D1).
+      if (planFromCurrentTraj(1))
       {
         changeFSMExecState(EXEC_TRAJ, "FSM");
         publishSwarmTrajs(false);
@@ -684,10 +684,29 @@ namespace ego_planner
 
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
   {
-    // Same as planFromGlobalTraj: local replan from measured pose, not from the previous B-spline.
     if (!have_odom_)
       return false;
-    return planFromGlobalTraj(trial_times);
+
+    LocalTrajData *info = &planner_manager_->local_data_;
+    if (info->start_time_.seconds() < 1e-5 || info->duration_ < 1e-3)
+      return planFromGlobalTraj(trial_times);
+
+    start_pt_ = odom_pos_;
+    start_vel_ = odom_vel_;
+    start_acc_.setZero();
+
+    bool flag_random_poly_init;
+    if (timesOfConsecutiveStateCalls().first == 1)
+      flag_random_poly_init = false;
+    else
+      flag_random_poly_init = true;
+
+    for (int i = 0; i < trial_times; i++)
+    {
+      if (callReboundReplan(false, flag_random_poly_init))
+        return true;
+    }
+    return false;
   }
 
   void EGOReplanFSM::checkCollisionCallback()
