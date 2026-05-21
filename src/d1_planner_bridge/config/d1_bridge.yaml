@@ -7,8 +7,8 @@ d1_planner_bridge_node:
     control_rate_hz: 100.0
 
     # Clamp only; no goal stop / no position pursuit
-    max_vx: 0.6
-    max_wz: 1.0
+    max_vx: 3.0
+    max_wz: 1.5
 
     # wz = yaw_kp * (cmd.yaw - robot_yaw) + yaw_rate_ff * cmd.yaw_dot
     yaw_kp: 1.5
