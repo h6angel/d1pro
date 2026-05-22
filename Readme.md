@@ -1,115 +1,49 @@
-# Usage
-## 1. Required Libraries 
-* vtk (A dependency library for PCL installation, need to check Qt during compilation)
-* PCL
+# EGO Planner（D1 + Gazebo）
 
-## 2. Prerequisites
-It might be due to some incorrect settings in my publish/subscribe configurations. Using ROS2's default FastDDS causes significant lag during program execution. The reason hasn't been identified yet. Please follow the steps below to change the DDS to cyclonedds.
+ROS 2 下的 EGO 避障规划，经 `d1_planner_bridge` 转成 D1 的 `cmd_vel`。
 
-### 2.1 Install cyclonedds
+**文档**（建议按顺序阅读）：
+
+- [系统总览](docs/00_overview.md) — 感知、规划 FSM、控制数据流
+- [规划数学原理](docs/01_planning_math.md) — B 样条优化、2D/odom 改动
+- [控制数学原理](docs/02_control_math.md) — 轨迹采样与差速跟踪
+
+## 依赖
+
+ROS 2 Humble、PCL（VTK 编译时勾选 Qt）。仿真需发布 `/odom`、`/gazebo_obstacles`。
+
+## 仿真环境依赖
+
+- [https://github.com/h6angel/d1sim](https://github.com/h6angel/d1sim)
+
+## 编译
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
+source install/setup.bash
 ```
+
+## DDS（建议）
+
+FastDDS 易卡顿，改用 CycloneDDS：
+
+```bash
 sudo apt install ros-humble-rmw-cyclonedds-cpp
-```
-
-### 2.2 Change default DDS
-```
 echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 2.3 Verify the change
-```
-ros2 doctor --report | grep "RMW middleware"
-```
-If the output shows rmw_cyclonedds_cpp, the modification is successful.
+## 运行
 
-## 3. Running the Code (D1 + Gazebo)
-### 3.1 Launch Rviz
-```
-ros2 launch ego_planner rviz.launch.py 
-```
-### 3.2 Run the planner
-```
-ros2 launch ego_planner single_run_d1.launch.py
-```
-Launch logs are saved by default under `<workspace>/ego_log/` (one file per run; disable with `save_log:=false`).
+先起 Gazebo + D1，再各开终端 `source install/setup.bash`：
 
-### 3.3 Run the D1 bridge
-```
+```bash
+ros2 launch ego_planner rviz.launch.py              # 可选，RViz 里 2D Goal 设目标
+ros2 launch ego_planner single_run_d1.launch.py     # 规划 + traj_server
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 ```
 
-**Launch logs (default on):** `<workspace>/ego_log/` — e.g. `ego_planner/ego_log/ego_planner_single_run_d1_*.log`, `d1_planner_bridge_d1_bridge_*.log`. Not colcon `log/` nor `~/.ros/log`. Override: `log_dir:=/path` or `save_log:=false`.
+默认：`flight_type:=1` 用 RViz 设目标；`flight_type:=2` 用 launch 预设航点。桥接参数见 `src/d1_planner_bridge/config/d1_bridge.yaml`。
 
-Defaults: subscribe `/odom` (robot pose) and `/gazebo_obstacles` (world-frame obstacle cloud); publish trajectory commands on `/drone_0_planning/pos_cmd`; bridge outputs `/command/cmd_twist`.
-
-Optional parameters:
-```
-ros2 launch ego_planner single_run_d1.launch.py \
-  odom_topic:=/odom \
-  cloud_topic:=/gazebo_obstacles \
-  pos_cmd_topic:=/your_d1_cmd_topic \
-  flight_type:=1
-```
-* `flight_type:=1` — set goal in RViz (2D Goal Pose)
-* `flight_type:=2` — use preset waypoints from launch file
-
-**Note:** `traj_server` uses odom-synced playback and the FSM uses odom-based goal reach (see `single_run_d1.launch.py`).
-
-# 使用方法
-## 1. 需要的库 
-* vtk(是安装PCL的依赖库，编译时需要勾选Qt)
-* PCL
-
-## 2. 前置条件
-可能是我一些发布订阅的设置写的不太对，使用ROS2默认的FastDDS会导致程序运行很卡，目前还没找到原因，所以请按照下述方法将DDS修改为cyclonedds
-
-### 2.1 安装cyclonedds
-```
-sudo apt install ros-humble-rmw-cyclonedds-cpp
-```
-
-### 2.2 修改默认的DDS
-```
-echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc
-source ~/.bashrc
-```
-
-### 2.3 检查是否修改成功
-```
-ros2 doctor --report | grep "RMW middleware"
-```
-输出显示rmw_cyclonedds_cpp则说明修改成功
-
-## 3. 代码运行（D1 + Gazebo）
-### 3.1 运行Rviz
-```
-ros2 launch ego_planner rviz.launch.py 
-```
-### 3.2 运行规划程序
-```
-ros2 launch ego_planner single_run_d1.launch.py
-```
-默认会把终端日志写入工程根目录下的 `ego_log/`（每次运行一个文件；关闭：`save_log:=false`）。
-
-### 3.3 运行 D1 桥接
-```
-ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
-```
-
-**日志（默认开启）：** `<工作空间>/ego_log/`，例如 `ego_planner/ego_log/ego_planner_single_run_d1_*.log`。与 colcon 的 `log/`、`~/.ros/log` 无关。可改 `log_dir:=/路径` 或 `save_log:=false`。
-
-默认订阅 `/odom`（机体位姿）与 `/gazebo_obstacles`（世界系障碍点云），输出轨迹指令 `/drone_0_planning/pos_cmd`，桥接节点发布 `/command/cmd_twist`。
-
-可选参数示例：
-```
-ros2 launch ego_planner single_run_d1.launch.py \
-  odom_topic:=/odom \
-  cloud_topic:=/gazebo_obstacles \
-  pos_cmd_topic:=/your_d1_cmd_topic \
-  flight_type:=1
-```
-* `flight_type:=1` — 在 RViz 用 2D Goal 设目标点
-* `flight_type:=2` — 使用 launch 里预设航点
-
-**说明：** 使用 `single_run_d1.launch.py` 时，`traj_server` 按 `/odom` 在轨迹上推进，FSM 按 odom 判到达。
+终端日志默认写在工程根目录 `ego_log/`，记录egoplanner的状态、d１机器人的位置以及接收到的速度命令、ego规划的速度。关闭：`save_log:=false`。
