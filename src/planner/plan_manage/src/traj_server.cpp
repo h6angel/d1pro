@@ -2,6 +2,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "traj_utils/msg/bspline.hpp"
+#include "traj_utils/trajectory_debug_log.hpp"
 #include "quadrotor_msgs/msg/position_command.hpp"
 #include "std_msgs/msg/empty.hpp"
 #include "visualization_msgs/msg/marker.hpp"
@@ -32,6 +33,14 @@ bool have_odom_ = false;
 Eigen::Vector3d odom_pos_ = Eigen::Vector3d::Zero();
 double t_progress_ = 0.0;
 double odom_lookahead_time_ = 0.4;
+// When odom is past traj end but not at endpoint: guide toward traj_end instead of freezing bad vel.
+double endpoint_approach_dist_ = 0.35;
+double endpoint_stop_dist_ = 0.08;
+double endpoint_vel_gain_ = 0.8;
+double endpoint_max_vel_ = 1.0;
+
+rclcpp::Node::SharedPtr g_node;
+int g_log_trace_period_ms_ = 500;
 
 double closestTimeOnTrajXY(const Eigen::Vector2d & query_xy)
 {
@@ -106,11 +115,25 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
 
   traj_duration_ = traj_[0].getTimeSum();
   t_progress_ = 0.0;
-  if (use_odom_progress_ && have_odom_)
+  if (use_odom_progress_ && have_odom_) {
     t_progress_ = closestTimeOnTrajXY(odom_pos_.head<2>());
+    t_progress_ = std::max(0.0, std::min(t_progress_, traj_duration_));
+  }
 
   receive_traj_ = true;
   publishExecBsplinePath(rclcpp::Time(msg->start_time.sec, msg->start_time.nanosec));
+
+  if (g_node) {
+    std::vector<geometry_msgs::msg::Point> pts(msg->pos_pts.begin(), msg->pos_pts.end());
+    const Eigen::Vector3d traj_end = traj_[0].evaluateDeBoorT(traj_duration_);
+    RCLCPP_INFO(
+      g_node->get_logger(),
+      "[bspline_rx] traj_id=%d dur=%.2fs odom=%s traj_end=%s %s",
+      traj_id_, traj_duration_,
+      traj_utils::formatVec3(odom_pos_).c_str(),
+      traj_utils::formatVec3(traj_end).c_str(),
+      traj_utils::formatControlPointsSummary(pts).c_str());
+  }
 }
 
 void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -220,19 +243,32 @@ void cmdCallback()
   rclcpp::Clock clock(RCL_ROS_TIME);
   rclcpp::Time time_now = clock.now();
 
+  const Eigen::Vector3d traj_end = traj_[0].evaluateDeBoorT(traj_duration_);
+
   double t_cur = 0.0;
+  bool endpoint_hold = false;
   if (use_odom_progress_ && have_odom_)
   {
     const double t_closest = closestTimeOnTrajXY(odom_pos_.head<2>());
-    t_progress_ = std::max(t_progress_, t_closest);
+    const double dist_odom_end_xy =
+      (odom_pos_.head<2>() - traj_end.head<2>()).norm();
+
+    // Overshoot past traj end: allow t_progress to move backward with closest projection.
+    if (t_closest >= traj_duration_ - 1e-3 &&
+        dist_odom_end_xy > endpoint_approach_dist_)
+    {
+      t_progress_ = t_closest;
+    }
+    else
+    {
+      t_progress_ = std::max(t_progress_, t_closest);
+    }
     t_cur = std::min(t_progress_ + odom_lookahead_time_, traj_duration_);
 
-    // Slow ground robot: don't command vel=0 at traj end while odom is still far from endpoint.
-    if (t_cur >= traj_duration_ - 1e-3)
+    if (t_cur >= traj_duration_ - 1e-3 &&
+        dist_odom_end_xy > endpoint_stop_dist_)
     {
-      const Eigen::Vector3d end_pos = traj_[0].evaluateDeBoorT(traj_duration_);
-      if ((odom_pos_.head<2>() - end_pos.head<2>()).norm() > 0.35)
-        t_cur = std::min(t_closest + odom_lookahead_time_, traj_duration_ - 1e-3);
+      endpoint_hold = true;
     }
   }
   else
@@ -244,7 +280,34 @@ void cmdCallback()
   std::pair<double, double> yaw_yawdot(0, 0);
 
   static rclcpp::Time time_last = clock.now();
-  if (t_cur < traj_duration_ && t_cur >= 0.0)
+  if (endpoint_hold)
+  {
+    pos = traj_end;
+    acc.setZero();
+    pos_f = traj_end;
+
+    const Eigen::Vector2d diff =
+      traj_end.head<2>() - odom_pos_.head<2>();
+    const double dist_xy = diff.norm();
+    vel.setZero();
+    if (dist_xy > endpoint_stop_dist_)
+    {
+      const double spd = std::min(endpoint_max_vel_, endpoint_vel_gain_ * dist_xy);
+      vel.head<2>() = diff / dist_xy * spd;
+    }
+
+    if (vel.head<2>().norm() > 0.05)
+    {
+      yaw_yawdot.first = std::atan2(vel(1), vel(0));
+      yaw_yawdot.second = 0.0;
+    }
+    else
+    {
+      yaw_yawdot.first = last_yaw_;
+      yaw_yawdot.second = 0.0;
+    }
+  }
+  else if (t_cur < traj_duration_ && t_cur >= 0.0)
   {
     pos = traj_[0].evaluateDeBoorT(t_cur);
     vel = traj_[1].evaluateDeBoorT(t_cur);
@@ -257,14 +320,24 @@ void cmdCallback()
   }
   else if (t_cur >= traj_duration_)
   {
-    pos = traj_[0].evaluateDeBoorT(traj_duration_);
-    vel = traj_[1].evaluateDeBoorT(std::max(traj_duration_ - 1e-3, 0.0));
+    pos = traj_end;
     acc.setZero();
+    pos_f = traj_end;
 
-    yaw_yawdot.first = last_yaw_;
-    yaw_yawdot.second = 0;
-
-    pos_f = pos;
+    const double dist_odom_end_xy = have_odom_ ?
+      (odom_pos_.head<2>() - traj_end.head<2>()).norm() : 0.0;
+    if (have_odom_ && dist_odom_end_xy <= endpoint_stop_dist_)
+    {
+      vel.setZero();
+      yaw_yawdot.first = last_yaw_;
+      yaw_yawdot.second = 0.0;
+    }
+    else
+    {
+      vel = traj_[1].evaluateDeBoorT(std::max(traj_duration_ - 1e-3, 0.0));
+      yaw_yawdot = calculate_yaw(
+        std::max(traj_duration_ - 1e-3, 0.0), pos, time_now, time_last);
+    }
   }
   else
   {
@@ -296,19 +369,43 @@ void cmdCallback()
   last_yaw_ = cmd.yaw;
 
   pos_cmd_pub->publish(cmd);
+
+  if (g_node && have_odom_) {
+    const double dist_odom_cmd = (odom_pos_.head<2>() - pos.head<2>()).norm();
+    RCLCPP_INFO_THROTTLE(
+      g_node->get_logger(), *g_node->get_clock(),
+      std::max(g_log_trace_period_ms_, 1),
+      "[pos_cmd_pub] traj_id=%d t=%.2f/%.2f odom=%s cmd_pos=%s vel=%s dist_odom_cmd=%.3f",
+      traj_id_, t_cur, traj_duration_,
+      traj_utils::formatVec3(odom_pos_).c_str(),
+      traj_utils::formatVec3(pos).c_str(),
+      traj_utils::formatXYZ(vel(0), vel(1), vel(2)).c_str(),
+      dist_odom_cmd);
+  }
 }
 
 int main(int argc, char **argv)
 {
   rclcpp::init(argc, argv);
   auto node = rclcpp::Node::make_shared("traj_server");
+  g_node = node;
 
   node->declare_parameter("traj_server/time_forward", 1.0);
   node->declare_parameter("traj_server/use_odom_progress", false);
   node->declare_parameter("traj_server/odom_lookahead_time", 0.4);
+  node->declare_parameter("traj_server/log_trace_period_ms", 500);
+  node->declare_parameter("traj_server/endpoint_approach_dist", 0.35);
+  node->declare_parameter("traj_server/endpoint_stop_dist", 0.08);
+  node->declare_parameter("traj_server/endpoint_vel_gain", 0.8);
+  node->declare_parameter("traj_server/endpoint_max_vel", 1.0);
   node->get_parameter("traj_server/time_forward", time_forward_);
   node->get_parameter("traj_server/use_odom_progress", use_odom_progress_);
   node->get_parameter("traj_server/odom_lookahead_time", odom_lookahead_time_);
+  node->get_parameter("traj_server/log_trace_period_ms", g_log_trace_period_ms_);
+  node->get_parameter("traj_server/endpoint_approach_dist", endpoint_approach_dist_);
+  node->get_parameter("traj_server/endpoint_stop_dist", endpoint_stop_dist_);
+  node->get_parameter("traj_server/endpoint_vel_gain", endpoint_vel_gain_);
+  node->get_parameter("traj_server/endpoint_max_vel", endpoint_max_vel_);
 
   auto bspline_sub = node->create_subscription<traj_utils::msg::Bspline>(
       "planning/bspline",

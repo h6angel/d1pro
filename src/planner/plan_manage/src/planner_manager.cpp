@@ -194,6 +194,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
 
         double t;
         double t_cur = (rclcpp::Clock().now() - local_data_.start_time_).seconds();
+        t_cur = std::max(0.0, std::min(t_cur, local_data_.duration_));
 
         vector<double> pseudo_arc_length;
         vector<Eigen::Vector3d> segment_point;
@@ -207,6 +208,14 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
           }
         }
         t -= ts;
+
+        // Need >=2 samples for arc-length interpolation; otherwise size()-2 underflows and segfaults.
+        if (pseudo_arc_length.size() < 2 || segment_point.size() < 2)
+        {
+          flag_force_polynomial = true;
+          flag_regenerate = true;
+          continue;
+        }
 
         double poly_time = (local_data_.position_traj_.evaluateDeBoorT(t) - local_target_pt).norm() / pp_.max_vel_ * 2;
         if (poly_time > ts)
@@ -241,12 +250,13 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
           point_set.clear();
           sample_length = 0;
           id = 0;
-          while ((id <= pseudo_arc_length.size() - 2) && sample_length <= pseudo_arc_length.back())
+          while (id + 1 < pseudo_arc_length.size() && sample_length <= pseudo_arc_length.back())
           {
-            if (sample_length >= pseudo_arc_length[id] && sample_length < pseudo_arc_length[id + 1])
+            const double seg_len = pseudo_arc_length[id + 1] - pseudo_arc_length[id];
+            if (sample_length >= pseudo_arc_length[id] && sample_length < pseudo_arc_length[id + 1] && seg_len > 1e-9)
             {
-              point_set.push_back((sample_length - pseudo_arc_length[id]) / (pseudo_arc_length[id + 1] - pseudo_arc_length[id]) * segment_point[id + 1] +
-                                  (pseudo_arc_length[id + 1] - sample_length) / (pseudo_arc_length[id + 1] - pseudo_arc_length[id]) * segment_point[id]);
+              point_set.push_back((sample_length - pseudo_arc_length[id]) / seg_len * segment_point[id + 1] +
+                                  (pseudo_arc_length[id + 1] - sample_length) / seg_len * segment_point[id]);
               sample_length += cps_dist;
             }
             else

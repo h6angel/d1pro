@@ -14,12 +14,20 @@ struct TrackerParams
   double max_wz{1.0};
   double yaw_kp{1.5};
   double yaw_rate_ff{1.0};
+  /// Cap |yaw_dot| feedforward from traj_server (avoids ±pi spikes on replan).
+  double max_yaw_dot_ff{0.5};
   bool project_velocity_to_body{true};
   /// If |vx| is in (vx_deadband, min_vx), boost to min_vx (quadruped static friction).
   double min_vx{0.0};
   double vx_deadband{0.01};
-  /// Cap on |yaw_kp * yaw_err| so turn-in-place does not dominate slow forward motion.
+  /// Cap on |yaw_kp * yaw_err| while driving (small turns during forward motion).
   double max_wz_yaw_p{1.0};
+  /// |wz| floor when |heading_err| > align_heading_thresh_rad (turn-in-place).
+  double min_turn_wz{0.5};
+
+  /// Turn in place when |heading_err| exceeds this (rad); no forward/backward until aligned.
+  double align_heading_thresh_rad{1.0471975511965976};  // 60 deg
+  bool allow_reverse{false};
 
   /// Cross-track correction: pos_cmd.position vs odom (carrot on traj_server lookahead point).
   bool enable_lateral_correction{true};
@@ -29,6 +37,10 @@ struct TrackerParams
   /// Reduce |vx| when lateral error is large (0 = off).
   double vx_lat_damp_gain{0.4};
   double lateral_slowdown_dist{0.4};
+  /// Skip lateral P when plan speed |v_xy| below this (stale / ended traj).
+  double min_plan_speed_for_lateral{0.15};
+  /// Skip lateral P when |e_lat| above this (robot far off path).
+  double max_lateral_error_m{2.0};
 };
 
 struct GroundTwist
@@ -38,6 +50,8 @@ struct GroundTwist
   bool valid{false};
   /// Signed lateral offset (m): robot left of path heading is positive.
   double lateral_error{0.0};
+  /// wrapPi(path_or_cmd_yaw - robot_yaw)
+  double heading_error{0.0};
 };
 
 /// Maps EGO pos_cmd to D1 cmd_twist: velocity feedforward + yaw & lateral error feedback.

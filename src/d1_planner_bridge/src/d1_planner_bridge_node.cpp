@@ -1,6 +1,7 @@
 #include "d1_planner_bridge/d1_planner_bridge.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 
 namespace d1_planner_bridge
@@ -52,18 +53,24 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
   TrackerParams p;
   p.max_vx = declare_parameter<double>("max_vx", 0.6);
   p.max_wz = declare_parameter<double>("max_wz", 1.0);
-  p.yaw_kp = declare_parameter<double>("yaw_kp", 1.5);
+  p.yaw_kp = declare_parameter<double>("yaw_kp", 0.8);
   p.yaw_rate_ff = declare_parameter<double>("yaw_rate_ff", 1.0);
+  p.max_yaw_dot_ff = declare_parameter<double>("max_yaw_dot_ff", 0.5);
   p.project_velocity_to_body = declare_parameter<bool>("project_velocity_to_body", true);
   p.min_vx = declare_parameter<double>("min_vx", 0.08);
   p.vx_deadband = declare_parameter<double>("vx_deadband", 0.01);
-  p.max_wz_yaw_p = declare_parameter<double>("max_wz_yaw_p", 0.35);
+  p.max_wz_yaw_p = declare_parameter<double>("max_wz_yaw_p", 0.5);
+  p.min_turn_wz = declare_parameter<double>("min_turn_wz", 0.5);
+  p.align_heading_thresh_rad = declare_parameter<double>("align_heading_thresh_rad", M_PI / 3.0);
+  p.allow_reverse = declare_parameter<bool>("allow_reverse", false);
   p.enable_lateral_correction = declare_parameter<bool>("enable_lateral_correction", true);
-  p.lateral_kp = declare_parameter<double>("lateral_kp", 0.9);
+  p.lateral_kp = declare_parameter<double>("lateral_kp", 0.3);
   p.lateral_error_deadband = declare_parameter<double>("lateral_error_deadband", 0.05);
   p.max_wz_lateral_p = declare_parameter<double>("max_wz_lateral_p", 0.35);
   p.vx_lat_damp_gain = declare_parameter<double>("vx_lat_damp_gain", 0.4);
   p.lateral_slowdown_dist = declare_parameter<double>("lateral_slowdown_dist", 0.4);
+  p.min_plan_speed_for_lateral = declare_parameter<double>("min_plan_speed_for_lateral", 0.15);
+  p.max_lateral_error_m = declare_parameter<double>("max_lateral_error_m", 2.0);
   return p;
 }
 
@@ -130,12 +137,30 @@ void D1PlannerBridgeNode::controlTimerCallback()
   if (log_cmd_vel_) {
     const int throttle_ms = std::max(log_cmd_vel_period_ms_, 0);
     if (ground.valid) {
+      double odom_x = 0.0, odom_y = 0.0, odom_yaw = 0.0;
+      if (odom) {
+        odom_x = odom->pose.pose.position.x;
+        odom_y = odom->pose.pose.position.y;
+        const auto & q = odom->pose.pose.orientation;
+        odom_yaw = std::atan2(
+          2.0 * (q.w * q.z + q.x * q.y),
+          1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+      }
+      const double dist_odom_cmd = odom ?
+        std::hypot(
+          odom_x - cmd->position.x,
+          odom_y - cmd->position.y) :
+        -1.0;
       RCLCPP_INFO_THROTTLE(
         get_logger(), *get_clock(), throttle_ms,
-        "D1 %s: linear.x=%.4f angular.z=%.4f | vel (%.4f, %.4f) yaw_dot=%.4f e_lat=%.3f",
-        cmd_vel_topic_.c_str(),
+        "[cmd_vel_pub] odom=(%.3f,%.3f,yaw=%.3f) cmd_pos=(%.3f,%.3f) cmd_vel=(%.3f,%.3f) "
+        "twist=(%.3f,%.3f) dist=%.3f e_lat=%.3f h_err=%.3f traj_id=%u",
+        odom_x, odom_y, odom_yaw,
+        cmd->position.x, cmd->position.y,
+        cmd->velocity.x, cmd->velocity.y,
         twist.linear.x, twist.angular.z,
-        cmd->velocity.x, cmd->velocity.y, cmd->yaw_dot, ground.lateral_error);
+        dist_odom_cmd, ground.lateral_error, ground.heading_error,
+        cmd->trajectory_id);
     } else {
       RCLCPP_INFO_THROTTLE(
         get_logger(), *get_clock(), throttle_ms,

@@ -32,10 +32,14 @@ ros2 launch ego_planner rviz.launch.py
 ```
 ros2 launch ego_planner single_run_d1.launch.py
 ```
+Launch logs are saved by default under `<workspace>/ego_log/` (one file per run; disable with `save_log:=false`).
+
 ### 3.3 Run the D1 bridge
 ```
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 ```
+
+**Launch logs (default on):** `<workspace>/ego_log/` — e.g. `ego_planner/ego_log/ego_planner_single_run_d1_*.log`, `d1_planner_bridge_d1_bridge_*.log`. Not colcon `log/` nor `~/.ros/log`. Override: `log_dir:=/path` or `save_log:=false`.
 
 Defaults: subscribe `/odom` (robot pose) and `/gazebo_obstacles` (world-frame obstacle cloud); publish trajectory commands on `/drone_0_planning/pos_cmd`; bridge outputs `/command/cmd_twist`.
 
@@ -86,10 +90,14 @@ ros2 launch ego_planner rviz.launch.py
 ```
 ros2 launch ego_planner single_run_d1.launch.py
 ```
+默认会把终端日志写入工程根目录下的 `ego_log/`（每次运行一个文件；关闭：`save_log:=false`）。
+
 ### 3.3 运行 D1 桥接
 ```
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 ```
+
+**日志（默认开启）：** `<工作空间>/ego_log/`，例如 `ego_planner/ego_log/ego_planner_single_run_d1_*.log`。与 colcon 的 `log/`、`~/.ros/log` 无关。可改 `log_dir:=/路径` 或 `save_log:=false`。
 
 默认订阅 `/odom`（机体位姿）与 `/gazebo_obstacles`（世界系障碍点云），输出轨迹指令 `/drone_0_planning/pos_cmd`，桥接节点发布 `/command/cmd_twist`。
 

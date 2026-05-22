@@ -64,51 +64,97 @@ GroundTwist TrajectoryTracker::compute(
     return out;
   }
 
-  double vx = cmd.velocity.x;
-  double wz = params_.yaw_rate_ff * cmd.yaw_dot;
+  const double v_plan = std::hypot(cmd.velocity.x, cmd.velocity.y);
+  const double path_yaw = pathYawFromCmd(cmd);
+
   out.lateral_error = 0.0;
+  out.heading_error = 0.0;
 
   if (odom != nullptr && params_.project_velocity_to_body) {
     const double robot_yaw = yawFromOdom(*odom);
     const double cos_yaw = std::cos(robot_yaw);
     const double sin_yaw = std::sin(robot_yaw);
-    vx = cos_yaw * cmd.velocity.x + sin_yaw * cmd.velocity.y;
-    const double wz_yaw = params_.yaw_kp * wrapPi(cmd.yaw - robot_yaw);
-    wz += std::clamp(wz_yaw, -params_.max_wz_yaw_p, params_.max_wz_yaw_p);
+    double vx = cos_yaw * cmd.velocity.x + sin_yaw * cmd.velocity.y;
 
-    if (params_.enable_lateral_correction) {
-      const double path_yaw = pathYawFromCmd(cmd);
-      const auto & p = odom->pose.pose.position;
-      out.lateral_error = signedLateralError(
-        p.x, p.y, cmd.position.x, cmd.position.y, path_yaw);
+    const double yaw_err_path = wrapPi(path_yaw - robot_yaw);
+    out.heading_error = yaw_err_path;
 
-      double e_lat = out.lateral_error;
-      if (std::abs(e_lat) < params_.lateral_error_deadband) {
-        e_lat = 0.0;
+    const bool heading_misaligned =
+      std::abs(yaw_err_path) > params_.align_heading_thresh_rad;
+    const bool plan_speed_ok = v_plan >= params_.min_plan_speed_for_lateral;
+
+    double wz = 0.0;
+    if (heading_misaligned) {
+      // Turn in place toward path tangent: use full max_wz, not max_wz_yaw_p.
+      wz = params_.yaw_kp * yaw_err_path;
+      wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
+      if (std::abs(yaw_err_path) > 0.15 && std::abs(wz) < params_.min_turn_wz) {
+        wz = (yaw_err_path > 0.0 ? 1.0 : -1.0) * params_.min_turn_wz;
+      }
+      vx = 0.0;
+    } else {
+      const double yaw_dot_ff = std::clamp(
+        cmd.yaw_dot, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);
+      wz = params_.yaw_rate_ff * yaw_dot_ff;
+
+      const double wz_yaw = params_.yaw_kp * yaw_err_path;
+      wz += std::clamp(wz_yaw, -params_.max_wz_yaw_p, params_.max_wz_yaw_p);
+
+      if (params_.enable_lateral_correction && plan_speed_ok) {
+        const auto & p = odom->pose.pose.position;
+        out.lateral_error = signedLateralError(
+          p.x, p.y, cmd.position.x, cmd.position.y, path_yaw);
+
+        if (std::abs(out.lateral_error) <= params_.max_lateral_error_m) {
+          double e_lat = out.lateral_error;
+          if (std::abs(e_lat) < params_.lateral_error_deadband) {
+            e_lat = 0.0;
+          }
+
+          const double wz_lat = -params_.lateral_kp * e_lat;
+          wz += std::clamp(wz_lat, -params_.max_wz_lateral_p, params_.max_wz_lateral_p);
+
+          if (params_.vx_lat_damp_gain > 0.0 && params_.lateral_slowdown_dist > 1e-3) {
+            const double lat_ratio = std::min(
+              std::abs(out.lateral_error) / params_.lateral_slowdown_dist, 1.0);
+            const double scale = 1.0 - params_.vx_lat_damp_gain * lat_ratio;
+            vx *= std::max(0.0, scale);
+          }
+        }
       }
 
-      // Robot left of path (e_lat > 0) -> turn right (negative wz in REP-103).
-      const double wz_lat = -params_.lateral_kp * e_lat;
-      wz += std::clamp(wz_lat, -params_.max_wz_lateral_p, params_.max_wz_lateral_p);
+      if (!params_.allow_reverse) {
+        vx = std::max(0.0, vx);
+      }
 
-      if (params_.vx_lat_damp_gain > 0.0 && params_.lateral_slowdown_dist > 1e-3) {
-        const double lat_ratio = std::min(
-          std::abs(out.lateral_error) / params_.lateral_slowdown_dist, 1.0);
-        const double scale = 1.0 - params_.vx_lat_damp_gain * lat_ratio;
-        vx *= std::max(0.0, scale);
+      if (params_.min_vx > 0.0) {
+        const double av = std::abs(vx);
+        if (av > params_.vx_deadband && av < params_.min_vx) {
+          vx = params_.min_vx;
+        }
       }
     }
-  }
 
-  if (params_.min_vx > 0.0) {
-    const double av = std::abs(vx);
-    if (av > params_.vx_deadband && av < params_.min_vx) {
-      vx = (vx > 0.0 ? 1.0 : -1.0) * params_.min_vx;
+    out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
+    out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
+  } else {
+    const double yaw_dot_ff = std::clamp(
+      cmd.yaw_dot, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);
+    double wz = params_.yaw_rate_ff * yaw_dot_ff;
+    double vx = cmd.velocity.x;
+    if (!params_.allow_reverse) {
+      vx = std::max(0.0, vx);
     }
+    if (params_.min_vx > 0.0) {
+      const double av = std::abs(vx);
+      if (av > params_.vx_deadband && av < params_.min_vx) {
+        vx = (vx >= 0.0 ? 1.0 : -1.0) * params_.min_vx;
+      }
+    }
+    out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
+    out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
   }
 
-  out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
-  out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
   out.valid = true;
   return out;
 }

@@ -112,9 +112,10 @@ flowchart LR
 - 发布：`/command/cmd_twist`（`geometry_msgs/Twist`，只用 `**linear.x`** 和 `**angular.z**`）
 - 逻辑概要（`trajectory_tracker`）：
   - 仅当 `trajectory_flag == TRAJECTORY_STATUS_READY` 才输出非零速度
-  - **前馈**：把 `pos_cmd` 世界系 `(vx, vy)` 用 `/odom` yaw 投影到车体 → `linear.x`
-  - **航向反馈**：`wz += yaw_kp * (cmd.yaw - robot_yaw)`（及 `yaw_dot` 前馈）
-  - **横向反馈**：`pos_cmd.position`（traj_server lookahead 点）相对 `/odom` 的横向偏差 → 修正 `angular.z`；偏差大时略减 `linear.x`（`lateral_kp` 等见 `d1_bridge.yaml`）
+  - **前馈**：把 `pos_cmd` 世界系 `(vx, vy)` 用 `/odom` yaw 投影到车体 → `linear.x`（默认禁止倒车）
+  - **对准再前进**：`|path_yaw - robot_yaw| > 60°` 时 `linear.x=0`，只转不走
+  - **航向反馈**：`wz += yaw_kp * (cmd.yaw - robot_yaw)`，`yaw_dot` 前馈限幅 `max_yaw_dot_ff`（抑制重规划 ±π 跳变）
+  - **横向反馈**：规划速度 &gt; 0.15 m/s 且 `|e_lat| < 2 m` 时，用前瞻点纠 `angular.z`；见 `d1_bridge.yaml`
   - 再按 `max_vx`、`max_wz` 限幅
 
 ### 第三步：Gazebo 执行
@@ -126,6 +127,33 @@ flowchart LR
 1. `ego_planner`：`single_run_d1.launch.py`（规划 + 建图 + traj_server）
 2. `d1_planner_bridge`：`d1_planner_bridge.launch.py`（或单独 node + `d1_bridge.yaml`）
 
+### 保存 launch 终端日志（默认开启，每次运行一个文件）
+
+默认写入 **工作空间根目录下的 `ego_log/`**（与 colcon 的 `log/`、`~/.ros/log` 分开）：
+
+```bash
+ros2 launch ego_planner single_run_d1.launch.py
+ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
+```
+
+关闭：`save_log:=false`。改目录：`log_dir:=/path`。
+
+| 日志文件前缀 | 便于查看 |
+|-------------|----------|
+| `ego_planner_single_run_d1_*` | FSM 状态、`refine_success`、重规划 |
+| `d1_planner_bridge_d1_bridge_*` | `linear.x` / `angular.z`、`vel`、`e_lat` |
+
+**位置追踪日志（默认 500ms 一条，写入 `ego_log/`）：**
+
+| 标签 | 节点 | 内容 |
+|------|------|------|
+| `[bspline_publish]` | ego_planner | 发布 B 样条时：odom、goal、控制点摘要、traj_end |
+| `[bspline_rx]` | traj_server | 收到 B 样条时：odom、控制点、轨迹终点 |
+| `[pos_cmd_pub]` | traj_server | 发 pos_cmd 时：odom、cmd_pos、vel、dist |
+| `[exec_trace]` | ego_planner | EXEC 中：dist_goal、t_cur/duration、at_goal |
+| `[goal_reached]` / `[goal_timeout]` | ego_planner | 到终点或超时未到达 |
+| `[cmd_vel_pub]` | d1_bridge | 发 cmd_twist 时：odom、cmd_pos、twist、dist |
+
 ---
 
 ## 4. D1 一冲一停：常见原因与调参
@@ -133,8 +161,9 @@ flowchart LR
 | 现象 | 可先试 |
 |------|--------|
 | `linear.x` 长期 &lt; 0.05，腿动一下停一下 | `d1_bridge.yaml` 里 `min_vx: 0.08`（过小速度抬到可起步） |
-| `angular.z` 一直涨、`yaw_dot=0` | 降低 `yaw_kp`，限制 `max_wz_yaw_p` |
-| 约每 2s 顿一下 | 增大 `thresh_replan_time`（`single_run_d1` 默认 4s） |
+| `angular.z` 一直涨、`yaw_dot=±3` | 降低 `max_yaw_dot_ff`、`yaw_kp`，限制 `max_wz` |
+| 约每 4–6s 顿一下 | 增大 `thresh_replan_time`（`single_run_d1` 默认 6s） |
+| 车头未对准仍往前蹭 | 检查 `align_heading_thresh_rad`、`h_err` 日志 |
 | 规划速度小、车跟不上轨迹 | 增大 `traj_server/odom_lookahead_time`（默认 0.7s） |
 | 通信卡顿 | 使用 CycloneDDS（见仓库 `Readme.md`） |
 

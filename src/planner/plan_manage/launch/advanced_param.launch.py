@@ -46,6 +46,7 @@ def generate_launch_description():
     thresh_replan_time = LaunchConfiguration('thresh_replan_time', default='1.0')
     obstacles_inflation = LaunchConfiguration('obstacles_inflation', default='0.099')
     optimization_dist0 = LaunchConfiguration('optimization_dist0', default='0.5')
+    lambda_fitness = LaunchConfiguration('lambda_fitness', default='1.0')
     use_distinctive_trajs = LaunchConfiguration('use_distinctive_trajs', default=False)
 
     map_size_x_arg = DeclareLaunchArgument('map_size_x_', default_value=map_size_x, description='Map size along X')
@@ -93,6 +94,9 @@ def generate_launch_description():
     optimization_dist0_arg = DeclareLaunchArgument(
         'optimization_dist0', default_value=optimization_dist0,
         description='B-spline optimizer clearance from obstacles (m)')
+    lambda_fitness_arg = DeclareLaunchArgument(
+        'lambda_fitness', default_value=lambda_fitness,
+        description='B-spline refine fitness weight; raise if refine hits obstacles often')
     use_distinctive_trajs_arg = DeclareLaunchArgument('use_distinctive_trajs', default_value=use_distinctive_trajs, description='Distinctive trajectories (multi-agent only)')
 
     ego_planner_node = Node(
@@ -127,6 +131,7 @@ def generate_launch_description():
             {'fsm/emergency_time': 1.0},
             {'fsm/realworld_experiment': False},
             {'fsm/fail_safe': True},
+            {'fsm/log_trace_period_ms': 500},
 
             {'fsm/waypoint_num': point_num},
             {'fsm/waypoint0_x': point0_x},
@@ -192,7 +197,7 @@ def generate_launch_description():
             {'optimization/lambda_smooth': 1.0},
             {'optimization/lambda_collision': 0.5},
             {'optimization/lambda_feasibility': 0.1},
-            {'optimization/lambda_fitness': 1.0},
+            {'optimization/lambda_fitness': lambda_fitness},
             {'optimization/dist0': optimization_dist0},
             {'optimization/swarm_clearance': 0.5},
             {'optimization/max_vel': max_vel},
@@ -244,6 +249,7 @@ def generate_launch_description():
     ld.add_action(thresh_replan_time_arg)
     ld.add_action(obstacles_inflation_arg)
     ld.add_action(optimization_dist0_arg)
+    ld.add_action(lambda_fitness_arg)
     ld.add_action(use_distinctive_trajs_arg)
     ld.add_action(ego_planner_node)
 

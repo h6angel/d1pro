@@ -9,28 +9,31 @@ d1_planner_bridge_node:
     log_cmd_vel: true
     log_cmd_vel_period_ms: 500
 
-    # Match ego single_run_d1 max_vel
-    max_vx: 2.6
+    max_vx: 1.6
     max_wz: 1.0
 
-    # Lower yaw_kp: avoid slow crawl + large turn-in-place (stutter in logs)
-    yaw_kp: 0.4
+    # Path-tangent yaw: align_heading ~34deg; faster kp for D1 trial tuning
+    yaw_kp: 1.2
     yaw_rate_ff: 1.0
-    max_wz_yaw_p: 0.35
+    max_yaw_dot_ff: 0.5
+    max_wz_yaw_p: 0.5
+    min_turn_wz: 0.5
 
-    # Boost tiny planner vx so D1 clears static friction (set 0 to disable)
+    align_heading_thresh_rad: 0.6
+    allow_reverse: false
+
     min_vx: 0.08
     vx_deadband: 0.01
 
-    # Cross-track: pos_cmd.position (lookahead) vs /odom; feedforward vx unchanged in spirit
     enable_lateral_correction: true
-    lateral_kp: 0.9
+    lateral_kp: 0.3
     lateral_error_deadband: 0.05
     max_wz_lateral_p: 0.35
-    vx_lat_damp_gain: 0.4
+    vx_lat_damp_gain: 0.25
     lateral_slowdown_dist: 0.4
+    min_plan_speed_for_lateral: 0.15
+    max_lateral_error_m: 2.0
 
-    # Smooth cmd_vel jumps from replan / odom projection (0 = off, 1 = no memory)
-    cmd_vel_ema_alpha: 0.35
+    cmd_vel_ema_alpha: 0.8
 
     project_velocity_to_body: true

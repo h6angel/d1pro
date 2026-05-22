@@ -1,5 +1,6 @@
 
 #include <ego_planner/ego_replan_fsm.h>
+#include "traj_utils/trajectory_debug_log.hpp"
 
 namespace ego_planner
 {
@@ -23,6 +24,7 @@ namespace ego_planner
     node_->declare_parameter("fsm/emergency_time", 1.0);
     node_->declare_parameter("fsm/realworld_experiment", false);
     node_->declare_parameter("fsm/fail_safe", true);
+    node_->declare_parameter("fsm/log_trace_period_ms", 500);
 
     node_->get_parameter("fsm/flight_type", target_type_);
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
@@ -35,6 +37,7 @@ namespace ego_planner
     node_->get_parameter("fsm/emergency_time", emergency_time_);
     node_->get_parameter("fsm/realworld_experiment", flag_realworld_experiment_);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
+    node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
 
     have_trigger_ = !flag_realworld_experiment_;
 
@@ -557,7 +560,7 @@ namespace ego_planner
       }
       else
       {
-        const double dist_to_goal = (end_pt_ - odom_pos_).norm();
+        const double dist_to_goal = (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
         if (dist_to_goal < goal_reach_thresh_)
         {
           have_target_ = false;
@@ -578,10 +581,20 @@ namespace ego_planner
       /* determine if need to replan */
       LocalTrajData *info = &planner_manager_->local_data_;
       rclcpp::Time time_now = rclcpp::Clock().now();
-      double t_cur = (time_now - info->start_time_).seconds();
-      t_cur = std::min(info->duration_, t_cur);
+      const double t_wall = (time_now - info->start_time_).seconds();
+      double t_cur = std::min(info->duration_, t_wall);
 
       Eigen::Vector3d pos = info->position_traj_.evaluateDeBoorT(t_cur);
+
+      const double dist_to_goal_xy =
+        (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
+      const bool at_goal = dist_to_goal_xy < goal_reach_thresh_;
+      const double local_tgt_xy_err =
+        (local_target_pt_.head<2>() - end_pt_.head<2>()).norm();
+      // XY only: local_target z is overwritten with odom z in callReboundReplan().
+      const bool local_target_is_goal = local_tgt_xy_err < 0.15;
+      const bool near_goal_phase =
+        local_target_is_goal || dist_to_goal_xy < planning_horizen_;
 
       /* && (end_pt_ - pos).norm() < 0.5 */
       if ((target_type_ == TARGET_TYPE::PRESET_TARGET) &&
@@ -591,15 +604,26 @@ namespace ego_planner
         wp_id_++;
         planNextWaypoint(wps_[wp_id_]);
       }
-      else if ((local_target_pt_ - end_pt_).norm() < 1e-3) // close to the global target
+      else if (near_goal_phase)
       {
-        const double dist_to_goal = (end_pt_ - odom_pos_).norm();
-        const bool at_goal = dist_to_goal < goal_reach_thresh_;
+        RCLCPP_INFO_THROTTLE(
+          node_->get_logger(), *node_->get_clock(),
+          std::max(log_trace_period_ms_, 1),
+          "[exec_trace] odom=%s goal=%s dist_goal_xy=%.3f t_wall=%.2f t_cur=%.2f/%.2f at_goal=%d",
+          traj_utils::formatVec3(odom_pos_).c_str(),
+          traj_utils::formatVec3(end_pt_).c_str(),
+          dist_to_goal_xy, t_wall, t_cur, info->duration_, at_goal ? 1 : 0);
 
         if (t_cur > info->duration_ - 1e-2)
         {
           if (at_goal)
           {
+            RCLCPP_INFO(
+              node_->get_logger(),
+              "[goal_reached] odom=%s goal=%s dist_xy=%.3f -> WAIT_TARGET (stop planning)",
+              traj_utils::formatVec3(odom_pos_).c_str(),
+              traj_utils::formatVec3(end_pt_).c_str(),
+              dist_to_goal_xy);
             have_target_ = false;
             have_trigger_ = false;
 
@@ -614,16 +638,19 @@ namespace ego_planner
           }
           else
           {
-            // Planned time elapsed but robot has not reached goal — keep replanning.
+            RCLCPP_WARN(
+              node_->get_logger(),
+              "[goal_timeout] traj ended dist_goal_xy=%.3f > thresh=%.3f -> REPLAN",
+              dist_to_goal_xy, goal_reach_thresh_);
             changeFSMExecState(REPLAN_TRAJ, "FSM");
           }
         }
-        else if (!at_goal && t_cur > replan_thresh_)
+        else if (!at_goal && t_wall > replan_thresh_)
         {
           changeFSMExecState(REPLAN_TRAJ, "FSM");
         }
       }
-      else if (t_cur > replan_thresh_)
+      else if (t_wall > replan_thresh_)
       {
         changeFSMExecState(REPLAN_TRAJ, "FSM");
       }
@@ -845,6 +872,19 @@ namespace ego_planner
 
       /* 1. publish traj to traj_server */
       bspline_pub_->publish(bspline);
+
+      const Eigen::Vector3d traj_end = info->position_traj_.evaluateDeBoorT(info->duration_);
+      const double dist_goal = (end_pt_ - odom_pos_).norm();
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[bspline_publish] traj_id=%d dur=%.2fs odom=%s goal=%s dist_goal=%.3f traj_end=%s start_pt=%s %s",
+        info->traj_id_, info->duration_,
+        traj_utils::formatVec3(odom_pos_).c_str(),
+        traj_utils::formatVec3(end_pt_).c_str(),
+        dist_goal,
+        traj_utils::formatVec3(traj_end).c_str(),
+        traj_utils::formatVec3(start_pt_).c_str(),
+        traj_utils::formatControlPointsSummary(pos_pts).c_str());
 
       /* 2. publish traj to the next drone of swarm */
 
