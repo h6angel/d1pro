@@ -13,7 +13,7 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
   tracker_.setParams(loadTrackerParams());
 
   pos_cmd_topic_ = declare_parameter<std::string>("pos_cmd_topic", "/drone_0_planning/pos_cmd");
-  odom_topic_ = declare_parameter<std::string>("odom_topic", "/odom");
+  odom_topic_ = declare_parameter<std::string>("odom_topic", "/ov_msckf/odomimu");
   cmd_vel_topic_ = declare_parameter<std::string>("cmd_vel_topic", "/command/cmd_twist");
 
   const double control_rate_hz = declare_parameter<double>("control_rate_hz", 100.0);

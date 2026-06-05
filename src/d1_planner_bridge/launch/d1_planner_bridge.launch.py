@@ -23,7 +23,7 @@ def generate_launch_description():
 
     config_file = LaunchConfiguration('config_file', default=default_config)
     pos_cmd_topic = LaunchConfiguration('pos_cmd_topic', default='/drone_0_planning/pos_cmd')
-    odom_topic = LaunchConfiguration('odom_topic', default='/odom')
+    odom_topic = LaunchConfiguration('odom_topic', default='/ov_msckf/odomimu')
     cmd_vel_topic = LaunchConfiguration('cmd_vel_topic', default='/command/cmd_twist')
     save_log = LaunchConfiguration('save_log', default='true')
     log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
@@ -42,8 +42,8 @@ def generate_launch_description():
             'pos_cmd_topic', default_value='/drone_0_planning/pos_cmd',
             description='EGO traj_server PositionCommand topic'),
         DeclareLaunchArgument(
-            'odom_topic', default_value='/odom',
-            description='Robot odometry in world frame'),
+            'odom_topic', default_value='/ov_msckf/odomimu',
+            description='Robot odometry in global frame'),
         DeclareLaunchArgument(
             'cmd_vel_topic', default_value='/command/cmd_twist',
             description='D1 cmd_twist topic (geometry_msgs/Twist; uses linear.x and angular.z only)'),

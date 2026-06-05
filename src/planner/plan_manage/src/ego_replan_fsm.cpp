@@ -22,7 +22,7 @@ namespace ego_planner
     node_->declare_parameter("fsm/planning_horizon", -1.0);
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
-    node_->declare_parameter("fsm/realworld_experiment", false);
+    node_->declare_parameter("fsm/realworld_experiment", true);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
 

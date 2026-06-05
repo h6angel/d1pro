@@ -1,7 +1,7 @@
 d1_planner_bridge_node:
   ros__parameters:
     pos_cmd_topic: "/drone_0_planning/pos_cmd"
-    odom_topic: "/odom"
+    odom_topic: "/ov_msckf/odomimu"
     cmd_vel_topic: "/command/cmd_twist"
 
     control_rate_hz: 100.0

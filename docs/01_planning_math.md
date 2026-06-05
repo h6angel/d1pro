@@ -137,7 +137,7 @@ $$
 J = \lambda_1 J_{\text{smooth}} + \lambda_4 J_{\text{fitness}} + \lambda_3 J_{\text{feas}}
 $$
 
-默认 D1 参数（`single_run_d1.launch.py` / `advanced_param.launch.py`）示例：`max_vel=1.6`，`max_acc=2.0`，`optimization/dist0=0.55`，`lambda_fitness=1.5`。
+默认 D1 参数（`single_run.launch.py` / `advanced_param.launch.py`）示例：`max_vel=1.6`，`max_acc=2.0`，`optimization/dist0=0.55`，`lambda_fitness=1.5`。
 
 ### 4.1 平滑项 $J_{\text{smooth}}$（Jerk）
 

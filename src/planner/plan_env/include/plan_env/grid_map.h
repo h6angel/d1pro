@@ -58,7 +58,6 @@ struct MappingParameters
   double obstacles_inflation_;
   string frame_id_;
   int pose_type_;
-  bool use_pointcloud_obstacles_;
 
   /* camera parameters */
   double cx_, cy_, fx_, fy_;
@@ -114,7 +113,7 @@ struct MappingData
 
   bool occ_need_update_, local_updated_;
   bool has_first_depth_;
-  bool has_odom_, has_cloud_;
+  bool has_odom_;
 
   // odom_depth_timeout_
   rclcpp::Time last_occ_update_time_;
@@ -209,7 +208,6 @@ private:
                          const geometry_msgs::msg::PoseStamped::ConstPtr &pose);
   void extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom);
   void depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img, const nav_msgs::msg::Odometry::ConstPtr &odom);
-  void cloudCallback(const sensor_msgs::msg::PointCloud2::ConstPtr &img);
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom);
 
   // update occupancy by raycasting
@@ -243,7 +241,6 @@ private:
   SynchronizerImagePose sync_image_pose_;
   SynchronizerImageOdom sync_image_odom_;
 
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr indep_cloud_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr indep_odom_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr extrinsic_sub_;
 

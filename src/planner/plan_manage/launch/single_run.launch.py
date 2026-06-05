@@ -1,9 +1,9 @@
 """
-EGO planner + traj_server for D1 with OpenVINS + RealSense depth mapping.
+EGO planner + traj_server for D1 real robot (OpenVINS + RealSense depth mapping).
 
 Prerequisites (separate terminals):
   ros2 launch ov_msckf d435i_openvins.launch.py
-  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py odom_topic:=/ov_msckf/odomimu
+  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 
 Depth intrinsics: override cx/cy/fx/fy from
   ros2 topic echo /camera/camera/depth/camera_info --once
@@ -18,7 +18,7 @@ if _launch_dir not in sys.path:
 from launch_log_utils import default_ego_log_dir, maybe_reexec_with_log
 
 _DEFAULT_LOG_DIR = default_ego_log_dir(__file__)
-maybe_reexec_with_log('ego_planner', 'single_run_openvins', _DEFAULT_LOG_DIR)
+maybe_reexec_with_log('ego_planner', 'single_run', _DEFAULT_LOG_DIR)
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -61,10 +61,7 @@ def generate_launch_description():
             'odometry_topic': odom_topic,
             'camera_pose_topic': pose_topic,
             'depth_topic': depth_topic,
-            'cloud_topic': '/gazebo_obstacles',
-            'use_gazebo_cloud': 'false',
             'map_frame_id': 'global',
-            'realworld_experiment': 'true',
             'cx': cx,
             'cy': cy,
             'fx': fx,
@@ -126,9 +123,9 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('map_size_y', default_value=map_size_y))
     ld.add_action(DeclareLaunchArgument('map_size_z', default_value=map_size_z))
     ld.add_action(DeclareLaunchArgument('odom_topic', default_value=odom_topic,
-                                        description='OpenVINS odom in global frame'))
+                                        description='VIO odom in global frame'))
     ld.add_action(DeclareLaunchArgument('pose_topic', default_value=pose_topic,
-                                        description='OpenVINS pose_stamped for depth sync'))
+                                        description='Camera pose for depth sync'))
     ld.add_action(DeclareLaunchArgument('depth_topic', default_value=depth_topic))
     ld.add_action(DeclareLaunchArgument('pos_cmd_topic', default_value=pos_cmd_topic))
     ld.add_action(DeclareLaunchArgument('flight_type', default_value=flight_type))

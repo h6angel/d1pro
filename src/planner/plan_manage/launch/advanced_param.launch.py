@@ -3,20 +3,17 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-# Single-robot (D1 / Gazebo): fixed internal namespace drone_0, external topics via remaps.
+# Single-robot D1 real deployment: fixed internal namespace drone_0, external topics via remaps.
 
 def generate_launch_description():
     map_size_x = LaunchConfiguration('map_size_x_', default=40.0)
     map_size_y = LaunchConfiguration('map_size_y_', default=40.0)
     map_size_z = LaunchConfiguration('map_size_z_', default=3.0)
 
-    odometry_topic = LaunchConfiguration('odometry_topic', default='/odom')
+    odometry_topic = LaunchConfiguration('odometry_topic', default='/ov_msckf/odomimu')
     camera_pose_topic = LaunchConfiguration('camera_pose_topic', default='/ov_msckf/pose_stamped')
     depth_topic = LaunchConfiguration('depth_topic', default='/camera/camera/depth/image_rect_raw')
-    cloud_topic = LaunchConfiguration('cloud_topic', default='/gazebo_obstacles')
     map_frame_id = LaunchConfiguration('map_frame_id', default='global')
-    use_gazebo_cloud = LaunchConfiguration('use_gazebo_cloud', default='false')
-    realworld_experiment = LaunchConfiguration('realworld_experiment', default='true')
 
     cx = LaunchConfiguration('cx', default=321.04638671875)
     cy = LaunchConfiguration('cy', default=243.44969177246094)
@@ -57,25 +54,16 @@ def generate_launch_description():
     map_size_z_arg = DeclareLaunchArgument('map_size_z_', default_value=map_size_z, description='Map size along Z')
     odometry_topic_arg = DeclareLaunchArgument(
         'odometry_topic', default_value=odometry_topic,
-        description='Robot odometry in map frame (e.g. /ov_msckf/odomimu or /odom)')
+        description='Robot odometry in map frame (nav_msgs/Odometry, e.g. /ov_msckf/odomimu)')
     camera_pose_topic_arg = DeclareLaunchArgument(
         'camera_pose_topic', default_value=camera_pose_topic,
         description='Camera pose for depth mapping (geometry_msgs/PoseStamped)')
     depth_topic_arg = DeclareLaunchArgument(
         'depth_topic', default_value=depth_topic,
         description='Depth image (sensor_msgs/Image, 16UC1 mm typical)')
-    cloud_topic_arg = DeclareLaunchArgument(
-        'cloud_topic', default_value=cloud_topic,
-        description='Gazebo obstacle cloud; only used if use_gazebo_cloud:=true')
     map_frame_id_arg = DeclareLaunchArgument(
         'map_frame_id', default_value=map_frame_id,
         description='Grid map / visualization frame (OpenVINS: global)')
-    use_gazebo_cloud_arg = DeclareLaunchArgument(
-        'use_gazebo_cloud', default_value=use_gazebo_cloud,
-        description='true: /gazebo_obstacles; false: depth+pose only')
-    realworld_experiment_arg = DeclareLaunchArgument(
-        'realworld_experiment', default_value=realworld_experiment,
-        description='true: RViz 2D goal without sim trigger')
     cx_arg = DeclareLaunchArgument('cx', default_value=cx, description='Camera intrinsic cx')
     cy_arg = DeclareLaunchArgument('cy', default_value=cy, description='Camera intrinsic cy')
     fx_arg = DeclareLaunchArgument('fx', default_value=fx, description='Camera intrinsic fx')
@@ -136,7 +124,6 @@ def generate_launch_description():
             ('a_star_list', 'drone_0_plan_vis/a_star_list'),
 
             ('grid_map/odom', odometry_topic),
-            ('grid_map/cloud', cloud_topic),
             ('grid_map/pose', camera_pose_topic),
             ('grid_map/depth', depth_topic),
             ('grid_map/occupancy_inflate', 'drone_0_grid/grid_map/occupancy_inflate'),
@@ -149,7 +136,7 @@ def generate_launch_description():
             {'fsm/planning_horizon': planning_horizon},
             {'fsm/planning_horizen_time': 3.0},
             {'fsm/emergency_time': 1.0},
-            {'fsm/realworld_experiment': realworld_experiment},
+            {'fsm/realworld_experiment': True},
             {'fsm/fail_safe': True},
             {'fsm/log_trace_period_ms': 500},
 
@@ -203,7 +190,6 @@ def generate_launch_description():
             {'grid_map/show_occ_time': False},
             {'grid_map/pose_type': 1},
             {'grid_map/frame_id': map_frame_id},
-            {'grid_map/use_pointcloud_obstacles': use_gazebo_cloud},
 
             {'manager/max_vel': max_vel},
             {'manager/max_acc': max_acc},
@@ -241,10 +227,7 @@ def generate_launch_description():
     ld.add_action(odometry_topic_arg)
     ld.add_action(camera_pose_topic_arg)
     ld.add_action(depth_topic_arg)
-    ld.add_action(cloud_topic_arg)
     ld.add_action(map_frame_id_arg)
-    ld.add_action(use_gazebo_cloud_arg)
-    ld.add_action(realworld_experiment_arg)
     ld.add_action(cx_arg)
     ld.add_action(cy_arg)
     ld.add_action(fx_arg)
