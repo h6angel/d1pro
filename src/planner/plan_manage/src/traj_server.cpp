@@ -67,7 +67,7 @@ void publishExecBsplinePath(const rclcpp::Time & stamp)
 
   nav_msgs::msg::Path path;
   path.header.stamp = stamp;
-  path.header.frame_id = "world";
+  path.header.frame_id = "global";
 
   constexpr double dt = 0.05;
   for (double t = 0.0; t <= traj_duration_ + 1e-6; t += dt)
@@ -347,7 +347,7 @@ void cmdCallback()
   time_last = time_now;
 
   cmd.header.stamp = time_now;
-  cmd.header.frame_id = "world";
+  cmd.header.frame_id = "global";
   cmd.trajectory_flag = quadrotor_msgs::msg::PositionCommand::TRAJECTORY_STATUS_READY;
   cmd.trajectory_id = traj_id_;
 

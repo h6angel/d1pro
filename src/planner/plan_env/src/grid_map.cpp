@@ -41,7 +41,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/virtual_ceil_yn", -0.1);
   node_->declare_parameter("grid_map/show_occ_time", false);
   node_->declare_parameter("grid_map/pose_type", 1);
-  node_->declare_parameter("grid_map/frame_id", "world");
+  node_->declare_parameter("grid_map/frame_id", "global");
+  node_->declare_parameter("grid_map/use_pointcloud_obstacles", true);
   node_->declare_parameter("grid_map/local_map_margin", 1);
   node_->declare_parameter("grid_map/ground_height", 1.0);
   node_->declare_parameter("grid_map/odom_depth_timeout", 1.0);
@@ -79,6 +80,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/show_occ_time", mp_.show_occ_time_);
   node_->get_parameter("grid_map/pose_type", mp_.pose_type_);
   node_->get_parameter("grid_map/frame_id", mp_.frame_id_);
+  node_->get_parameter("grid_map/use_pointcloud_obstacles", mp_.use_pointcloud_obstacles_);
   node_->get_parameter("grid_map/local_map_margin", mp_.local_map_margin_);
   node_->get_parameter("grid_map/ground_height", mp_.ground_height_);
   node_->get_parameter("grid_map/odom_depth_timeout", mp_.odom_depth_timeout_);
@@ -164,9 +166,11 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
         std::bind(&GridMap::depthOdomCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
 
-  // 使用独立的里程计和点云订阅
-  indep_cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
-      "grid_map/cloud", 10, std::bind(&GridMap::cloudCallback, this, std::placeholders::_1));
+  // 使用独立的里程计和点云订阅（仿真 /gazebo_obstacles；实机 depth+pose 时关闭）
+  if (mp_.use_pointcloud_obstacles_) {
+    indep_cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
+        "grid_map/cloud", 10, std::bind(&GridMap::cloudCallback, this, std::placeholders::_1));
+  }
 
   indep_odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
       "grid_map/odom", 10, std::bind(&GridMap::odomCallback, this, std::placeholders::_1));

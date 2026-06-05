@@ -36,6 +36,8 @@ source ~/.bashrc
 
 ## 运行
 
+### Gazebo 仿真（障碍来自 `/gazebo_obstacles` 点云）
+
 先起 Gazebo + D1，再各开终端 `source install/setup.bash`：
 
 ```bash
@@ -43,6 +45,24 @@ ros2 launch ego_planner rviz.launch.py              # 可选，RViz 里 2D Goal 
 ros2 launch ego_planner single_run_d1.launch.py     # 规划 + traj_server
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 ```
+
+### 实机 OpenVINS + RealSense（深度 + `/ov_msckf/pose_stamped` 建图）
+
+```bash
+# 终端 1：相机 + OpenVINS
+ros2 launch ov_msckf d435i_openvins.launch.py
+
+# 终端 2：规划（地图系 global，与 OpenVINS 一致）
+ros2 launch ego_planner single_run_openvins.launch.py
+
+# 终端 3：桥接（里程计也用 OpenVINS）
+ros2 launch d1_planner_bridge d1_planner_bridge.launch.py odom_topic:=/ov_msckf/odomimu
+
+# 可选 RViz：Fixed Frame 选 global
+ros2 launch ego_planner rviz.launch.py
+```
+
+深度内参请用 `ros2 topic echo /camera/camera/depth/camera_info --once` 核对后覆盖 launch 的 `cx/cy/fx/fy`。
 
 默认：`flight_type:=1` 用 RViz 设目标；`flight_type:=2` 用 launch 预设航点。桥接参数见 `src/d1_planner_bridge/config/d1_bridge.yaml`。
 

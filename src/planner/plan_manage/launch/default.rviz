@@ -312,7 +312,7 @@ Visualization Manager:
       Name: drone0
   Global Options:
     Background Color: 255; 255; 255
-    Fixed Frame: world
+    Fixed Frame: global
     Frame Rate: 30
   Name: root
   Tools:

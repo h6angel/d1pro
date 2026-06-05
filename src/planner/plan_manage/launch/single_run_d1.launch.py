@@ -27,6 +27,8 @@ def generate_launch_description():
     flight_type = LaunchConfiguration('flight_type', default='1')
     odom_topic = LaunchConfiguration('odom_topic', default='/odom')
     cloud_topic = LaunchConfiguration('cloud_topic', default='/gazebo_obstacles')
+    use_gazebo_cloud = LaunchConfiguration('use_gazebo_cloud', default='true')
+    map_frame_id = LaunchConfiguration('map_frame_id', default='world')
     pos_cmd_topic = LaunchConfiguration('pos_cmd_topic', default='/drone_0_planning/pos_cmd')
     max_vel = LaunchConfiguration('max_vel', default='1.6')
     goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
@@ -70,6 +72,11 @@ def generate_launch_description():
             'map_size_z_': map_size_z,
             'odometry_topic': odom_topic,
             'cloud_topic': cloud_topic,
+            'use_gazebo_cloud': use_gazebo_cloud,
+            'map_frame_id': map_frame_id,
+            'realworld_experiment': 'false',
+            'camera_pose_topic': '/unused_pose',
+            'depth_topic': '/unused_depth',
             'cx': str(321.04638671875),
             'cy': str(243.44969177246094),
             'fx': str(387.229248046875),
