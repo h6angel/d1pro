@@ -30,6 +30,8 @@ def generate_launch_description():
     pos_cmd_topic = LaunchConfiguration('pos_cmd_topic', default='/drone_0_planning/pos_cmd')
     max_vel = LaunchConfiguration('max_vel', default='1.6')
     goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
+    obstacles_inflation = LaunchConfiguration('obstacles_inflation', default='0.32')
+    optimization_dist0 = LaunchConfiguration('optimization_dist0', default='0.50')
     save_log = LaunchConfiguration('save_log', default='true')
     log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
 
@@ -54,6 +56,12 @@ def generate_launch_description():
     goal_reach_thresh_cmd = DeclareLaunchArgument(
         'goal_reach_thresh', default_value=goal_reach_thresh,
         description='FSM goal reached radius in meters (odom vs end_pt)')
+    obstacles_inflation_cmd = DeclareLaunchArgument(
+        'obstacles_inflation', default_value=obstacles_inflation,
+        description='Grid map obstacle inflation radius (m); ~robot radius for D1')
+    optimization_dist0_cmd = DeclareLaunchArgument(
+        'optimization_dist0', default_value=optimization_dist0,
+        description='B-spline optimizer clearance from inflated obstacles (m)')
     save_log_cmd = DeclareLaunchArgument(
         'save_log', default_value=save_log,
         description='Default true: tee launch output to <workspace>/ego_log/ (save_log:=false to disable)')
@@ -81,8 +89,8 @@ def generate_launch_description():
             'flight_type': flight_type,
             'goal_reach_thresh': goal_reach_thresh,
             'thresh_replan_time': '2.5',
-            'obstacles_inflation': '0.09',
-            'optimization_dist0': '0.55',
+            'obstacles_inflation': obstacles_inflation,
+            'optimization_dist0': optimization_dist0,
             'lambda_fitness': '1.5',
             'point_num': str(1),
             'point0_x': str(15.0),
@@ -136,6 +144,8 @@ def generate_launch_description():
     ld.add_action(flight_type_cmd)
     ld.add_action(max_vel_cmd)
     ld.add_action(goal_reach_thresh_cmd)
+    ld.add_action(obstacles_inflation_cmd)
+    ld.add_action(optimization_dist0_cmd)
     ld.add_action(save_log_cmd)
     ld.add_action(log_dir_cmd)
     ld.add_action(advanced_param_include)
