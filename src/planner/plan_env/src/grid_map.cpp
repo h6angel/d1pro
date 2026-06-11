@@ -52,6 +52,10 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/occ_clear_frames", 5);
   node_->declare_parameter("grid_map/use_fixed_publish_window", true);
   node_->declare_parameter("grid_map/map_vis_rate", 2.0);
+  node_->declare_parameter("grid_map/ground_filter_enable", true);
+  node_->declare_parameter("grid_map/ground_filter_margin", 0.12);
+  node_->declare_parameter("grid_map/inflate_xy_only", true);
+  node_->declare_parameter("grid_map/robot_footprint_radius", 0.35);
 
   node_->get_parameter("grid_map/resolution", mp_.resolution_);
   node_->get_parameter("grid_map/map_size_x", x_size);
@@ -93,6 +97,10 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/occ_clear_frames", mp_.occ_clear_frames_);
   node_->get_parameter("grid_map/use_fixed_publish_window", mp_.use_fixed_publish_window_);
   node_->get_parameter("grid_map/map_vis_rate", mp_.map_vis_rate_);
+  node_->get_parameter("grid_map/ground_filter_enable", mp_.ground_filter_enable_);
+  node_->get_parameter("grid_map/ground_filter_margin", mp_.ground_filter_margin_);
+  node_->get_parameter("grid_map/inflate_xy_only", mp_.inflate_xy_only_);
+  node_->get_parameter("grid_map/robot_footprint_radius", mp_.robot_footprint_radius_);
 
   mp_.occ_confirm_frames_ = std::max(1, mp_.occ_confirm_frames_);
   mp_.occ_clear_frames_ = std::max(1, mp_.occ_clear_frames_);
@@ -212,6 +220,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.flag_use_depth_fusion = false;
   md_.last_inflate_camera_pos_ = Eigen::Vector3d::Constant(1e6);
   md_.occ_changed_indices_.clear();
+  md_.robot_pos_.setZero();
+  md_.has_robot_pos_ = false;
 
   // rand_noise_ = uniform_real_distribution<double>(-0.2, 0.2);
   // rand_noise2_ = normal_distribution<double>(0, 0.2);
@@ -253,6 +263,9 @@ int GridMap::setCacheOccupancy(Eigen::Vector3d pos, int occ)
 {
   if (occ != 1 && occ != 0)
     return INVALID_IDX;
+
+  if (occ == 1 && isGroundFilteredPoint(pos))
+    occ = 0;
 
   Eigen::Vector3i id;
   posToIndex(pos, id);
@@ -622,6 +635,54 @@ Eigen::Vector3d GridMap::closetPointInMap(const Eigen::Vector3d &pt, const Eigen
   return camera_pt + (min_t - 1e-3) * diff;
 }
 
+bool GridMap::isGroundFilteredPoint(const Eigen::Vector3d &pos) const
+{
+  if (!mp_.ground_filter_enable_)
+    return false;
+  return pos(2) < mp_.ground_height_ + mp_.ground_filter_margin_;
+}
+
+bool GridMap::isGroundFilteredIndex(const Eigen::Vector3i &id) const
+{
+  if (!mp_.ground_filter_enable_)
+    return false;
+  const double z = (id(2) + 0.5) * mp_.resolution_ + mp_.map_origin_(2);
+  return z < mp_.ground_height_ + mp_.ground_filter_margin_;
+}
+
+int GridMap::inflationKernelSize(int inf_step) const
+{
+  const int side = 2 * inf_step + 1;
+  return mp_.inflate_xy_only_ ? side * side : side * side * side;
+}
+
+void GridMap::clearRobotFootprint()
+{
+  if (mp_.robot_footprint_radius_ <= 1e-3 || !md_.has_robot_pos_)
+    return;
+
+  const int r_step = static_cast<int>(ceil(mp_.robot_footprint_radius_ / mp_.resolution_));
+  Eigen::Vector3i center_id;
+  posToIndex(md_.robot_pos_, center_id);
+
+  for (int dx = -r_step; dx <= r_step; ++dx)
+  {
+    for (int dy = -r_step; dy <= r_step; ++dy)
+    {
+      if (dx * dx + dy * dy > (r_step + 1) * (r_step + 1))
+        continue;
+
+      for (int z = 0; z < mp_.map_voxel_num_(2); ++z)
+      {
+        const Eigen::Vector3i id(center_id(0) + dx, center_id(1) + dy, z);
+        if (!isInMap(id))
+          continue;
+        md_.occupancy_buffer_inflate_[toAddress(id)] = 0;
+      }
+    }
+  }
+}
+
 void GridMap::getStableLocalIndexBounds(Eigen::Vector3i &min_id, Eigen::Vector3i &max_id,
                                        bool for_publish)
 {
@@ -645,6 +706,9 @@ void GridMap::getStableLocalIndexBounds(Eigen::Vector3i &min_id, Eigen::Vector3i
 void GridMap::inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step,
                                    vector<Eigen::Vector3i> &inf_pts)
 {
+  if (isGroundFilteredIndex(id))
+    return;
+
   inflatePoint(id, inf_step, inf_pts);
   Eigen::Vector3i inf_pt;
   const int buffer_size =
@@ -738,7 +802,7 @@ void GridMap::clearAndInflateLocalMap()
   // inflate occupied voxels to compensate robot size
 
   int inf_step = ceil(mp_.obstacles_inflation_ / mp_.resolution_);
-  vector<Eigen::Vector3i> inf_pts(pow(2 * inf_step + 1, 3));
+  vector<Eigen::Vector3i> inf_pts(inflationKernelSize(inf_step));
   Eigen::Vector3i inf_min, inf_max;
   getStableLocalIndexBounds(inf_min, inf_max, false);
 
@@ -811,6 +875,8 @@ void GridMap::clearAndInflateLocalMap()
   }
 
   md_.occ_changed_indices_.clear();
+
+  clearRobotFootprint();
 
   // add virtual ceiling to limit flight height
   if (mp_.virtual_ceil_height_ > -0.5)
@@ -917,6 +983,11 @@ void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
 
 void GridMap::odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
 {
+  md_.robot_pos_(0) = odom->pose.pose.position.x;
+  md_.robot_pos_(1) = odom->pose.pose.position.y;
+  md_.robot_pos_(2) = odom->pose.pose.position.z;
+  md_.has_robot_pos_ = true;
+
   if (md_.has_first_depth_)
     return;
 

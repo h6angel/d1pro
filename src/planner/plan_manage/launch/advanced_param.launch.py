@@ -194,6 +194,10 @@ def generate_launch_description():
             {'grid_map/occ_clear_frames': 5},
             {'grid_map/use_fixed_publish_window': True},
             {'grid_map/map_vis_rate': 2.0},
+            {'grid_map/ground_filter_enable': True},
+            {'grid_map/ground_filter_margin': 0.12},
+            {'grid_map/inflate_xy_only': True},
+            {'grid_map/robot_footprint_radius': 0.35},
 
             {'manager/max_vel': max_vel},
             {'manager/max_acc': max_acc},

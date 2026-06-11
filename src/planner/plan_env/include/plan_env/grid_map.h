@@ -93,6 +93,12 @@ struct MappingParameters
   int occ_clear_frames_;
   bool use_fixed_publish_window_;
   double map_vis_rate_;
+
+  /* D1 ground robot */
+  bool ground_filter_enable_;
+  double ground_filter_margin_;
+  bool inflate_xy_only_;
+  double robot_footprint_radius_;
 };
 
 // intermediate mapping data for fusion
@@ -107,8 +113,10 @@ struct MappingData
   // camera position and pose data
 
   Eigen::Vector3d camera_pos_, last_camera_pos_;
+  Eigen::Vector3d robot_pos_;
   Eigen::Matrix3d camera_r_m_, last_camera_r_m_;
   Eigen::Matrix4d cam2body_;
+  bool has_robot_pos_;
 
   // depth image data
 
@@ -229,6 +237,10 @@ private:
   void clearAndInflateLocalMap();
   void getStableLocalIndexBounds(Eigen::Vector3i &min_id, Eigen::Vector3i &max_id, bool for_publish);
   void inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step, vector<Eigen::Vector3i> &inf_pts);
+  void clearRobotFootprint();
+  bool isGroundFilteredPoint(const Eigen::Vector3d &pos) const;
+  bool isGroundFilteredIndex(const Eigen::Vector3i &id) const;
+  int inflationKernelSize(int inf_step) const;
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);
@@ -368,6 +380,14 @@ inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos)
   if (!isInMap(pos))
     return -1;
 
+  if (mp_.robot_footprint_radius_ > 1e-3 && md_.has_robot_pos_)
+  {
+    const double dx = pos(0) - md_.robot_pos_(0);
+    const double dy = pos(1) - md_.robot_pos_(1);
+    if (dx * dx + dy * dy <= mp_.robot_footprint_radius_ * mp_.robot_footprint_radius_)
+      return 0;
+  }
+
   Eigen::Vector3i id;
   posToIndex(pos, id);
 
@@ -446,13 +466,19 @@ inline void GridMap::inflatePoint(const Eigen::Vector3i &pt, int step, vector<Ei
   //   pts[num++] = Eigen::Vector3i(pt(0), pt(1), pt(2) + z);
   // }
 
-  /* ---------- all inflate ---------- */
-  for (int x = -step; x <= step; ++x)
-    for (int y = -step; y <= step; ++y)
-      for (int z = -step; z <= step; ++z)
-      {
-        pts[num++] = Eigen::Vector3i(pt(0) + x, pt(1) + y, pt(2) + z);
-      }
+  if (mp_.inflate_xy_only_)
+  {
+    for (int x = -step; x <= step; ++x)
+      for (int y = -step; y <= step; ++y)
+        pts[num++] = Eigen::Vector3i(pt(0) + x, pt(1) + y, pt(2));
+  }
+  else
+  {
+    for (int x = -step; x <= step; ++x)
+      for (int y = -step; y <= step; ++y)
+        for (int z = -step; z <= step; ++z)
+          pts[num++] = Eigen::Vector3i(pt(0) + x, pt(1) + y, pt(2) + z);
+  }
 }
 
 inline double GridMap::getResolution() { return mp_.resolution_; }
