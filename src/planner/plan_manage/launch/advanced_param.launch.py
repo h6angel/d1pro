@@ -190,6 +190,10 @@ def generate_launch_description():
             {'grid_map/show_occ_time': False},
             {'grid_map/pose_type': 1},
             {'grid_map/frame_id': map_frame_id},
+            {'grid_map/occ_confirm_frames': 3},
+            {'grid_map/occ_clear_frames': 5},
+            {'grid_map/use_fixed_publish_window': True},
+            {'grid_map/map_vis_rate': 2.0},
 
             {'manager/max_vel': max_vel},
             {'manager/max_acc': max_acc},

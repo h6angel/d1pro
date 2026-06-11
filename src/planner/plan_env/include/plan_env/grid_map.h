@@ -87,6 +87,12 @@ struct MappingParameters
 
   /* active mapping */
   double unknown_flag_;
+
+  /* map stability (Plan C) */
+  int occ_confirm_frames_;
+  int occ_clear_frames_;
+  bool use_fixed_publish_window_;
+  double map_vis_rate_;
 };
 
 // intermediate mapping data for fusion
@@ -128,6 +134,7 @@ struct MappingData
   // flag buffers for speeding up raycasting
 
   vector<short> count_hit_, count_hit_and_miss_;
+  vector<uint8_t> hit_streak_, miss_streak_;
   vector<char> flag_traverse_, flag_rayend_;
   char raycast_num_;
   queue<Eigen::Vector3i> cache_voxel_;
@@ -135,6 +142,8 @@ struct MappingData
   // range of updating grid
 
   Eigen::Vector3i local_bound_min_, local_bound_max_;
+  Eigen::Vector3d last_inflate_camera_pos_;
+  vector<int> occ_changed_indices_;
 
   // computation time
 
@@ -218,6 +227,8 @@ private:
   void projectDepthImage();
   void raycastProcess();
   void clearAndInflateLocalMap();
+  void getStableLocalIndexBounds(Eigen::Vector3i &min_id, Eigen::Vector3i &max_id, bool for_publish);
+  void inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step, vector<Eigen::Vector3i> &inf_pts);
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);
