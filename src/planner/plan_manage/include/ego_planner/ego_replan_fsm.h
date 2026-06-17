@@ -62,11 +62,13 @@ namespace ego_planner
     int waypoint_num_, wp_id_;
     double planning_horizen_, planning_horizen_time_;
     double emergency_time_;
+    double global_replan_drift_thresh_;
     bool flag_realworld_experiment_;
     bool enable_fail_safe_;
 
     /* planning data */
     bool have_trigger_, have_target_, have_odom_, have_new_target_, have_recv_pre_agent_;
+    bool pending_estop_global_replan_{false};
     FSM_EXEC_STATE exec_state_;
     int continously_called_times_{0};
 
@@ -113,6 +115,8 @@ namespace ego_planner
     void readGivenWps();
     void planNextWaypoint(const Eigen::Vector3d next_wp);
     void getLocalTarget();
+    double distToGlobalTrajXY(const Eigen::Vector3d &pos, double *nearest_t_out = nullptr);
+    bool maybeReplanGlobalAfterEstop();
 
     /* ROS functions */
     void execFSMCallback();

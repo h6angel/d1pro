@@ -136,6 +136,7 @@ def generate_launch_description():
             {'fsm/planning_horizon': planning_horizon},
             {'fsm/planning_horizen_time': 3.0},
             {'fsm/emergency_time': 1.0},
+            {'fsm/global_replan_drift_thresh': 0.25},
             {'fsm/realworld_experiment': True},
             {'fsm/fail_safe': True},
             {'fsm/log_trace_period_ms': 500},

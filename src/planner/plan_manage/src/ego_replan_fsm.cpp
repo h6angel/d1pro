@@ -1,4 +1,6 @@
 
+#include <limits>
+
 #include <ego_planner/ego_replan_fsm.h>
 #include "traj_utils/trajectory_debug_log.hpp"
 
@@ -22,6 +24,7 @@ namespace ego_planner
     node_->declare_parameter("fsm/planning_horizon", -1.0);
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
+    node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
     node_->declare_parameter("fsm/realworld_experiment", true);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
@@ -35,6 +38,7 @@ namespace ego_planner
     node_->get_parameter("fsm/planning_horizon", planning_horizen_);
     node_->get_parameter("fsm/planning_horizen_time", planning_horizen_time_);
     node_->get_parameter("fsm/emergency_time", emergency_time_);
+    node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
     node_->get_parameter("fsm/realworld_experiment", flag_realworld_experiment_);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
@@ -535,6 +539,11 @@ namespace ego_planner
 
     case GEN_NEW_TRAJ:
     {
+      if (pending_estop_global_replan_)
+      {
+        pending_estop_global_replan_ = false;
+        maybeReplanGlobalAfterEstop();
+      }
 
       bool success = planFromGlobalTraj(10); // zx-todo
       if (success)
@@ -660,7 +669,10 @@ namespace ego_planner
     case EMERGENCY_STOP:
     {
       if (enable_fail_safe_ && odom_vel_.norm() < 0.1)
+      {
+        pending_estop_global_replan_ = true;
         changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+      }
       break;
     }
     }
@@ -982,6 +994,80 @@ namespace ego_planner
     bspline_pub_->publish(bspline);
 
     return true;
+  }
+
+  double EGOReplanFSM::distToGlobalTrajXY(const Eigen::Vector3d &pos, double *nearest_t_out)
+  {
+    if (planner_manager_->global_data_.global_duration_ < 1e-3)
+      return std::numeric_limits<double>::infinity();
+
+    const double t_step = planning_horizen_ / 20 / planner_manager_->pp_.max_vel_;
+    double dist_min = std::numeric_limits<double>::infinity();
+    double nearest_t = 0.0;
+
+    for (double t = 0.0; t <= planner_manager_->global_data_.global_duration_ + 1e-6; t += t_step)
+    {
+      const Eigen::Vector3d pos_t = planner_manager_->global_data_.getPosition(t);
+      const double dist = (pos_t.head<2>() - pos.head<2>()).norm();
+      if (dist < dist_min)
+      {
+        dist_min = dist;
+        nearest_t = t;
+      }
+    }
+
+    if (nearest_t_out)
+      *nearest_t_out = nearest_t;
+    return dist_min;
+  }
+
+  bool EGOReplanFSM::maybeReplanGlobalAfterEstop()
+  {
+    if (!have_target_ || !have_odom_)
+      return false;
+
+    double nearest_t = 0.0;
+    const double drift = distToGlobalTrajXY(odom_pos_, &nearest_t);
+
+    if (drift <= global_replan_drift_thresh_)
+    {
+      planner_manager_->global_data_.last_progress_time_ = nearest_t;
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[global_replan] skip drift_xy=%.3f <= thresh=%.3f nearest_t=%.2f",
+        drift, global_replan_drift_thresh_, nearest_t);
+      return false;
+    }
+
+    planner_manager_->setRobotPlanningZ(odom_pos_(2));
+    const bool ok = planner_manager_->planGlobalTraj(
+        odom_pos_, odom_vel_, Eigen::Vector3d::Zero(),
+        end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+
+    if (ok)
+    {
+      constexpr double step_size_t = 0.1;
+      const int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
+      vector<Eigen::Vector3d> global_traj(i_end);
+      for (int i = 0; i < i_end; i++)
+        global_traj[i] = planner_manager_->global_data_.global_traj_.evaluate(i * step_size_t);
+      visualization_->displayGlobalPathList(global_traj, 0.1, 0);
+    }
+
+    if (ok)
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[global_replan] replan drift_xy=%.3f > thresh=%.3f odom=%s goal=%s",
+        drift, global_replan_drift_thresh_,
+        traj_utils::formatVec3(odom_pos_).c_str(),
+        traj_utils::formatVec3(end_pt_).c_str());
+    else
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "[global_replan] failed drift_xy=%.3f > thresh=%.3f",
+        drift, global_replan_drift_thresh_);
+
+    return ok;
   }
 
   void EGOReplanFSM::getLocalTarget()
