@@ -916,6 +916,7 @@ void GridMap::updateOccupancyCallback()
     return;
   }
   md_.last_occ_update_time_ = node_->now();
+  md_.flag_depth_odom_timeout_ = false;
 
   /* update occupancy */
   // ros::Time t1, t2, t3, t4;

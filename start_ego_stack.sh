@@ -126,6 +126,8 @@ launch_bg realsense \
 
 if [[ "${SKIP_WAIT}" == "false" ]]; then
   wait_for_topic /camera/camera/imu 60 || exit 1
+  wait_for_topic /camera/camera/depth/image_rect_raw 60 || exit 1
+  wait_for_message /camera/camera/depth/image_rect_raw 30 || exit 1
 fi
 
 # 2. OpenVINS (rs_d435i)

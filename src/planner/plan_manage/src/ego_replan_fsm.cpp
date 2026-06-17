@@ -750,9 +750,11 @@ namespace ego_planner
     /* ---------- check lost of depth ---------- */
     if (map->getOdomDepthTimeout())
     {
-      RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
-
-      enterEmergencyStop("SAFETY", true);
+      if (exec_state_ != EMERGENCY_STOP)
+      {
+        RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
+        enterEmergencyStop("SAFETY");
+      }
       return;
     }
 
