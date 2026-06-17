@@ -110,6 +110,31 @@ void D1PlannerBridgeNode::controlTimerCallback()
     return;
   }
 
+  constexpr double kHardStopPlanSpeed = 0.02;
+  const double v_plan_cmd = std::hypot(cmd->velocity.x, cmd->velocity.y);
+
+  if (have_last_traj_id_ && cmd->trajectory_id != last_traj_id_ && v_plan_cmd < kHardStopPlanSpeed) {
+    cmd_vel_filter_init_ = false;
+    filt_vx_ = 0.0;
+    filt_wz_ = 0.0;
+  }
+  last_traj_id_ = cmd->trajectory_id;
+  have_last_traj_id_ = true;
+
+  if (v_plan_cmd < kHardStopPlanSpeed) {
+    twist.linear.x = 0.0;
+    twist.angular.z = 0.0;
+    cmd_vel_pub_->publish(twist);
+    if (log_cmd_vel_) {
+      const int throttle_ms = std::max(log_cmd_vel_period_ms_, 0);
+      RCLCPP_INFO_THROTTLE(
+        get_logger(), *get_clock(), throttle_ms,
+        "[cmd_vel_pub] hard_stop traj_id=%u plan_vel=%.4f twist=(0,0)",
+        cmd->trajectory_id, v_plan_cmd);
+    }
+    return;
+  }
+
   const GroundTwist ground = tracker_.compute(*cmd, odom ? odom.get() : nullptr);
   if (ground.valid) {
     const double a = std::clamp(cmd_vel_ema_alpha_, 0.0, 1.0);

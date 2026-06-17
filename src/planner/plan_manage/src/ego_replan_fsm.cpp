@@ -540,7 +540,6 @@ namespace ego_planner
       if (success)
       {
         changeFSMExecState(EXEC_TRAJ, "FSM");
-        flag_escape_emergency_ = true;
         publishSwarmTrajs(false);
       }
       else
@@ -660,18 +659,8 @@ namespace ego_planner
 
     case EMERGENCY_STOP:
     {
-
-      if (flag_escape_emergency_) // Avoiding repeated calls
-      {
-        callEmergencyStop(odom_pos_);
-      }
-      else
-      {
-        if (enable_fail_safe_ && odom_vel_.norm() < 0.1)
-          changeFSMExecState(GEN_NEW_TRAJ, "FSM");
-      }
-
-      flag_escape_emergency_ = false;
+      if (enable_fail_safe_ && odom_vel_.norm() < 0.1)
+        changeFSMExecState(GEN_NEW_TRAJ, "FSM");
       break;
     }
     }
@@ -751,8 +740,8 @@ namespace ego_planner
     {
       RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
 
-      enable_fail_safe_ = false;
-      changeFSMExecState(EMERGENCY_STOP, "SAFETY");
+      enterEmergencyStop("SAFETY", true);
+      return;
     }
 
     /* ---------- check trajectory ---------- */
@@ -809,7 +798,7 @@ namespace ego_planner
           {
             RCLCPP_WARN(node_->get_logger(), "Suddenly discovered obstacles. emergency stop! time=%f", t - t_cur);
 
-            changeFSMExecState(EMERGENCY_STOP, "SAFETY");
+            enterEmergencyStop("SAFETY");
           }
           else
           {
@@ -945,6 +934,18 @@ namespace ego_planner
     }
 
     broadcast_bspline_pub_->publish(bspline);
+  }
+
+  void EGOReplanFSM::enterEmergencyStop(const string &pos_call, bool disable_fail_safe)
+  {
+    if (disable_fail_safe)
+      enable_fail_safe_ = false;
+    if (exec_state_ == EMERGENCY_STOP)
+      return;
+
+    changeFSMExecState(EMERGENCY_STOP, pos_call);
+    if (have_odom_)
+      callEmergencyStop(odom_pos_);
   }
 
   bool EGOReplanFSM::callEmergencyStop(Eigen::Vector3d stop_pos)

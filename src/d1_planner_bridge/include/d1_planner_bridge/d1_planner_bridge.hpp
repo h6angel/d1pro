@@ -48,6 +48,8 @@ private:
   bool cmd_vel_filter_init_{false};
   double filt_vx_{0.0};
   double filt_wz_{0.0};
+  uint32_t last_traj_id_{0};
+  bool have_last_traj_id_{false};
 };
 
 }  // namespace d1_planner_bridge

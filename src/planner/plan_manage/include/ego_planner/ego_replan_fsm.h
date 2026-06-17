@@ -79,8 +79,6 @@ namespace ego_planner
     std::vector<Eigen::Vector3d> wps_;
     int current_wp_;
 
-    bool flag_escape_emergency_;
-
     /* ROS utils */
     rclcpp::Node::SharedPtr node_;
     rclcpp::TimerBase::SharedPtr exec_timer_, safety_timer_;
@@ -101,6 +99,7 @@ namespace ego_planner
     /* helper functions */
     bool callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj); // front-end and back-end method
     bool callEmergencyStop(Eigen::Vector3d stop_pos);                          // front-end and back-end method
+    void enterEmergencyStop(const string &pos_call, bool disable_fail_safe = false);
     /// First plan / emergency: polynomial init from /odom to local target.
     bool planFromGlobalTraj(const int trial_times = 1);
     /// Local replan: warm-start from previous B-spline at t_cur; pin first ctrl pts to /odom.
