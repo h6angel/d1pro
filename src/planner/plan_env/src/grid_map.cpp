@@ -51,7 +51,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/occ_confirm_frames", 3);
   node_->declare_parameter("grid_map/occ_clear_frames", 5);
   node_->declare_parameter("grid_map/use_fixed_publish_window", true);
-  node_->declare_parameter("grid_map/map_vis_rate", 2.0);
+  node_->declare_parameter("grid_map/map_vis_rate", 25.0);
   node_->declare_parameter("grid_map/ground_filter_enable", true);
   node_->declare_parameter("grid_map/ground_filter_margin", 0.12);
   node_->declare_parameter("grid_map/inflate_xy_only", true);
