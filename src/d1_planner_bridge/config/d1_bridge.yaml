@@ -9,8 +9,8 @@ d1_planner_bridge_node:
     log_cmd_vel: true
     log_cmd_vel_period_ms: 500
 
-    max_vx: 1.6
-    max_wz: 1.0
+    max_vx: 0.6
+    max_wz: 0.5
 
     # Path-tangent yaw: align_heading ~34deg; faster kp for D1 trial tuning
     yaw_kp: 1.2
