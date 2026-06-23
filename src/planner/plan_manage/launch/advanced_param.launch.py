@@ -49,6 +49,16 @@ def generate_launch_description():
     lambda_fitness = LaunchConfiguration('lambda_fitness', default='1.0')
     use_distinctive_trajs = LaunchConfiguration('use_distinctive_trajs', default=False)
 
+    enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
+    tag_pose_topic = LaunchConfiguration('tag_pose_topic', default='/apriltag/target_pose_global')
+    tag_detected_topic = LaunchConfiguration('tag_detected_topic', default='/apriltag/target_detected')
+    tag_follow_offset_x = LaunchConfiguration('tag_follow_offset_x', default='0.0')
+    tag_follow_offset_y = LaunchConfiguration('tag_follow_offset_y', default='-0.3')
+    tag_follow_offset_z = LaunchConfiguration('tag_follow_offset_z', default='0.0')
+    tag_update_min_dist = LaunchConfiguration('tag_update_min_dist', default='0.08')
+    tag_replan_min_period = LaunchConfiguration('tag_replan_min_period', default='0.5')
+    tag_lost_timeout_sec = LaunchConfiguration('tag_lost_timeout_sec', default='30.0')
+
     map_size_x_arg = DeclareLaunchArgument('map_size_x_', default_value=map_size_x, description='Map size along X')
     map_size_y_arg = DeclareLaunchArgument('map_size_y_', default_value=map_size_y, description='Map size along Y')
     map_size_z_arg = DeclareLaunchArgument('map_size_z_', default_value=map_size_z, description='Map size along Z')
@@ -107,6 +117,18 @@ def generate_launch_description():
         description='B-spline refine fitness weight; raise if refine hits obstacles often')
     use_distinctive_trajs_arg = DeclareLaunchArgument('use_distinctive_trajs', default_value=use_distinctive_trajs, description='Distinctive trajectories (multi-agent only)')
 
+    enable_tag_tracking_arg = DeclareLaunchArgument(
+        'enable_tag_tracking', default_value=enable_tag_tracking,
+        description='true: follow /apriltag targets; false: RViz 2D Goal')
+    tag_pose_topic_arg = DeclareLaunchArgument('tag_pose_topic', default_value=tag_pose_topic)
+    tag_detected_topic_arg = DeclareLaunchArgument('tag_detected_topic', default_value=tag_detected_topic)
+    tag_follow_offset_x_arg = DeclareLaunchArgument('tag_follow_offset_x', default_value=tag_follow_offset_x)
+    tag_follow_offset_y_arg = DeclareLaunchArgument('tag_follow_offset_y', default_value=tag_follow_offset_y)
+    tag_follow_offset_z_arg = DeclareLaunchArgument('tag_follow_offset_z', default_value=tag_follow_offset_z)
+    tag_update_min_dist_arg = DeclareLaunchArgument('tag_update_min_dist', default_value=tag_update_min_dist)
+    tag_replan_min_period_arg = DeclareLaunchArgument('tag_replan_min_period', default_value=tag_replan_min_period)
+    tag_lost_timeout_sec_arg = DeclareLaunchArgument('tag_lost_timeout_sec', default_value=tag_lost_timeout_sec)
+
     ego_planner_node = Node(
         package='ego_planner',
         executable='ego_planner_node',
@@ -140,6 +162,16 @@ def generate_launch_description():
             {'fsm/realworld_experiment': True},
             {'fsm/fail_safe': True},
             {'fsm/log_trace_period_ms': 500},
+
+            {'fsm/enable_tag_tracking': enable_tag_tracking},
+            {'fsm/tag_pose_topic': tag_pose_topic},
+            {'fsm/tag_detected_topic': tag_detected_topic},
+            {'fsm/tag_follow_offset_x': tag_follow_offset_x},
+            {'fsm/tag_follow_offset_y': tag_follow_offset_y},
+            {'fsm/tag_follow_offset_z': tag_follow_offset_z},
+            {'fsm/tag_update_min_dist': tag_update_min_dist},
+            {'fsm/tag_replan_min_period': tag_replan_min_period},
+            {'fsm/tag_lost_timeout_sec': tag_lost_timeout_sec},
 
             {'fsm/waypoint_num': point_num},
             {'fsm/waypoint0_x': point0_x},
@@ -268,6 +300,15 @@ def generate_launch_description():
     ld.add_action(optimization_dist0_arg)
     ld.add_action(lambda_fitness_arg)
     ld.add_action(use_distinctive_trajs_arg)
+    ld.add_action(enable_tag_tracking_arg)
+    ld.add_action(tag_pose_topic_arg)
+    ld.add_action(tag_detected_topic_arg)
+    ld.add_action(tag_follow_offset_x_arg)
+    ld.add_action(tag_follow_offset_y_arg)
+    ld.add_action(tag_follow_offset_z_arg)
+    ld.add_action(tag_update_min_dist_arg)
+    ld.add_action(tag_replan_min_period_arg)
+    ld.add_action(tag_lost_timeout_sec_arg)
     ld.add_action(ego_planner_node)
 
     return ld

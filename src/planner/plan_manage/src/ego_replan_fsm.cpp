@@ -43,6 +43,28 @@ namespace ego_planner
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
 
+    node_->declare_parameter("fsm/enable_tag_tracking", false);
+    node_->declare_parameter("fsm/tag_pose_topic", "/apriltag/target_pose_global");
+    node_->declare_parameter("fsm/tag_detected_topic", "/apriltag/target_detected");
+    node_->declare_parameter("fsm/tag_follow_offset_x", 0.0);
+    node_->declare_parameter("fsm/tag_follow_offset_y", -0.3);
+    node_->declare_parameter("fsm/tag_follow_offset_z", 0.0);
+    node_->declare_parameter("fsm/tag_update_min_dist", 0.08);
+    node_->declare_parameter("fsm/tag_replan_min_period", 0.5);
+    node_->declare_parameter("fsm/tag_lost_timeout_sec", 30.0);
+
+    node_->get_parameter("fsm/enable_tag_tracking", enable_tag_tracking_);
+    node_->get_parameter("fsm/tag_pose_topic", tag_pose_topic_);
+    node_->get_parameter("fsm/tag_detected_topic", tag_detected_topic_);
+    double tag_off_x = 0.0, tag_off_y = -0.3, tag_off_z = 0.0;
+    node_->get_parameter("fsm/tag_follow_offset_x", tag_off_x);
+    node_->get_parameter("fsm/tag_follow_offset_y", tag_off_y);
+    node_->get_parameter("fsm/tag_follow_offset_z", tag_off_z);
+    tag_follow_offset_ = Eigen::Vector3d(tag_off_x, tag_off_y, tag_off_z);
+    node_->get_parameter("fsm/tag_update_min_dist", tag_update_min_dist_);
+    node_->get_parameter("fsm/tag_replan_min_period", tag_replan_min_period_);
+    node_->get_parameter("fsm/tag_lost_timeout_sec", tag_lost_timeout_sec_);
+
     have_trigger_ = !flag_realworld_experiment_;
 
     node_->declare_parameter("fsm/waypoint_num", -1);
@@ -163,6 +185,29 @@ namespace ego_planner
     }
     else
       cout << "Wrong target_type_ value! target_type_=" << target_type_ << endl;
+
+    if (enable_tag_tracking_)
+    {
+      RCLCPP_INFO(
+          node_->get_logger(),
+          "AprilTag tracking enabled: pose=%s detected=%s offset=(%.2f,%.2f,%.2f)",
+          tag_pose_topic_.c_str(), tag_detected_topic_.c_str(),
+          tag_follow_offset_.x(), tag_follow_offset_.y(), tag_follow_offset_.z());
+
+      tag_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
+          tag_pose_topic_, 10,
+          [this](const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
+          {
+            this->tagPoseCallback(msg);
+          });
+
+      tag_detected_sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+          tag_detected_topic_, 10,
+          [this](const std::shared_ptr<const std_msgs::msg::Bool> &msg)
+          {
+            this->tagDetectedCallback(msg);
+          });
+    }
   }
 
   void EGOReplanFSM::readGivenWps()
@@ -241,6 +286,9 @@ namespace ego_planner
 
   void EGOReplanFSM::waypointCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
   {
+    if (enable_tag_tracking_)
+      return;
+
     if (msg->pose.position.z < -0.1)
       return;
 
@@ -474,6 +522,9 @@ namespace ego_planner
   {
     exec_timer_->cancel(); // To avoid blockage
 
+    if (enable_tag_tracking_)
+      updateTagTrackingOnExecTick();
+
     static int fsm_num = 0;
     fsm_num++;
     if (fsm_num == 100)
@@ -569,7 +620,7 @@ namespace ego_planner
       else
       {
         const double dist_to_goal = (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
-        if (dist_to_goal < goal_reach_thresh_)
+        if (!isTagFollowing() && dist_to_goal < goal_reach_thresh_)
         {
           have_target_ = false;
           have_trigger_ = false;
@@ -624,7 +675,7 @@ namespace ego_planner
 
         if (t_cur > info->duration_ - 1e-2)
         {
-          if (at_goal)
+          if (at_goal && !isTagFollowing())
           {
             RCLCPP_INFO(
               node_->get_logger(),
@@ -1127,6 +1178,173 @@ namespace ego_planner
     {
       local_target_vel_ = planner_manager_->global_data_.getVelocity(t);
     }
+  }
+
+  bool EGOReplanFSM::isTagFollowing() const
+  {
+    return enable_tag_tracking_ &&
+           (tag_track_state_ == TagTrackState::ACTIVE ||
+            tag_track_state_ == TagTrackState::HOLD);
+  }
+
+  Eigen::Vector3d EGOReplanFSM::computeFollowGoal(const Eigen::Vector3d &tag_pos) const
+  {
+    Eigen::Vector3d goal = tag_pos + tag_follow_offset_;
+    if (have_odom_)
+      goal.z() = odom_pos_.z();
+    return goal;
+  }
+
+  bool EGOReplanFSM::isAtFollowGoal(const Eigen::Vector3d &goal) const
+  {
+    return (odom_pos_.head<2>() - goal.head<2>()).norm() <= goal_reach_thresh_;
+  }
+
+  bool EGOReplanFSM::shouldReplanForTagGoal(const Eigen::Vector3d &new_goal) const
+  {
+    if (tag_force_replan_)
+      return true;
+    if (!have_target_)
+      return true;
+    if ((new_goal.head<2>() - end_pt_.head<2>()).norm() > tag_update_min_dist_)
+      return true;
+    if (last_tag_replan_time_.nanoseconds() == 0)
+      return true;
+    return (node_->now() - last_tag_replan_time_).seconds() > tag_replan_min_period_;
+  }
+
+  void EGOReplanFSM::applyTagGoal(const Eigen::Vector3d &goal_wp)
+  {
+    init_pt_ = odom_pos_;
+    planNextWaypoint(goal_wp);
+    visualization_->displayGoalPoint(goal_wp, Eigen::Vector4d(0.0, 0.8, 0.2, 1.0), 0.35, 0);
+    last_tag_replan_time_ = node_->now();
+    tag_force_replan_ = false;
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[tag_track] replan tag=%s goal=%s",
+        traj_utils::formatVec3(tag_pos_last_).c_str(),
+        traj_utils::formatVec3(goal_wp).c_str());
+  }
+
+  void EGOReplanFSM::finishTagTracking(const string &reason)
+  {
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[tag_track] DONE (%s) odom=%s goal=%s -> WAIT_TARGET",
+        reason.c_str(),
+        traj_utils::formatVec3(odom_pos_).c_str(),
+        traj_utils::formatVec3(end_pt_).c_str());
+    tag_track_state_ = TagTrackState::DONE;
+    have_target_ = false;
+    have_trigger_ = false;
+    changeFSMExecState(WAIT_TARGET, "TAG_DONE");
+  }
+
+  void EGOReplanFSM::processTagDetection(bool detected)
+  {
+    if (!enable_tag_tracking_)
+      return;
+
+    std::lock_guard<std::mutex> lock(tag_mutex_);
+    tag_detected_ = detected;
+
+    if (!detected)
+    {
+      if (tag_track_state_ == TagTrackState::ACTIVE)
+      {
+        tag_pos_frozen_ = tag_pos_last_;
+        tag_track_state_ = TagTrackState::HOLD;
+        tag_lost_since_ = node_->now();
+        tag_force_replan_ = true;
+        const Eigen::Vector3d goal = computeFollowGoal(tag_pos_frozen_);
+        RCLCPP_INFO(
+            node_->get_logger(),
+            "[tag_track] HOLD tag=%s goal=%s",
+            traj_utils::formatVec3(tag_pos_frozen_).c_str(),
+            traj_utils::formatVec3(goal).c_str());
+        if (shouldReplanForTagGoal(goal))
+          applyTagGoal(goal);
+      }
+      return;
+    }
+
+    if (!have_tag_pose_)
+      return;
+
+    const bool resume = tag_track_state_ == TagTrackState::HOLD;
+    const bool first_seen = tag_track_state_ == TagTrackState::NEVER_SEEN;
+    if (first_seen)
+      RCLCPP_INFO(node_->get_logger(), "[tag_track] ACTIVE (first detection)");
+    else if (resume)
+      RCLCPP_INFO(node_->get_logger(), "[tag_track] RESUME");
+
+    tag_track_state_ = TagTrackState::ACTIVE;
+    tag_force_replan_ = first_seen || resume;
+
+    const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);
+    if (shouldReplanForTagGoal(goal))
+      applyTagGoal(goal);
+  }
+
+  void EGOReplanFSM::updateTagTrackingOnExecTick()
+  {
+    if (tag_track_state_ != TagTrackState::HOLD)
+      return;
+
+    std::lock_guard<std::mutex> lock(tag_mutex_);
+    const Eigen::Vector3d goal_last = computeFollowGoal(tag_pos_frozen_);
+    const bool at_goal = isAtFollowGoal(goal_last);
+    const double t_lost = (node_->now() - tag_lost_since_).seconds();
+    if (at_goal && t_lost >= tag_lost_timeout_sec_)
+      finishTagTracking("lost timeout and at follow goal");
+  }
+
+  void EGOReplanFSM::tagPoseCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
+  {
+    if (!enable_tag_tracking_)
+      return;
+
+    if (msg->header.frame_id != "global")
+    {
+      RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(), 5000,
+          "[tag_track] pose frame_id='%s' != 'global', ignored",
+          msg->header.frame_id.c_str());
+      return;
+    }
+
+    std::lock_guard<std::mutex> lock(tag_mutex_);
+    tag_pos_last_(0) = msg->pose.position.x;
+    tag_pos_last_(1) = msg->pose.position.y;
+    tag_pos_last_(2) = msg->pose.position.z;
+    have_tag_pose_ = true;
+
+    if (!tag_detected_)
+      return;
+
+    if (tag_track_state_ == TagTrackState::NEVER_SEEN)
+    {
+      tag_track_state_ = TagTrackState::ACTIVE;
+      tag_force_replan_ = true;
+      RCLCPP_INFO(node_->get_logger(), "[tag_track] ACTIVE (first detection, pose)");
+      applyTagGoal(computeFollowGoal(tag_pos_last_));
+      return;
+    }
+
+    if (tag_track_state_ != TagTrackState::ACTIVE)
+      return;
+
+    const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);
+    if (shouldReplanForTagGoal(goal))
+      applyTagGoal(goal);
+  }
+
+  void EGOReplanFSM::tagDetectedCallback(const std::shared_ptr<const std_msgs::msg::Bool> &msg)
+  {
+    if (!enable_tag_tracking_)
+      return;
+    processTagDetection(msg->data);
   }
 
 } // namespace ego_planner

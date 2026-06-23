@@ -93,7 +93,7 @@ Visualization Manager:
               Enabled: true
               Name: goal_point
               Namespaces:
-                {}
+                "": true
               Topic:
                 Depth: 5
                 Durability Policy: Volatile
@@ -106,7 +106,7 @@ Visualization Manager:
               Enabled: true
               Name: global_path
               Namespaces:
-                {}
+                "": true
               Topic:
                 Depth: 5
                 Durability Policy: Volatile
@@ -119,7 +119,7 @@ Visualization Manager:
               Enabled: true
               Name: optimal_traj
               Namespaces:
-                {}
+                "": true
               Topic:
                 Depth: 5
                 Durability Policy: Volatile
@@ -344,6 +344,10 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        cam0:
+          Value: true
+        cam1:
+          Value: true
         camera_accel_frame:
           Value: true
         camera_accel_optical_frame:
@@ -372,13 +376,24 @@ Visualization Manager:
           Value: true
         camera_link:
           Value: true
+        global:
+          Value: true
+        imu:
+          Value: true
+        tag_0:
+          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        global:
+          imu:
+            cam0:
+              {}
+            cam1:
+              {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/Image
@@ -394,6 +409,26 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /camera/camera/infra1/image_rect_raw
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /apriltag/target_pose_global
       Value: true
   Enabled: true
   Global Options:
@@ -441,7 +476,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 2.4606831073760986
+      Distance: 5.439786434173584
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -479,7 +514,7 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 2474
-  X: 86
-  Y: 165
+  X: 317
+  Y: 94
   depth:
     collapsed: false

@@ -2,9 +2,10 @@
 # 一键启动：RealSense 相机 + OpenVINS (rs_d435i) + EGO 规划 + D1 桥接 (+ 可选 RViz)
 #
 # 用法:
-#   ./start_ego_stack.sh           # 默认启动 RViz
-#   ./start_ego_stack.sh --no-rviz # 不启动 RViz
-#   ./start_ego_stack.sh --skip-wait  # 跳过话题就绪检测（调试用）
+#   ./start_ego_stack.sh                        # 默认：RViz 手动设点
+#   ./start_ego_stack.sh enable_tag_tracking=true  # AprilTag 追踪模式
+#   ./start_ego_stack.sh --no-rviz              # 不启动 RViz
+#   ./start_ego_stack.sh --skip-wait            # 跳过话题就绪检测（调试用）
 #
 # 日志目录: <本仓库>/ego_log/stack_YYYYMMDD_HHMMSS/
 
@@ -19,15 +20,18 @@ EGO_WS="${SCRIPT_DIR}"
 
 ENABLE_RVIZ=true
 SKIP_WAIT=false
+ENABLE_TAG_TRACKING=false
 
 usage() {
-  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-rviz) ENABLE_RVIZ=false; shift ;;
     --skip-wait) SKIP_WAIT=true; shift ;;
+    enable_tag_tracking=true) ENABLE_TAG_TRACKING=true; shift ;;
+    enable_tag_tracking=false) ENABLE_TAG_TRACKING=false; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "未知参数: $1" >&2; usage; exit 1 ;;
   esac
@@ -119,6 +123,7 @@ log "工作区: realsense=${REALSENSE_WS}"
 log "        openvins=${OPENVINS_WS}"
 log "        ego_control=${EGO_WS}"
 log "日志目录: ${LOG_DIR}"
+log "enable_tag_tracking=${ENABLE_TAG_TRACKING}"
 
 # 1. RealSense D435i
 launch_bg realsense \
@@ -142,7 +147,8 @@ fi
 
 # 3. EGO 规划
 launch_bg ego_planner \
-  ros2 launch ego_planner single_run.launch.py
+  ros2 launch ego_planner single_run.launch.py \
+  enable_tag_tracking:=${ENABLE_TAG_TRACKING}
 
 sleep 2
 

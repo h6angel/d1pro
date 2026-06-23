@@ -42,6 +42,7 @@ def generate_launch_description():
         'pos_cmd_topic', default='/drone_0_planning/pos_cmd')
     max_vel = LaunchConfiguration('max_vel', default='1.6')
     goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
+    enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
     save_log = LaunchConfiguration('save_log', default='true')
     log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
 
@@ -72,6 +73,7 @@ def generate_launch_description():
             'use_distinctive_trajs': 'False',
             'flight_type': flight_type,
             'goal_reach_thresh': goal_reach_thresh,
+            'enable_tag_tracking': enable_tag_tracking,
             'thresh_replan_time': '2.5',
             'obstacles_inflation': '0.09',
             'optimization_dist0': '0.55',
@@ -131,6 +133,9 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('flight_type', default_value=flight_type))
     ld.add_action(DeclareLaunchArgument('max_vel', default_value=max_vel))
     ld.add_action(DeclareLaunchArgument('goal_reach_thresh', default_value=goal_reach_thresh))
+    ld.add_action(DeclareLaunchArgument(
+        'enable_tag_tracking', default_value=enable_tag_tracking,
+        description='true: AprilTag tracking; false: RViz 2D Goal'))
     ld.add_action(DeclareLaunchArgument('save_log', default_value=save_log))
     ld.add_action(DeclareLaunchArgument('log_dir', default_value=log_dir))
     ld.add_action(DeclareLaunchArgument('cx', default_value=cx))

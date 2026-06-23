@@ -239,3 +239,5 @@ ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 | [00_overview.md](00_overview.md) | 本文：系统总览 |
 | [01_planning_math.md](01_planning_math.md) | B 样条、代价函数、L-BFGS、2D 改动 |
 | [02_control_math.md](02_control_math.md) | odom 进度、跟踪律、参数 |
+| [04_apriltag_integration.md](04_apriltag_integration.md) | AprilTag 感知迁入本仓、话题契约、一键启动 |
+| [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md) | Tag 跟随 FSM（规划侧，已实现） |
