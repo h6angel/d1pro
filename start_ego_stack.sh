@@ -48,6 +48,8 @@ LOG_DIR="${EGO_WS}/ego_log/stack_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${LOG_DIR}"
 
 PIDS=()
+CLEANUP_DONE=false
+INTERRUPTED=false
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
@@ -61,6 +63,12 @@ launch_bg() {
 }
 
 cleanup() {
+  if [[ "${CLEANUP_DONE}" == "true" ]]; then
+    return 0
+  fi
+  CLEANUP_DONE=true
+  trap - EXIT INT TERM
+
   log "正在停止所有节点 ..."
   for pid in "${PIDS[@]}"; do
     kill -TERM "${pid}" 2>/dev/null || true
@@ -72,7 +80,14 @@ cleanup() {
   log "已退出。日志保留在: ${LOG_DIR}"
 }
 
-trap cleanup EXIT INT TERM
+on_interrupt() {
+  INTERRUPTED=true
+  cleanup
+  exit 130
+}
+
+trap cleanup EXIT
+trap on_interrupt INT TERM
 
 export AMENT_TRACE_SETUP_FILES="${AMENT_TRACE_SETUP_FILES:-}"
 
@@ -85,6 +100,15 @@ source "${OPENVINS_WS}/install/setup.bash"
 # shellcheck disable=SC1091
 source "${EGO_WS}/install/setup.bash"
 
+# 本仓 apriltag_detect 优先于旧 ../apriltagdetect 工作区（同名包遮蔽会导致 launch 失败）
+EGO_APRILTAG_PREFIX="${EGO_WS}/install/apriltag_detect"
+if [[ ! -f "${EGO_APRILTAG_PREFIX}/share/apriltag_detect/launch/apriltag.launch.py" ]]; then
+  log "[错误] 未找到 ${EGO_APRILTAG_PREFIX}/share/apriltag_detect/launch/apriltag.launch.py" >&2
+  log "       请先执行: cd ${EGO_WS} && colcon build --symlink-install --packages-select apriltag_detect" >&2
+  exit 1
+fi
+export AMENT_PREFIX_PATH="${EGO_APRILTAG_PREFIX}${AMENT_PREFIX_PATH:+:${AMENT_PREFIX_PATH}}"
+
 if [[ -z "${RMW_IMPLEMENTATION:-}" ]]; then
   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
   log "RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION}"
@@ -93,14 +117,17 @@ fi
 wait_for_topic() {
   local topic="$1"
   local timeout="${2:-60}"
-  log "等待话题出现: ${topic} (最多 ${timeout}s)"
+  log "等待话题出现: ${topic} (最多 ${timeout}s，Ctrl+C 可立即退出)"
   local i=0
   while (( i < timeout )); do
+    if [[ "${INTERRUPTED}" == "true" ]]; then
+      return 130
+    fi
     if ros2 topic list 2>/dev/null | grep -Fxq "${topic}"; then
       log "话题已出现: ${topic}"
       return 0
     fi
-    sleep 1
+    sleep 1 || return 130
     ((i++))
   done
   log "超时: 未找到话题 ${topic}" >&2
@@ -110,10 +137,16 @@ wait_for_topic() {
 wait_for_message() {
   local topic="$1"
   local timeout="${2:-90}"
-  log "等待首条消息: ${topic} (最多 ${timeout}s)"
+  log "等待首条消息: ${topic} (最多 ${timeout}s，Ctrl+C 可立即退出)"
+  if [[ "${INTERRUPTED}" == "true" ]]; then
+    return 130
+  fi
   if timeout "${timeout}" ros2 topic echo "${topic}" --once >/dev/null 2>&1; then
     log "已收到: ${topic}"
     return 0
+  fi
+  if [[ "${INTERRUPTED}" == "true" ]]; then
+    return 130
   fi
   log "超时: 未收到 ${topic} 数据（可轻微晃动相机帮助 OpenVINS 初始化）" >&2
   return 1
@@ -130,9 +163,9 @@ launch_bg realsense \
   ros2 launch realsense2_camera rs_launch.py
 
 if [[ "${SKIP_WAIT}" == "false" ]]; then
-  wait_for_topic /camera/camera/imu 60 || exit 1
-  wait_for_topic /camera/camera/depth/image_rect_raw 60 || exit 1
-  wait_for_message /camera/camera/depth/image_rect_raw 30 || exit 1
+  wait_for_topic /camera/camera/imu 60 || exit $?
+  wait_for_topic /camera/camera/depth/image_rect_raw 60 || exit $?
+  wait_for_message /camera/camera/depth/image_rect_raw 30 || exit $?
 fi
 
 # 2. OpenVINS (rs_d435i)
@@ -141,12 +174,19 @@ launch_bg openvins \
   config:=rs_d435i use_stereo:=true max_cameras:=2
 
 if [[ "${SKIP_WAIT}" == "false" ]]; then
-  wait_for_topic /ov_msckf/pose_stamped 30 || exit 1
-  wait_for_message /ov_msckf/pose_stamped 90 || exit 1
+  wait_for_topic /ov_msckf/pose_stamped 30 || exit $?
+  wait_for_message /ov_msckf/pose_stamped 90 || exit $?
 fi
 
 # 3. AprilTag 感知（仅追踪模式）
 if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
+  resolved_apriltag="$(ros2 pkg prefix apriltag_detect 2>/dev/null || true)"
+  log "apriltag_detect 包路径: ${resolved_apriltag}"
+  if [[ "${resolved_apriltag}" != "${EGO_APRILTAG_PREFIX}" ]]; then
+    log "[错误] apriltag_detect 仍解析到旧工作区: ${resolved_apriltag}" >&2
+    log "       请检查 ~/.bashrc 是否 source 了 ../apriltagdetect/install/setup.bash" >&2
+    exit 1
+  fi
   launch_bg apriltag \
     ros2 launch apriltag_detect apriltag.launch.py
   if [[ "${SKIP_WAIT}" == "false" ]]; then
@@ -159,7 +199,7 @@ launch_bg ego_planner \
   ros2 launch ego_planner single_run.launch.py \
   enable_tag_tracking:=${ENABLE_TAG_TRACKING}
 
-sleep 2
+sleep 2 || exit 130
 
 # 5. D1 底盘桥接
 launch_bg d1_bridge \
