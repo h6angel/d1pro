@@ -18,6 +18,10 @@ REALSENSE_WS="${D1ROBOT_DIR}/realsense"
 OPENVINS_WS="${D1ROBOT_DIR}/openvins"
 EGO_WS="${SCRIPT_DIR}"
 
+# D1 底盘速度上限（规划 / traj_server / bridge 共用，改此处即可）
+D1_MAX_VX=0.6
+D1_MAX_WZ=0.5
+
 ENABLE_RVIZ=true
 SKIP_WAIT=false
 ENABLE_TAG_TRACKING=false
@@ -157,6 +161,7 @@ log "        openvins=${OPENVINS_WS}"
 log "        ego_control=${EGO_WS}"
 log "日志目录: ${LOG_DIR}"
 log "enable_tag_tracking=${ENABLE_TAG_TRACKING}"
+log "D1 limits: max_vx=${D1_MAX_VX} m/s max_wz=${D1_MAX_WZ} rad/s"
 
 # 1. RealSense D435i
 launch_bg realsense \
@@ -197,13 +202,15 @@ fi
 # 4. EGO 规划
 launch_bg ego_planner \
   ros2 launch ego_planner single_run.launch.py \
-  enable_tag_tracking:=${ENABLE_TAG_TRACKING}
+  enable_tag_tracking:=${ENABLE_TAG_TRACKING} \
+  max_vel:=${D1_MAX_VX} max_wz:=${D1_MAX_WZ}
 
 sleep 2 || exit 130
 
 # 5. D1 底盘桥接
 launch_bg d1_bridge \
-  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
+  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py \
+  max_vx:=${D1_MAX_VX} max_wz:=${D1_MAX_WZ}
 
 # 6. 可选 RViz（Fixed Frame 选 global）
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then

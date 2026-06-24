@@ -6,6 +6,7 @@
 #include "quadrotor_msgs/msg/position_command.hpp"
 #include "std_msgs/msg/empty.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+#include <cmath>
 #include <rclcpp/rclcpp.hpp>
 
 rclcpp::Publisher<quadrotor_msgs::msg::PositionCommand>::SharedPtr pos_cmd_pub;
@@ -37,7 +38,8 @@ double odom_lookahead_time_ = 0.4;
 double endpoint_approach_dist_ = 0.35;
 double endpoint_stop_dist_ = 0.08;
 double endpoint_vel_gain_ = 0.8;
-double endpoint_max_vel_ = 1.0;
+double endpoint_max_vel_ = 0.6;
+double max_yaw_dot_ = 0.5;
 
 rclcpp::Node::SharedPtr g_node;
 int g_log_trace_period_ms_ = 500;
@@ -120,6 +122,17 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
     t_progress_ = std::max(0.0, std::min(t_progress_, traj_duration_));
   }
 
+  last_yaw_dot_ = 0.0;
+  if (!std::isfinite(last_yaw_))
+    last_yaw_ = 0.0;
+  if (have_odom_ && traj_duration_ > 1e-6) {
+    const double t_yaw = std::min(t_progress_ + time_forward_, traj_duration_);
+    const Eigen::Vector3d p_ref = traj_[0].evaluateDeBoorT(t_yaw);
+    const Eigen::Vector2d diff = (p_ref.head<2>() - odom_pos_.head<2>());
+    if (diff.norm() > 0.05)
+      last_yaw_ = std::atan2(diff.y(), diff.x());
+  }
+
   receive_traj_ = true;
   publishExecBsplinePath(rclcpp::Time(msg->start_time.sec, msg->start_time.nanosec));
 
@@ -147,14 +160,23 @@ void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, rclcpp::Time &time_now, rclcpp::Time &time_last)
 {
   constexpr double PI = 3.1415926;
-  constexpr double YAW_DOT_MAX_PER_SEC = PI;
+  const double yaw_dot_max = std::max(max_yaw_dot_, 1e-3);
   std::pair<double, double> yaw_yawdot(0, 0);
   double yaw = 0;
   double yawdot = 0;
 
+  if (!std::isfinite(last_yaw_))
+    last_yaw_ = 0.0;
+  if (!std::isfinite(last_yaw_dot_))
+    last_yaw_dot_ = 0.0;
+
+  const double dt = std::max((time_now - time_last).seconds(), 1e-3);
+
   Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? traj_[0].evaluateDeBoorT(t_cur + time_forward_) - pos : traj_[0].evaluateDeBoorT(traj_duration_) - pos;
   double yaw_temp = dir.norm() > 0.1 ? atan2(dir(1), dir(0)) : last_yaw_;
-  double max_yaw_change = YAW_DOT_MAX_PER_SEC * (time_now - time_last).seconds();
+  if (!std::isfinite(yaw_temp))
+    yaw_temp = last_yaw_;
+  double max_yaw_change = yaw_dot_max * dt;
   if (yaw_temp - last_yaw_ > PI)
   {
     if (yaw_temp - last_yaw_ - 2 * PI < -max_yaw_change)
@@ -163,15 +185,15 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, rclc
       if (yaw < -PI)
         yaw += 2 * PI;
 
-      yawdot = -YAW_DOT_MAX_PER_SEC;
+      yawdot = -yaw_dot_max;
     }
     else
     {
       yaw = yaw_temp;
       if (yaw - last_yaw_ > PI)
-        yawdot = -YAW_DOT_MAX_PER_SEC;
+        yawdot = -yaw_dot_max;
       else
-        yawdot = (yaw_temp - last_yaw_) / (time_now - time_last).seconds();
+        yawdot = (yaw_temp - last_yaw_) / dt;
     }
   }
   else if (yaw_temp - last_yaw_ < -PI)
@@ -182,15 +204,15 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, rclc
       if (yaw > PI)
         yaw -= 2 * PI;
 
-      yawdot = YAW_DOT_MAX_PER_SEC;
+      yawdot = yaw_dot_max;
     }
     else
     {
       yaw = yaw_temp;
       if (yaw - last_yaw_ < -PI)
-        yawdot = YAW_DOT_MAX_PER_SEC;
+        yawdot = yaw_dot_max;
       else
-        yawdot = (yaw_temp - last_yaw_) / (time_now - time_last).seconds();
+        yawdot = (yaw_temp - last_yaw_) / dt;
     }
   }
   else
@@ -201,7 +223,7 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, rclc
       if (yaw < -PI)
         yaw += 2 * PI;
 
-      yawdot = -YAW_DOT_MAX_PER_SEC;
+      yawdot = -yaw_dot_max;
     }
     else if (yaw_temp - last_yaw_ > max_yaw_change)
     {
@@ -209,23 +231,29 @@ std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, rclc
       if (yaw > PI)
         yaw -= 2 * PI;
 
-      yawdot = YAW_DOT_MAX_PER_SEC;
+      yawdot = yaw_dot_max;
     }
     else
     {
       yaw = yaw_temp;
       if (yaw - last_yaw_ > PI)
-        yawdot = -YAW_DOT_MAX_PER_SEC;
+        yawdot = -yaw_dot_max;
       else if (yaw - last_yaw_ < -PI)
-        yawdot = YAW_DOT_MAX_PER_SEC;
+        yawdot = yaw_dot_max;
       else
-        yawdot = (yaw_temp - last_yaw_) / (time_now - time_last).seconds();
+        yawdot = (yaw_temp - last_yaw_) / dt;
     }
   }
 
   if (fabs(yaw - last_yaw_) <= max_yaw_change)
     yaw = 0.5 * last_yaw_ + 0.5 * yaw;
   yawdot = 0.5 * last_yaw_dot_ + 0.5 * yawdot;
+
+  if (!std::isfinite(yaw))
+    yaw = last_yaw_;
+  if (!std::isfinite(yawdot))
+    yawdot = 0.0;
+
   last_yaw_ = yaw;
   last_yaw_dot_ = yawdot;
 
@@ -366,6 +394,12 @@ void cmdCallback()
   cmd.yaw = yaw_yawdot.first;
   cmd.yaw_dot = yaw_yawdot.second;
 
+  if (!std::isfinite(cmd.velocity.x)) cmd.velocity.x = 0.0;
+  if (!std::isfinite(cmd.velocity.y)) cmd.velocity.y = 0.0;
+  if (!std::isfinite(cmd.velocity.z)) cmd.velocity.z = 0.0;
+  if (!std::isfinite(cmd.yaw)) cmd.yaw = std::isfinite(last_yaw_) ? last_yaw_ : 0.0;
+  if (!std::isfinite(cmd.yaw_dot)) cmd.yaw_dot = 0.0;
+
   last_yaw_ = cmd.yaw;
 
   pos_cmd_pub->publish(cmd);
@@ -397,7 +431,8 @@ int main(int argc, char **argv)
   node->declare_parameter("traj_server/endpoint_approach_dist", 0.35);
   node->declare_parameter("traj_server/endpoint_stop_dist", 0.08);
   node->declare_parameter("traj_server/endpoint_vel_gain", 0.8);
-  node->declare_parameter("traj_server/endpoint_max_vel", 1.0);
+  node->declare_parameter("traj_server/endpoint_max_vel", 0.6);
+  node->declare_parameter("traj_server/max_yaw_dot", 0.5);
   node->get_parameter("traj_server/time_forward", time_forward_);
   node->get_parameter("traj_server/use_odom_progress", use_odom_progress_);
   node->get_parameter("traj_server/odom_lookahead_time", odom_lookahead_time_);
@@ -406,6 +441,7 @@ int main(int argc, char **argv)
   node->get_parameter("traj_server/endpoint_stop_dist", endpoint_stop_dist_);
   node->get_parameter("traj_server/endpoint_vel_gain", endpoint_vel_gain_);
   node->get_parameter("traj_server/endpoint_max_vel", endpoint_max_vel_);
+  node->get_parameter("traj_server/max_yaw_dot", max_yaw_dot_);
 
   auto bspline_sub = node->create_subscription<traj_utils::msg::Bspline>(
       "planning/bspline",

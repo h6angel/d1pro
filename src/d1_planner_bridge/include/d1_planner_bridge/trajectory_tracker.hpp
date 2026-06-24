@@ -11,7 +11,7 @@ namespace d1_planner_bridge
 struct TrackerParams
 {
   double max_vx{0.6};
-  double max_wz{1.0};
+  double max_wz{0.5};
   double yaw_kp{1.5};
   double yaw_rate_ff{1.0};
   /// Cap |yaw_dot| feedforward from traj_server (avoids ±pi spikes on replan).
@@ -21,7 +21,7 @@ struct TrackerParams
   double min_vx{0.0};
   double vx_deadband{0.01};
   /// Cap on |yaw_kp * yaw_err| while driving (small turns during forward motion).
-  double max_wz_yaw_p{1.0};
+  double max_wz_yaw_p{0.5};
   /// |wz| floor when |heading_err| > align_heading_thresh_rad (turn-in-place).
   double min_turn_wz{0.5};
 

@@ -25,6 +25,8 @@ def generate_launch_description():
     pos_cmd_topic = LaunchConfiguration('pos_cmd_topic', default='/drone_0_planning/pos_cmd')
     odom_topic = LaunchConfiguration('odom_topic', default='/ov_msckf/odomimu')
     cmd_vel_topic = LaunchConfiguration('cmd_vel_topic', default='/command/cmd_twist')
+    max_vx = LaunchConfiguration('max_vx', default='0.6')
+    max_wz = LaunchConfiguration('max_wz', default='0.5')
     save_log = LaunchConfiguration('save_log', default='true')
     log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
 
@@ -47,6 +49,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'cmd_vel_topic', default_value='/command/cmd_twist',
             description='D1 cmd_twist topic (geometry_msgs/Twist; uses linear.x and angular.z only)'),
+        DeclareLaunchArgument(
+            'max_vx', default_value=max_vx,
+            description='Max forward speed (m/s); match planner max_vel'),
+        DeclareLaunchArgument(
+            'max_wz', default_value=max_wz,
+            description='Max angular speed (rad/s); match planner max_wz'),
 
         Node(
             package='d1_planner_bridge',
@@ -59,6 +67,11 @@ def generate_launch_description():
                     'pos_cmd_topic': pos_cmd_topic,
                     'odom_topic': odom_topic,
                     'cmd_vel_topic': cmd_vel_topic,
+                    'max_vx': max_vx,
+                    'max_wz': max_wz,
+                    'max_yaw_dot_ff': max_wz,
+                    'max_wz_yaw_p': max_wz,
+                    'min_turn_wz': max_wz,
                 },
             ],
         ),
