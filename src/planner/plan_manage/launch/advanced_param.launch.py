@@ -154,6 +154,7 @@ def generate_launch_description():
             {'fsm/flight_type': flight_type},
             {'fsm/thresh_replan_time': thresh_replan_time},
             {'fsm/thresh_no_replan_meter': 1.0},
+            {'fsm/odom_traj_mismatch_thresh': 0.22},
             {'fsm/thresh_goal_reach_meter': goal_reach_thresh},
             {'fsm/planning_horizon': planning_horizon},
             {'fsm/planning_horizen_time': 3.0},

@@ -66,7 +66,7 @@ namespace ego_planner
     double emergency_time_;
     double global_replan_drift_thresh_;
     /// Odom farther than this from the time-sampled traj point => stale traj / jump, force replan.
-    double odom_traj_mismatch_thresh_{0.12};
+    double odom_traj_mismatch_thresh_{0.22};
     bool flag_realworld_experiment_;
     bool enable_fail_safe_;
 

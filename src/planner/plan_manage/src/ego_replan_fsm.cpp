@@ -26,7 +26,7 @@ namespace ego_planner
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
-    node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.12);
+    node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.22);
     node_->declare_parameter("fsm/realworld_experiment", true);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
