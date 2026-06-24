@@ -1,0 +1,14 @@
+target_pose_node:
+  ros__parameters:
+    world_frame: global
+    camera_frame: camera_infra1_optical_frame
+    openvins_camera_frame: cam0
+    target_tag_id: 0
+    tf_timeout_sec: 0.05
+    vio_tf_use_latest: true
+    tag_tf_use_latest_fallback: true
+    tf_warn_throttle_sec: 5.0
+    publish_rate_hz: 30.0
+    target_pose_topic: /apriltag/target_pose_global
+    target_detected_topic: /apriltag/target_detected
+    detections_topic: /apriltag/detections

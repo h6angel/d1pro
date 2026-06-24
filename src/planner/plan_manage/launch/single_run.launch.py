@@ -40,8 +40,12 @@ def generate_launch_description():
         'depth_topic', default='/camera/camera/depth/image_rect_raw')
     pos_cmd_topic = LaunchConfiguration(
         'pos_cmd_topic', default='/drone_0_planning/pos_cmd')
-    max_vel = LaunchConfiguration('max_vel', default='1.6')
+    # D1 chassis limits (keep in sync with d1_bridge.yaml and start_ego_stack.sh)
+    max_vel = LaunchConfiguration('max_vel', default='0.6')
+    max_wz = LaunchConfiguration('max_wz', default='0.5')
+    max_acc = LaunchConfiguration('max_acc', default='1.0')
     goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
+    enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
     save_log = LaunchConfiguration('save_log', default='true')
     log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
 
@@ -67,11 +71,12 @@ def generate_launch_description():
             'fx': fx,
             'fy': fy,
             'max_vel': max_vel,
-            'max_acc': str(2.0),
+            'max_acc': max_acc,
             'planning_horizon': str(7.5),
             'use_distinctive_trajs': 'False',
             'flight_type': flight_type,
             'goal_reach_thresh': goal_reach_thresh,
+            'enable_tag_tracking': enable_tag_tracking,
             'thresh_replan_time': '2.5',
             'obstacles_inflation': '0.09',
             'optimization_dist0': '0.55',
@@ -114,7 +119,8 @@ def generate_launch_description():
             {'traj_server/endpoint_approach_dist': 0.35},
             {'traj_server/endpoint_stop_dist': 0.08},
             {'traj_server/endpoint_vel_gain': 0.8},
-            {'traj_server/endpoint_max_vel': 1.6},
+            {'traj_server/endpoint_max_vel': max_vel},
+            {'traj_server/max_yaw_dot': max_wz},
         ],
     )
 
@@ -129,8 +135,19 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('depth_topic', default_value=depth_topic))
     ld.add_action(DeclareLaunchArgument('pos_cmd_topic', default_value=pos_cmd_topic))
     ld.add_action(DeclareLaunchArgument('flight_type', default_value=flight_type))
-    ld.add_action(DeclareLaunchArgument('max_vel', default_value=max_vel))
+    ld.add_action(DeclareLaunchArgument(
+        'max_vel', default_value=max_vel,
+        description='Planner max speed (m/s per axis); match d1_bridge max_vx'))
+    ld.add_action(DeclareLaunchArgument(
+        'max_wz', default_value=max_wz,
+        description='traj_server yaw_dot cap (rad/s); match d1_bridge max_wz'))
+    ld.add_action(DeclareLaunchArgument(
+        'max_acc', default_value=max_acc,
+        description='Planner max acceleration (m/s^2)'))
     ld.add_action(DeclareLaunchArgument('goal_reach_thresh', default_value=goal_reach_thresh))
+    ld.add_action(DeclareLaunchArgument(
+        'enable_tag_tracking', default_value=enable_tag_tracking,
+        description='true: AprilTag tracking; false: RViz 2D Goal'))
     ld.add_action(DeclareLaunchArgument('save_log', default_value=save_log))
     ld.add_action(DeclareLaunchArgument('log_dir', default_value=log_dir))
     ld.add_action(DeclareLaunchArgument('cx', default_value=cx))

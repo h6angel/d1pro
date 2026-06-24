@@ -1,0 +1,22 @@
+/**:
+    ros__parameters:
+        image_transport: raw
+        family: 25h9
+        size: 0.0778
+        max_hamming: 1
+
+        detector:
+            threads: 2
+            decimate: 2.0
+            blur: 0.0
+            refine: true
+            sharpening: 0.25
+            debug: false
+
+        pose_estimation_method: "pnp"
+
+        # tag25h9, ID=0, 黑色方块边长 77.8mm（生成器 TAG SIZE，非 TOTAL SIZE 100mm）
+        tag:
+            ids: [0]
+            frames: [tag_0]
+            sizes: [0.1536]

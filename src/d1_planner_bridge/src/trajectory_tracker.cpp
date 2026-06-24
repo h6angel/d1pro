@@ -30,18 +30,33 @@ double TrajectoryTracker::wrapPi(double a)
 double TrajectoryTracker::yawFromOdom(const nav_msgs::msg::Odometry & odom)
 {
   const auto & q = odom.pose.pose.orientation;
-  const double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
-  const double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
-  return std::atan2(siny_cosp, cosy_cosp);
+  const double n2 = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
+  if (!std::isfinite(n2) || n2 < 1e-8) {
+    return 0.0;
+  }
+  const double inv_n = 1.0 / std::sqrt(n2);
+  const double w = q.w * inv_n;
+  const double x = q.x * inv_n;
+  const double y = q.y * inv_n;
+  const double z = q.z * inv_n;
+  const double siny_cosp = 2.0 * (w * z + x * y);
+  const double cosy_cosp = 1.0 - 2.0 * (y * y + z * z);
+  const double yaw = std::atan2(siny_cosp, cosy_cosp);
+  return std::isfinite(yaw) ? yaw : 0.0;
 }
 
 double TrajectoryTracker::pathYawFromCmd(const quadrotor_msgs::msg::PositionCommand & cmd)
 {
-  const double vxy = std::hypot(cmd.velocity.x, cmd.velocity.y);
+  const double vx = std::isfinite(cmd.velocity.x) ? cmd.velocity.x : 0.0;
+  const double vy = std::isfinite(cmd.velocity.y) ? cmd.velocity.y : 0.0;
+  const double vxy = std::hypot(vx, vy);
   if (vxy > 0.05) {
-    return std::atan2(cmd.velocity.y, cmd.velocity.x);
+    const double yaw = std::atan2(vy, vx);
+    if (std::isfinite(yaw)) {
+      return yaw;
+    }
   }
-  return cmd.yaw;
+  return std::isfinite(cmd.yaw) ? cmd.yaw : 0.0;
 }
 
 double TrajectoryTracker::signedLateralError(
@@ -64,7 +79,9 @@ GroundTwist TrajectoryTracker::compute(
     return out;
   }
 
-  const double v_plan = std::hypot(cmd.velocity.x, cmd.velocity.y);
+  const double vel_x = std::isfinite(cmd.velocity.x) ? cmd.velocity.x : 0.0;
+  const double vel_y = std::isfinite(cmd.velocity.y) ? cmd.velocity.y : 0.0;
+  const double v_plan = std::hypot(vel_x, vel_y);
   const double path_yaw = pathYawFromCmd(cmd);
 
   out.lateral_error = 0.0;
@@ -72,14 +89,19 @@ GroundTwist TrajectoryTracker::compute(
 
   if (odom != nullptr && params_.project_velocity_to_body) {
     const double robot_yaw = yawFromOdom(*odom);
+    if (!std::isfinite(robot_yaw) || !std::isfinite(path_yaw)) {
+      return out;
+    }
+
     const double cos_yaw = std::cos(robot_yaw);
     const double sin_yaw = std::sin(robot_yaw);
-    double vx = cos_yaw * cmd.velocity.x + sin_yaw * cmd.velocity.y;
+    double vx = cos_yaw * vel_x + sin_yaw * vel_y;
 
     const double yaw_err_path = wrapPi(path_yaw - robot_yaw);
     out.heading_error = yaw_err_path;
 
     const bool heading_misaligned =
+      std::isfinite(yaw_err_path) &&
       std::abs(yaw_err_path) > params_.align_heading_thresh_rad;
     const bool plan_speed_ok = v_plan >= params_.min_plan_speed_for_lateral;
 
@@ -93,8 +115,9 @@ GroundTwist TrajectoryTracker::compute(
       }
       vx = 0.0;
     } else {
+      const double yaw_dot_raw = std::isfinite(cmd.yaw_dot) ? cmd.yaw_dot : 0.0;
       const double yaw_dot_ff = std::clamp(
-        cmd.yaw_dot, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);
+        yaw_dot_raw, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);
       wz = params_.yaw_rate_ff * yaw_dot_ff;
 
       const double wz_yaw = params_.yaw_kp * yaw_err_path;
@@ -138,10 +161,11 @@ GroundTwist TrajectoryTracker::compute(
     out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
     out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
   } else {
+    const double yaw_dot_raw = std::isfinite(cmd.yaw_dot) ? cmd.yaw_dot : 0.0;
     const double yaw_dot_ff = std::clamp(
-      cmd.yaw_dot, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);
+      yaw_dot_raw, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);
     double wz = params_.yaw_rate_ff * yaw_dot_ff;
-    double vx = cmd.velocity.x;
+    double vx = vel_x;
     if (!params_.allow_reverse) {
       vx = std::max(0.0, vx);
     }
@@ -153,6 +177,11 @@ GroundTwist TrajectoryTracker::compute(
     }
     out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
     out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
+  }
+
+  if (!std::isfinite(out.vx) || !std::isfinite(out.wz)) {
+    out.vx = 0.0;
+    out.wz = 0.0;
   }
 
   out.valid = true;

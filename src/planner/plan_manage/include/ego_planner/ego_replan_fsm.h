@@ -8,7 +8,9 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/empty.hpp"
+#include <mutex>
 #include <vector>
 #include "visualization_msgs/msg/marker.hpp"
 
@@ -62,11 +64,38 @@ namespace ego_planner
     int waypoint_num_, wp_id_;
     double planning_horizen_, planning_horizen_time_;
     double emergency_time_;
+    double global_replan_drift_thresh_;
     bool flag_realworld_experiment_;
     bool enable_fail_safe_;
 
+    /* AprilTag tracking (launch-time only) */
+    enum class TagTrackState
+    {
+      NEVER_SEEN,
+      ACTIVE,
+      HOLD,
+      DONE
+    };
+    bool enable_tag_tracking_{false};
+    std::string tag_pose_topic_{"/apriltag/target_pose_global"};
+    std::string tag_detected_topic_{"/apriltag/target_detected"};
+    Eigen::Vector3d tag_follow_offset_{0.0, -0.3, 0.0};
+    double tag_update_min_dist_{0.08};
+    double tag_replan_min_period_{0.5};
+    double tag_lost_timeout_sec_{30.0};
+    TagTrackState tag_track_state_{TagTrackState::NEVER_SEEN};
+    bool tag_detected_{false};
+    bool have_tag_pose_{false};
+    bool tag_force_replan_{false};
+    Eigen::Vector3d tag_pos_last_{0.0, 0.0, 0.0};
+    Eigen::Vector3d tag_pos_frozen_{0.0, 0.0, 0.0};
+    rclcpp::Time tag_lost_since_{0, 0, RCL_ROS_TIME};
+    rclcpp::Time last_tag_replan_time_{0, 0, RCL_ROS_TIME};
+    std::mutex tag_mutex_;
+
     /* planning data */
     bool have_trigger_, have_target_, have_odom_, have_new_target_, have_recv_pre_agent_;
+    bool pending_estop_global_replan_{false};
     FSM_EXEC_STATE exec_state_;
     int continously_called_times_{0};
 
@@ -79,8 +108,6 @@ namespace ego_planner
     std::vector<Eigen::Vector3d> wps_;
     int current_wp_;
 
-    bool flag_escape_emergency_;
-
     /* ROS utils */
     rclcpp::Node::SharedPtr node_;
     rclcpp::TimerBase::SharedPtr exec_timer_, safety_timer_;
@@ -90,6 +117,8 @@ namespace ego_planner
     rclcpp::Subscription<traj_utils::msg::MultiBsplines>::SharedPtr swarm_trajs_sub_;
     rclcpp::Subscription<traj_utils::msg::Bspline>::SharedPtr broadcast_bspline_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr trigger_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr tag_pose_sub_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr tag_detected_sub_;
 
     // rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr replan_pub_;
     // rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr new_pub_;
@@ -101,6 +130,7 @@ namespace ego_planner
     /* helper functions */
     bool callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj); // front-end and back-end method
     bool callEmergencyStop(Eigen::Vector3d stop_pos);                          // front-end and back-end method
+    void enterEmergencyStop(const string &pos_call, bool disable_fail_safe = false);
     /// First plan / emergency: polynomial init from /odom to local target.
     bool planFromGlobalTraj(const int trial_times = 1);
     /// Local replan: warm-start from previous B-spline at t_cur; pin first ctrl pts to /odom.
@@ -114,6 +144,17 @@ namespace ego_planner
     void readGivenWps();
     void planNextWaypoint(const Eigen::Vector3d next_wp);
     void getLocalTarget();
+    double distToGlobalTrajXY(const Eigen::Vector3d &pos, double *nearest_t_out = nullptr);
+    bool maybeReplanGlobalAfterEstop();
+
+    bool isTagFollowing() const;
+    Eigen::Vector3d computeFollowGoal(const Eigen::Vector3d &tag_pos) const;
+    bool isAtFollowGoal(const Eigen::Vector3d &goal) const;
+    bool shouldReplanForTagGoal(const Eigen::Vector3d &new_goal) const;
+    void applyTagGoal(const Eigen::Vector3d &goal_wp);
+    void finishTagTracking(const string &reason);
+    void processTagDetection(bool detected);
+    void updateTagTrackingOnExecTick();
 
     /* ROS functions */
     void execFSMCallback();
@@ -123,6 +164,8 @@ namespace ego_planner
     void odometryCallback(const std::shared_ptr<const nav_msgs::msg::Odometry> &msg);
     void swarmTrajsCallback(const std::shared_ptr<const traj_utils::msg::MultiBsplines> &msg);
     void BroadcastBsplineCallback(const std::shared_ptr<const traj_utils::msg::Bspline> &msg);
+    void tagPoseCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg);
+    void tagDetectedCallback(const std::shared_ptr<const std_msgs::msg::Bool> &msg);
 
     bool checkCollision();
     void publishSwarmTrajs(bool startup_pub);

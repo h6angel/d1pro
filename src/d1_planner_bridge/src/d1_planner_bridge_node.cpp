@@ -7,6 +7,23 @@
 namespace d1_planner_bridge
 {
 
+namespace
+{
+
+void resetCmdVelFilter(bool & init, double & vx, double & wz)
+{
+  init = false;
+  vx = 0.0;
+  wz = 0.0;
+}
+
+double finiteOrZero(double v)
+{
+  return std::isfinite(v) ? v : 0.0;
+}
+
+}  // namespace
+
 D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
 : Node("d1_planner_bridge_node", options)
 {
@@ -52,7 +69,7 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
 {
   TrackerParams p;
   p.max_vx = declare_parameter<double>("max_vx", 0.6);
-  p.max_wz = declare_parameter<double>("max_wz", 1.0);
+  p.max_wz = declare_parameter<double>("max_wz", 0.5);
   p.yaw_kp = declare_parameter<double>("yaw_kp", 0.8);
   p.yaw_rate_ff = declare_parameter<double>("yaw_rate_ff", 1.0);
   p.max_yaw_dot_ff = declare_parameter<double>("max_yaw_dot_ff", 0.5);
@@ -110,26 +127,56 @@ void D1PlannerBridgeNode::controlTimerCallback()
     return;
   }
 
+  constexpr double kHardStopPlanSpeed = 0.02;
+  const double v_plan_cmd = std::hypot(cmd->velocity.x, cmd->velocity.y);
+
+  if (have_last_traj_id_ && cmd->trajectory_id != last_traj_id_) {
+    resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
+  }
+  last_traj_id_ = cmd->trajectory_id;
+  have_last_traj_id_ = true;
+
+  if (v_plan_cmd < kHardStopPlanSpeed) {
+    resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
+    twist.linear.x = 0.0;
+    twist.angular.z = 0.0;
+    cmd_vel_pub_->publish(twist);
+    if (log_cmd_vel_) {
+      const int throttle_ms = std::max(log_cmd_vel_period_ms_, 0);
+      RCLCPP_INFO_THROTTLE(
+        get_logger(), *get_clock(), throttle_ms,
+        "[cmd_vel_pub] hard_stop traj_id=%u plan_vel=%.4f twist=(0,0)",
+        cmd->trajectory_id, v_plan_cmd);
+    }
+    return;
+  }
+
   const GroundTwist ground = tracker_.compute(*cmd, odom ? odom.get() : nullptr);
   if (ground.valid) {
+    const double gv = finiteOrZero(ground.vx);
+    const double gw = finiteOrZero(ground.wz);
     const double a = std::clamp(cmd_vel_ema_alpha_, 0.0, 1.0);
-    if (!cmd_vel_filter_init_) {
-      filt_vx_ = ground.vx;
-      filt_wz_ = ground.wz;
+    if (!cmd_vel_filter_init_ || !std::isfinite(filt_vx_) || !std::isfinite(filt_wz_)) {
+      filt_vx_ = gv;
+      filt_wz_ = gw;
       cmd_vel_filter_init_ = true;
     } else if (a > 0.0) {
-      filt_vx_ = a * ground.vx + (1.0 - a) * filt_vx_;
-      filt_wz_ = a * ground.wz + (1.0 - a) * filt_wz_;
+      filt_vx_ = a * gv + (1.0 - a) * filt_vx_;
+      filt_wz_ = a * gw + (1.0 - a) * filt_wz_;
     } else {
-      filt_vx_ = ground.vx;
-      filt_wz_ = ground.wz;
+      filt_vx_ = gv;
+      filt_wz_ = gw;
     }
-    twist.linear.x = filt_vx_;
-    twist.angular.z = filt_wz_;
+    twist.linear.x = finiteOrZero(filt_vx_);
+    twist.angular.z = finiteOrZero(filt_wz_);
+    if (!std::isfinite(ground.vx) || !std::isfinite(ground.wz)) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000,
+        "[cmd_vel_pub] non-finite tracker output sanitized (vx=%.3f wz=%.3f)",
+        ground.vx, ground.wz);
+    }
   } else {
-    cmd_vel_filter_init_ = false;
-    filt_vx_ = 0.0;
-    filt_wz_ = 0.0;
+    resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
   }
 
   cmd_vel_pub_->publish(twist);
