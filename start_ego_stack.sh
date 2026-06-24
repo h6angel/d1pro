@@ -145,18 +145,27 @@ if [[ "${SKIP_WAIT}" == "false" ]]; then
   wait_for_message /ov_msckf/pose_stamped 90 || exit 1
 fi
 
-# 3. EGO 规划
+# 3. AprilTag 感知（仅追踪模式）
+if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
+  launch_bg apriltag \
+    ros2 launch apriltag_detect apriltag.launch.py
+  if [[ "${SKIP_WAIT}" == "false" ]]; then
+    wait_for_topic /apriltag/target_detected 30 || true
+  fi
+fi
+
+# 4. EGO 规划
 launch_bg ego_planner \
   ros2 launch ego_planner single_run.launch.py \
   enable_tag_tracking:=${ENABLE_TAG_TRACKING}
 
 sleep 2
 
-# 4. D1 底盘桥接
+# 5. D1 底盘桥接
 launch_bg d1_bridge \
   ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 
-# 5. 可选 RViz（Fixed Frame 选 global）
+# 6. 可选 RViz（Fixed Frame 选 global）
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
   launch_bg rviz \
     ros2 launch ego_planner rviz.launch.py
@@ -166,6 +175,9 @@ log "=========================================="
 log "全部节点已启动。按 Ctrl+C 停止。"
 log "  RealSense  -> ${LOG_DIR}/realsense.log"
 log "  OpenVINS   -> ${LOG_DIR}/openvins.log"
+if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
+  log "  AprilTag   -> ${LOG_DIR}/apriltag.log"
+fi
 log "  EGO 规划   -> ${LOG_DIR}/ego_planner.log (+ ego_log/ 内 launch tee)"
 log "  D1 桥接    -> ${LOG_DIR}/d1_bridge.log"
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
