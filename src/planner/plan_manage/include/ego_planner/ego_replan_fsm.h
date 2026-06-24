@@ -65,6 +65,8 @@ namespace ego_planner
     double planning_horizen_, planning_horizen_time_;
     double emergency_time_;
     double global_replan_drift_thresh_;
+    /// Odom farther than this from the time-sampled traj point => stale traj / jump, force replan.
+    double odom_traj_mismatch_thresh_{0.12};
     bool flag_realworld_experiment_;
     bool enable_fail_safe_;
 
@@ -98,6 +100,16 @@ namespace ego_planner
     bool pending_estop_global_replan_{false};
     FSM_EXEC_STATE exec_state_;
     int continously_called_times_{0};
+
+    /// GEN_NEW_TRAJ recovery: backoff + cap to avoid exec-timer spin when plan fails.
+    int gen_new_traj_fail_count_{0};
+    rclcpp::Time gen_new_traj_next_attempt_{0, 0, RCL_ROS_TIME};
+    int gen_new_traj_max_failures_{8};
+    double gen_new_traj_backoff_base_sec_{0.25};
+    double gen_new_traj_backoff_max_sec_{2.0};
+
+    void resetGenNewTrajRetry();
+    void onGenNewTrajPlanFailed();
 
     Eigen::Vector3d odom_pos_, odom_vel_, odom_acc_; // odometry state
     Eigen::Quaterniond odom_orient_;
@@ -135,6 +147,7 @@ namespace ego_planner
     bool planFromGlobalTraj(const int trial_times = 1);
     /// Local replan: warm-start from previous B-spline at t_cur; pin first ctrl pts to /odom.
     bool planFromCurrentTraj(const int trial_times = 1);
+    bool isOdomBodyInObstacle() const;
 
     /* return value: std::pair< Times of the same state be continuously called, current continuously called state > */
     void changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call);

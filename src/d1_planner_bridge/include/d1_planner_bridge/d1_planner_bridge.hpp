@@ -45,6 +45,8 @@ private:
   int log_cmd_vel_period_ms_{0};
 
   double cmd_vel_ema_alpha_{0.35};
+  /// plan_vel below this forces twist=(0,0); true stop is plan_vel==0.
+  double hard_stop_plan_speed_{0.005};
   bool cmd_vel_filter_init_{false};
   double filt_vx_{0.0};
   double filt_wz_{0.0};

@@ -162,6 +162,9 @@ def generate_launch_description():
             {'fsm/realworld_experiment': True},
             {'fsm/fail_safe': True},
             {'fsm/log_trace_period_ms': 500},
+            {'fsm/gen_new_traj_max_failures': 8},
+            {'fsm/gen_new_traj_backoff_base_sec': 0.25},
+            {'fsm/gen_new_traj_backoff_max_sec': 2.0},
 
             {'fsm/enable_tag_tracking': enable_tag_tracking},
             {'fsm/tag_pose_topic': tag_pose_topic},

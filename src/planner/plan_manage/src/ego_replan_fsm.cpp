@@ -1,4 +1,5 @@
 
+#include <algorithm>
 #include <limits>
 
 #include <ego_planner/ego_replan_fsm.h>
@@ -25,9 +26,13 @@ namespace ego_planner
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
+    node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.12);
     node_->declare_parameter("fsm/realworld_experiment", true);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
+    node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
+    node_->declare_parameter("fsm/gen_new_traj_backoff_base_sec", 0.25);
+    node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
 
     node_->get_parameter("fsm/flight_type", target_type_);
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
@@ -39,9 +44,18 @@ namespace ego_planner
     node_->get_parameter("fsm/planning_horizen_time", planning_horizen_time_);
     node_->get_parameter("fsm/emergency_time", emergency_time_);
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
+    node_->get_parameter("fsm/odom_traj_mismatch_thresh", odom_traj_mismatch_thresh_);
+    odom_traj_mismatch_thresh_ = std::max(odom_traj_mismatch_thresh_, 0.01);
     node_->get_parameter("fsm/realworld_experiment", flag_realworld_experiment_);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
+    node_->get_parameter("fsm/gen_new_traj_max_failures", gen_new_traj_max_failures_);
+    node_->get_parameter("fsm/gen_new_traj_backoff_base_sec", gen_new_traj_backoff_base_sec_);
+    node_->get_parameter("fsm/gen_new_traj_backoff_max_sec", gen_new_traj_backoff_max_sec_);
+    gen_new_traj_max_failures_ = std::max(gen_new_traj_max_failures_, 1);
+    gen_new_traj_backoff_base_sec_ = std::max(gen_new_traj_backoff_base_sec_, 0.05);
+    gen_new_traj_backoff_max_sec_ = std::max(
+      gen_new_traj_backoff_max_sec_, gen_new_traj_backoff_base_sec_);
 
     node_->declare_parameter("fsm/enable_tag_tracking", false);
     node_->declare_parameter("fsm/tag_pose_topic", "/apriltag/target_pose_global");
@@ -264,6 +278,7 @@ namespace ego_planner
       have_new_target_ = true;
 
       /*** FSM: schedule replan on next exec tick (never spin node from a callback) ***/
+      resetGenNewTrajRetry();
       if (exec_state_ == WAIT_TARGET)
         changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
       else
@@ -280,8 +295,45 @@ namespace ego_planner
   void EGOReplanFSM::triggerCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
   {
     have_trigger_ = true;
+    resetGenNewTrajRetry();
     cout << "Triggered!" << endl;
     init_pt_ = odom_pos_;
+  }
+
+  void EGOReplanFSM::resetGenNewTrajRetry()
+  {
+    gen_new_traj_fail_count_ = 0;
+    gen_new_traj_next_attempt_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+  }
+
+  void EGOReplanFSM::onGenNewTrajPlanFailed()
+  {
+    gen_new_traj_fail_count_++;
+    const double backoff = std::min(
+      gen_new_traj_backoff_max_sec_,
+      gen_new_traj_backoff_base_sec_ * static_cast<double>(gen_new_traj_fail_count_));
+    gen_new_traj_next_attempt_ = node_->now() + rclcpp::Duration::from_seconds(backoff);
+
+    if (gen_new_traj_fail_count_ >= gen_new_traj_max_failures_)
+    {
+      RCLCPP_ERROR(
+        node_->get_logger(),
+        "GEN_NEW_TRAJ failed %d times (stale map / in obstacle?). "
+        "Holding stop; fix depth/VIO and re-send goal.",
+        gen_new_traj_fail_count_);
+      resetGenNewTrajRetry();
+      have_trigger_ = false;
+      if (have_odom_)
+        callEmergencyStop(odom_pos_);
+      changeFSMExecState(WAIT_TARGET, "FSM");
+      return;
+    }
+
+    RCLCPP_WARN_THROTTLE(
+      node_->get_logger(), *node_->get_clock(),
+      std::max(log_trace_period_ms_, 500),
+      "GEN_NEW_TRAJ plan failed (%d/%d), retry in %.2fs",
+      gen_new_traj_fail_count_, gen_new_traj_max_failures_, backoff);
   }
 
   void EGOReplanFSM::waypointCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
@@ -576,7 +628,7 @@ namespace ego_planner
           else
           {
             RCLCPP_ERROR(node_->get_logger(), "Failed to generate the first trajectory!!!");
-            changeFSMExecState(SEQUENTIAL_START, "FSM");
+            changeFSMExecState(GEN_NEW_TRAJ, "FSM");
           }
         }
         else
@@ -590,6 +642,12 @@ namespace ego_planner
 
     case GEN_NEW_TRAJ:
     {
+      if (gen_new_traj_next_attempt_.nanoseconds() > 0 &&
+          node_->now() < gen_new_traj_next_attempt_)
+      {
+        goto force_return;
+      }
+
       if (pending_estop_global_replan_)
       {
         pending_estop_global_replan_ = false;
@@ -599,12 +657,13 @@ namespace ego_planner
       bool success = planFromGlobalTraj(10); // zx-todo
       if (success)
       {
+        resetGenNewTrajRetry();
         changeFSMExecState(EXEC_TRAJ, "FSM");
         publishSwarmTrajs(false);
       }
       else
       {
-        changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+        onGenNewTrajPlanFailed();
       }
       break;
     }
@@ -762,6 +821,16 @@ namespace ego_planner
     return false;
   }
 
+  bool EGOReplanFSM::isOdomBodyInObstacle() const
+  {
+    if (!have_odom_)
+      return false;
+
+    const auto map = planner_manager_->grid_map_;
+    Eigen::Vector3d p = odom_pos_;
+    return map->getInflateOccupancyNoFootprint(p) > 0;
+  }
+
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
   {
     if (!have_odom_)
@@ -786,6 +855,16 @@ namespace ego_planner
       if (callReboundReplan(false, flag_random_poly_init))
         return true;
     }
+
+    // Odom jump / stale warm-start ctrl pts: retry from polynomial init when body is free.
+    if (!isOdomBodyInObstacle())
+    {
+      for (int i = 0; i < trial_times; i++)
+      {
+        if (callReboundReplan(true, flag_random_poly_init))
+          return true;
+      }
+    }
     return false;
   }
 
@@ -795,19 +874,30 @@ namespace ego_planner
     LocalTrajData *info = &planner_manager_->local_data_;
     auto map = planner_manager_->grid_map_;
     
-    if (exec_state_ == WAIT_TARGET || info->start_time_.seconds() < 1e-5)
+    if (exec_state_ == WAIT_TARGET || exec_state_ == INIT ||
+        info->start_time_.seconds() < 1e-5)
       return;
 
     /* ---------- check lost of depth ---------- */
     if (map->getOdomDepthTimeout())
     {
-      if (exec_state_ != EMERGENCY_STOP)
+      if (exec_state_ == EXEC_TRAJ || exec_state_ == REPLAN_TRAJ)
       {
         RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
         enterEmergencyStop("SAFETY");
       }
+      else if (exec_state_ == GEN_NEW_TRAJ)
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(),
+          std::max(log_trace_period_ms_, 500),
+          "Depth stale during GEN_NEW_TRAJ recovery (no re-estop)");
+      }
       return;
     }
+
+    if (exec_state_ != EXEC_TRAJ && exec_state_ != REPLAN_TRAJ)
+      return;
 
     /* ---------- check trajectory ---------- */
     constexpr double time_step = 0.01;
@@ -815,6 +905,18 @@ namespace ego_planner
     double t_cur = (rclcpp::Clock().now() - info->start_time_).seconds();
 
     Eigen::Vector3d p_cur = info->position_traj_.evaluateDeBoorT(t_cur);
+    const double odom_traj_xy_dist = (odom_pos_.head<2>() - p_cur.head<2>()).norm();
+    if (odom_traj_xy_dist > odom_traj_mismatch_thresh_)
+    {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(), *node_->get_clock(),
+        std::max(log_trace_period_ms_, 500),
+        "Odom-traj mismatch %.3fm (>%.3fm), force replan (odom jump / stale traj).",
+        odom_traj_xy_dist, odom_traj_mismatch_thresh_);
+      changeFSMExecState(REPLAN_TRAJ, "ODOM_JUMP");
+      return;
+    }
+
     const double CLEARANCE = 1.0 * planner_manager_->getSwarmClearance();
     // double t_cur_global = ros::Time::now().toSec();
     double t_cur_global = rclcpp::Clock().now().seconds();
@@ -859,7 +961,16 @@ namespace ego_planner
         }
         else
         {
-          if (t - t_cur < emergency_time_) // 0.8s of emergency time
+          const bool odom_in_obstacle = isOdomBodyInObstacle();
+          if (!odom_in_obstacle)
+          {
+            RCLCPP_WARN(
+              node_->get_logger(),
+              "Trajectory collision but odom body free (odom-traj dist=%.3fm, dt=%.3fs), replan.",
+              odom_traj_xy_dist, t - t_cur);
+            changeFSMExecState(REPLAN_TRAJ, "SAFETY");
+          }
+          else if (t - t_cur < emergency_time_)
           {
             RCLCPP_WARN(node_->get_logger(), "Suddenly discovered obstacles. emergency stop! time=%f", t - t_cur);
 
