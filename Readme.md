@@ -50,7 +50,13 @@ ros2 launch ego_planner rviz.launch.py
 
 深度内参请用 `ros2 topic echo /camera/camera/depth/camera_info --once` 核对后覆盖 launch 的 `cx/cy/fx/fy`。
 
-默认：`flight_type:=1` 用 RViz 设目标；`flight_type:=2` 用 launch 预设航点。桥接参数见 `src/d1_planner_bridge/config/d1_bridge.yaml`。
+**D1 话题与速度上限**（规划、traj_server、bridge 共用）统一在：
+
+`src/planner/plan_manage/config/d1_robot.yaml`
+
+改 `max_vel` / `max_wz` / `max_acc` 或话题名时只改此文件；launch 仍可用 `max_vel:=0.5` 等临时覆盖。
+
+桥接控制调参见 `src/d1_planner_bridge/config/d1_bridge.yaml`。
 
 若使用自定义 VIO，通过 launch 参数覆盖：
 

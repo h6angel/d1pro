@@ -1,24 +1,16 @@
 d1_planner_bridge_node:
   ros__parameters:
-    # D1 chassis limits — also set D1_MAX_VX / D1_MAX_WZ in start_ego_stack.sh
-    pos_cmd_topic: "/drone_0_planning/pos_cmd"
-    odom_topic: "/ov_msckf/odomimu"
-    cmd_vel_topic: "/command/cmd_twist"
+    # 话题与速度上限见 ego_planner/config/d1_robot.yaml（launch 注入）
+    # 此处仅保留 bridge 专用控制调参
 
     control_rate_hz: 100.0
 
     log_cmd_vel: true
     log_cmd_vel_period_ms: 500
 
-    max_vx: 0.6
-    max_wz: 0.5
-
     # path yaw: min-error pick of cmd.yaw vs velocity; carrot bearing on overshoot
     yaw_kp: 1.2
     yaw_rate_ff: 1.0
-    max_yaw_dot_ff: 0.5
-    max_wz_yaw_p: 0.5
-    min_turn_wz: 0.5
 
     align_heading_thresh_rad: 0.4
     allow_reverse: false

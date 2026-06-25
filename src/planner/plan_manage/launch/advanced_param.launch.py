@@ -3,7 +3,8 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
-# Single-robot D1 real deployment: fixed internal namespace drone_0, external topics via remaps.
+# D1 实机话题/速度默认值见 config/d1_robot.yaml（由 single_run.launch.py 传入）。
+# 单独 launch 本文件时仍使用下方 fallback 默认。
 
 def generate_launch_description():
     map_size_x = LaunchConfiguration('map_size_x_', default=40.0)
@@ -47,7 +48,6 @@ def generate_launch_description():
     obstacles_inflation = LaunchConfiguration('obstacles_inflation', default='0.099')
     optimization_dist0 = LaunchConfiguration('optimization_dist0', default='0.5')
     lambda_fitness = LaunchConfiguration('lambda_fitness', default='1.0')
-    use_distinctive_trajs = LaunchConfiguration('use_distinctive_trajs', default=False)
 
     enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
     tag_pose_topic = LaunchConfiguration('tag_pose_topic', default='/apriltag/target_pose_global')
@@ -115,7 +115,6 @@ def generate_launch_description():
     lambda_fitness_arg = DeclareLaunchArgument(
         'lambda_fitness', default_value=lambda_fitness,
         description='B-spline refine fitness weight; raise if refine hits obstacles often')
-    use_distinctive_trajs_arg = DeclareLaunchArgument('use_distinctive_trajs', default_value=use_distinctive_trajs, description='Distinctive trajectories (multi-agent only)')
 
     enable_tag_tracking_arg = DeclareLaunchArgument(
         'enable_tag_tracking', default_value=enable_tag_tracking,
@@ -243,8 +242,6 @@ def generate_launch_description():
             {'manager/control_points_distance': 0.4},
             {'manager/feasibility_tolerance': 0.05},
             {'manager/planning_horizon': planning_horizon},
-            {'manager/use_distinctive_trajs': use_distinctive_trajs},
-            {'manager/drone_id': -1},
             {'manager/use_robot_z_planning': True},
 
             {'optimization/lambda_smooth': 1.0},
@@ -252,7 +249,6 @@ def generate_launch_description():
             {'optimization/lambda_feasibility': 0.1},
             {'optimization/lambda_fitness': lambda_fitness},
             {'optimization/dist0': optimization_dist0},
-            {'optimization/swarm_clearance': 0.5},
             {'optimization/max_vel': max_vel},
             {'optimization/max_acc': max_acc},
 
@@ -303,7 +299,6 @@ def generate_launch_description():
     ld.add_action(obstacles_inflation_arg)
     ld.add_action(optimization_dist0_arg)
     ld.add_action(lambda_fitness_arg)
-    ld.add_action(use_distinctive_trajs_arg)
     ld.add_action(enable_tag_tracking_arg)
     ld.add_action(tag_pose_topic_arg)
     ld.add_action(tag_detected_topic_arg)

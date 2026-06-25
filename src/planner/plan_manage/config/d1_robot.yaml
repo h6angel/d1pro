@@ -1,0 +1,23 @@
+# D1 实机部署 — 话题与物理限制的唯一配置源
+# 使用者: single_run.launch.py, d1_planner_bridge.launch.py, start_ego_stack.sh
+# 调 max_vel / max_wz / max_acc 或话题名时只改此文件即可。
+
+topics:
+  odom: "/ov_msckf/odomimu"
+  pose: "/ov_msckf/pose_stamped"
+  depth: "/camera/camera/depth/image_rect_raw"
+  pos_cmd: "/drone_0_planning/pos_cmd"
+  cmd_vel: "/command/cmd_twist"
+  map_frame_id: "global"
+
+limits:
+  max_vel: 0.6   # 规划 + traj_server 终点引导速度上限 (m/s)
+  max_wz: 0.5    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
+  max_acc: 1.0   # 规划加速度上限 (m/s^2)
+
+# D435i depth 640x360 — 设备上可用 ros2 topic echo .../depth/camera_info 核对
+camera:
+  cx: 323.168
+  cy: 180.403
+  fx: 320.244
+  fy: 320.244

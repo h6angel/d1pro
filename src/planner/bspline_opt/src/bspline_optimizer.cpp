@@ -1,5 +1,4 @@
 #include "bspline_opt/bspline_optimizer.h"
-#include "bspline_opt/gradient_descent_optimizer.h"
 // using namespace std;
 
 namespace ego_planner
@@ -14,7 +13,6 @@ namespace ego_planner
     node->declare_parameter("optimization/lambda_fitness", -1.0);
 
     node->declare_parameter("optimization/dist0", -1.0);
-    node->declare_parameter("optimization/swarm_clearance", -1.0);
     node->declare_parameter("optimization/max_vel", -1.0);
     node->declare_parameter("optimization/max_acc", -1.0);
 
@@ -26,7 +24,6 @@ namespace ego_planner
     node->get_parameter("optimization/lambda_fitness", lambda4_);
 
     node->get_parameter("optimization/dist0", dist0_);
-    node->get_parameter("optimization/swarm_clearance", swarm_clearance_);
     node->get_parameter("optimization/max_vel", max_vel_);
     node->get_parameter("optimization/max_acc", max_acc_);
 
@@ -89,431 +86,6 @@ namespace ego_planner
   }
 
   void BsplineOptimizer::setBsplineInterval(const double &ts) { bspline_interval_ = ts; }
-
-  void BsplineOptimizer::setSwarmTrajs(SwarmTrajData *swarm_trajs_ptr) { swarm_trajs_ = swarm_trajs_ptr; }
-
-  void BsplineOptimizer::setDroneId(const int drone_id) { drone_id_ = drone_id; }
-
-  // 返回多个安全的控制点集
-  std::vector<ControlPoints> BsplineOptimizer::distinctiveTrajs(vector<std::pair<int, int>> segments)
-  {
-    if (segments.size() == 0) // will be invoked again later.
-    {
-      std::vector<ControlPoints> oneSeg;
-      oneSeg.push_back(cps_);
-      return oneSeg;
-    }
-
-    constexpr int MAX_TRAJS = 8;                                                                            // 最多的轨迹数量
-    constexpr int VARIS = 2;                                                                                // 允许的变化种类数
-    int seg_upbound = std::min((int)segments.size(), static_cast<int>(floor(log(MAX_TRAJS) / log(VARIS)))); // 允许变换的片段数量上限
-    std::vector<ControlPoints> control_pts_buf;
-    control_pts_buf.reserve(MAX_TRAJS);
-    const double RESOLUTION = grid_map_->getResolution();
-    const double CTRL_PT_DIST = (cps_.points.col(0) - cps_.points.col(cps_.size - 1)).norm() / (cps_.size - 1); // 计算控制点间的平均距离
-
-    // Step 1. Find the opposite vectors and base points for every segment.
-    std::vector<std::pair<ControlPoints, ControlPoints>> RichInfoSegs;
-    // 初始化两套控制点信息
-    for (int i = 0; i < seg_upbound; i++)
-    {
-      std::pair<ControlPoints, ControlPoints> RichInfoOneSeg;
-      ControlPoints RichInfoOneSeg_temp;
-      // 获取指定片段的控制点信息
-      cps_.segment(RichInfoOneSeg_temp, segments[i].first, segments[i].second);
-      RichInfoOneSeg.first = RichInfoOneSeg_temp;
-      RichInfoOneSeg.second = RichInfoOneSeg_temp;
-      RichInfoSegs.push_back(RichInfoOneSeg);
-
-      // cout << "RichInfoOneSeg_temp, out" << endl;
-      // cout << "RichInfoSegs[" << i << "].first" << endl;
-      // for ( int k=0; k<RichInfoOneSeg_temp.size; k++ )
-      //   if ( RichInfoOneSeg_temp.base_point[k].size() > 0 )
-      //   {
-      //     cout << "###" << RichInfoOneSeg_temp.points.col(k).transpose() << endl;
-      //     for (int k2 = 0; k2 < RichInfoOneSeg_temp.base_point[k].size(); k2++)
-      //     {
-      //       cout << "      " << RichInfoOneSeg_temp.base_point[k][k2].transpose() << " @ " << RichInfoOneSeg_temp.direction[k][k2].transpose() << endl;
-      //     }
-      //   }
-    }
-
-    for (int i = 0; i < seg_upbound; i++)
-    {
-
-      // 1.1 Find the start occupied point id and the last occupied point id
-      if (RichInfoSegs[i].first.size > 1)
-      {
-        int occ_start_id = -1, occ_end_id = -1;
-        Eigen::Vector3d occ_start_pt, occ_end_pt;
-        for (int j = 0; j < RichInfoSegs[i].first.size - 1; j++)
-        {
-          // cout << "A *" << j << "*" << endl;
-          //  遍历每个控制点及其后一个点，在两点间通过线性插值生成采样点
-          double step_size = RESOLUTION / (RichInfoSegs[i].first.points.col(j) - RichInfoSegs[i].first.points.col(j + 1)).norm() / 2;
-          for (double a = 1; a > 0; a -= step_size)
-          {
-            Eigen::Vector3d pt(a * RichInfoSegs[i].first.points.col(j) + (1 - a) * RichInfoSegs[i].first.points.col(j + 1));
-            // cout << " " << checkOccupancy(pt) << " pt=" << pt.transpose() << endl;
-            //  如果检测到在障碍物内，则存储对应数据
-            if (checkOccupancy(pt))
-            {
-              occ_start_id = j;
-              occ_start_pt = pt;
-              goto exit_multi_loop1;
-            }
-          }
-        }
-      exit_multi_loop1:;
-        // 查找片段与最后一个障碍物的交点
-        for (int j = RichInfoSegs[i].first.size - 1; j >= 1; j--)
-        {
-          // cout << "j=" << j << endl;
-          // cout << "B *" << j << "*" << endl;
-          ;
-          // 和上面同样的采样，然后检测是否在障碍物中
-          double step_size = RESOLUTION / (RichInfoSegs[i].first.points.col(j) - RichInfoSegs[i].first.points.col(j - 1)).norm();
-          for (double a = 1; a > 0; a -= step_size)
-          {
-            Eigen::Vector3d pt(a * RichInfoSegs[i].first.points.col(j) + (1 - a) * RichInfoSegs[i].first.points.col(j - 1));
-            // cout << " " << checkOccupancy(pt) << " pt=" << pt.transpose() << endl;
-            ;
-            if (checkOccupancy(pt))
-            {
-              occ_end_id = j;
-              occ_end_pt = pt;
-              goto exit_multi_loop2;
-            }
-          }
-        }
-      exit_multi_loop2:;
-
-        // double check
-        // 如果片段的起点或者终点在障碍物中，将会被移除
-        if (occ_start_id == -1 || occ_end_id == -1)
-        {
-          // It means that the first or the last control points of one segment are in obstacles, which is not allowed.
-          // ROS_WARN("What? occ_start_id=%d, occ_end_id=%d", occ_start_id, occ_end_id);
-
-          segments.erase(segments.begin() + i);
-          RichInfoSegs.erase(RichInfoSegs.begin() + i);
-          seg_upbound--;
-          i--;
-
-          continue;
-
-          // cout << "RichInfoSegs[" << i << "].first" << endl;
-          // for (int k = 0; k < RichInfoSegs[i].first.size; k++)
-          // {
-          //   if (RichInfoSegs[i].first.base_point.size() > 0)
-          //   {
-          //     cout << "###" << RichInfoSegs[i].first.points.col(k).transpose() << endl;
-          //     for (int k2 = 0; k2 < RichInfoSegs[i].first.base_point[k].size(); k2++)
-          //     {
-          //       cout << "      " << RichInfoSegs[i].first.base_point[k][k2].transpose() << " @ " << RichInfoSegs[i].first.direction[k][k2].transpose() << endl;
-          //     }
-          //   }
-          // }
-        }
-
-        // 1.2 Reverse the vector and find new base points from occ_start_id to occ_end_id.
-        for (int j = occ_start_id; j <= occ_end_id; j++)
-        {
-          Eigen::Vector3d base_pt_reverse, base_vec_reverse;
-          // 检查控制点的base point是否为1
-          if (RichInfoSegs[i].first.base_point[j].size() != 1)
-          {
-            cout << "RichInfoSegs[" << i << "].first.base_point[" << j << "].size()=" << RichInfoSegs[i].first.base_point[j].size() << endl;
-            RCLCPP_ERROR(rclcpp::get_logger("distinctiveTrajs"), "Wrong number of base_points!!! Should not be happen!.");
-
-            cout << setprecision(5);
-            cout << "cps_" << endl;
-            cout << " clearance=" << cps_.clearance << " cps.size=" << cps_.size << endl;
-            // 输出错误信息
-            for (int temp_i = 0; temp_i < cps_.size; temp_i++)
-            {
-              if (cps_.base_point[temp_i].size() > 1 && cps_.base_point[temp_i].size() < 1000)
-              {
-                RCLCPP_ERROR(rclcpp::get_logger("distinctiveTrajs"), "Should not happen!!!");
-                cout << "######" << cps_.points.col(temp_i).transpose() << endl;
-                for (size_t temp_j = 0; temp_j < cps_.base_point[temp_i].size(); temp_j++)
-                  cout << "      " << cps_.base_point[temp_i][temp_j].transpose() << " @ " << cps_.direction[temp_i][temp_j].transpose() << endl;
-              }
-            }
-
-            std::vector<ControlPoints> blank;
-            return blank;
-          }
-
-          // 通过取反获得相反方向的向量
-          base_vec_reverse = -RichInfoSegs[i].first.direction[j][0];
-
-          // The start and the end case must get taken special care of.
-          // 若当前控制点为片段的起始点 occ_start_id，则将障碍物交点 occ_start_pt 直接设为 base_pt_reverse
-          if (j == occ_start_id)
-          {
-            base_pt_reverse = occ_start_pt;
-          }
-          // 若当前控制点为片段的终止点 occ_end_id，则将终点交点 occ_end_pt 设为 base_pt_reverse
-          else if (j == occ_end_id)
-          {
-            base_pt_reverse = occ_end_pt;
-          }
-          // 对于片段中的中间控制点，将基准点 base_pt_reverse 设置为当前控制点 points.col(j) 沿反向向量 base_vec_reverse 方向延伸的某一距离位置
-          else
-          {
-            base_pt_reverse = RichInfoSegs[i].first.points.col(j) + base_vec_reverse * (RichInfoSegs[i].first.base_point[j][0] - RichInfoSegs[i].first.points.col(j)).norm();
-          }
-
-          // 检查base_pt_reverse是否在障碍物中
-          if (checkOccupancy(base_pt_reverse)) // Search outward.
-          {
-            // 最大搜索范围
-            double l_upbound = 5 * CTRL_PT_DIST; // "5" is the threshold.
-            double l = RESOLUTION;
-            for (; l <= l_upbound; l += RESOLUTION)
-            {
-              // 不断将控制点向外移动，寻找不在障碍物中的控制点
-              Eigen::Vector3d base_pt_temp = base_pt_reverse + l * base_vec_reverse;
-              // cout << base_pt_temp.transpose() << endl;
-              if (!checkOccupancy(base_pt_temp))
-              {
-                RichInfoSegs[i].second.base_point[j][0] = base_pt_temp;
-                RichInfoSegs[i].second.direction[j][0] = base_vec_reverse;
-                break;
-              }
-            }
-            // 如果找不到则删除这一段
-            if (l > l_upbound)
-            {
-              RCLCPP_WARN(rclcpp::get_logger("distinctiveTrajs"), "Can't find the new base points at the opposite within the threshold. i=%d, j=%d", i, j);
-
-              segments.erase(segments.begin() + i);
-              RichInfoSegs.erase(RichInfoSegs.begin() + i);
-              seg_upbound--;
-              i--;
-
-              goto exit_multi_loop3; // break "for (int j = 0; j < RichInfoSegs[i].first.size; j++)"
-            }
-          }
-          // 如果距离控制点足够远且不再障碍物中则无需继续搜索
-          else if ((base_pt_reverse - RichInfoSegs[i].first.points.col(j)).norm() >= RESOLUTION) // Unnecessary to search.
-          {
-            RichInfoSegs[i].second.base_point[j][0] = base_pt_reverse;
-            RichInfoSegs[i].second.direction[j][0] = base_vec_reverse;
-          }
-          // 基点和控制点太近则删除这一段
-          else
-          {
-            RCLCPP_WARN(rclcpp::get_logger("distinctiveTrajs"), "base_point and control point are too close!");
-            cout << "base_point=" << RichInfoSegs[i].first.base_point[j][0].transpose() << " control point=" << RichInfoSegs[i].first.points.col(j).transpose() << endl;
-
-            segments.erase(segments.begin() + i);
-            RichInfoSegs.erase(RichInfoSegs.begin() + i);
-            seg_upbound--;
-            i--;
-
-            goto exit_multi_loop3; // break "for (int j = 0; j < RichInfoSegs[i].first.size; j++)"
-          }
-        }
-
-        // 1.3 Assign the base points to control points within [0, occ_start_id) and (occ_end_id, RichInfoSegs[i].first.size()-1].
-        if (RichInfoSegs[i].second.size)
-        {
-          // 为片段起点之前和终点之后的控制点设置统一的基准点和方向，使得这些控制点在障碍物影响范围外时能够保持一致的路径属性
-          for (int j = occ_start_id - 1; j >= 0; j--)
-          {
-            RichInfoSegs[i].second.base_point[j][0] = RichInfoSegs[i].second.base_point[occ_start_id][0];
-            RichInfoSegs[i].second.direction[j][0] = RichInfoSegs[i].second.direction[occ_start_id][0];
-          }
-          for (int j = occ_end_id + 1; j < RichInfoSegs[i].second.size; j++)
-          {
-            RichInfoSegs[i].second.base_point[j][0] = RichInfoSegs[i].second.base_point[occ_end_id][0];
-            RichInfoSegs[i].second.direction[j][0] = RichInfoSegs[i].second.direction[occ_end_id][0];
-          }
-        }
-
-      exit_multi_loop3:;
-      }
-      // 片段只有一个控制点的情况
-      else if (RichInfoSegs[i].first.size == 1)
-      {
-        cout << "i=" << i << " RichInfoSegs.size()=" << RichInfoSegs.size() << endl;
-        cout << "RichInfoSegs[i].first.size=" << RichInfoSegs[i].first.size << endl;
-        cout << "RichInfoSegs[i].first.direction.size()=" << RichInfoSegs[i].first.direction.size() << endl;
-        cout << "RichInfoSegs[i].first.direction[0].size()=" << RichInfoSegs[i].first.direction[0].size() << endl;
-        cout << "RichInfoSegs[i].first.points.cols()=" << RichInfoSegs[i].first.points.cols() << endl;
-        cout << "RichInfoSegs[i].first.base_point.size()=" << RichInfoSegs[i].first.base_point.size() << endl;
-        cout << "RichInfoSegs[i].first.base_point[0].size()=" << RichInfoSegs[i].first.base_point[0].size() << endl;
-        Eigen::Vector3d base_vec_reverse = -RichInfoSegs[i].first.direction[0][0];
-        Eigen::Vector3d base_pt_reverse = RichInfoSegs[i].first.points.col(0) + base_vec_reverse * (RichInfoSegs[i].first.base_point[0][0] - RichInfoSegs[i].first.points.col(0)).norm();
-
-        if (checkOccupancy(base_pt_reverse)) // Search outward.
-        {
-          double l_upbound = 5 * CTRL_PT_DIST; // "5" is the threshold.
-          double l = RESOLUTION;
-          for (; l <= l_upbound; l += RESOLUTION)
-          {
-            Eigen::Vector3d base_pt_temp = base_pt_reverse + l * base_vec_reverse;
-            // cout << base_pt_temp.transpose() << endl;
-            if (!checkOccupancy(base_pt_temp))
-            {
-              RichInfoSegs[i].second.base_point[0][0] = base_pt_temp;
-              RichInfoSegs[i].second.direction[0][0] = base_vec_reverse;
-              break;
-            }
-          }
-          if (l > l_upbound)
-          {
-            RCLCPP_WARN(rclcpp::get_logger("distinctiveTrajs"), 
-                        "Can't find the new base points at the opposite within the threshold, 2. i=%d", i);
-
-            segments.erase(segments.begin() + i);
-            RichInfoSegs.erase(RichInfoSegs.begin() + i);
-            seg_upbound--;
-            i--;
-          }
-        }
-        else if ((base_pt_reverse - RichInfoSegs[i].first.points.col(0)).norm() >= RESOLUTION) // Unnecessary to search.
-        {
-          RichInfoSegs[i].second.base_point[0][0] = base_pt_reverse;
-          RichInfoSegs[i].second.direction[0][0] = base_vec_reverse;
-        }
-        else
-        {
-          RCLCPP_WARN(rclcpp::get_logger("distinctiveTrajs"), 
-                        "base_point and control point are too close!, 2");
-          cout << "base_point=" << RichInfoSegs[i].first.base_point[0][0].transpose() << " control point=" << RichInfoSegs[i].first.points.col(0).transpose() << endl;
-
-          segments.erase(segments.begin() + i);
-          RichInfoSegs.erase(RichInfoSegs.begin() + i);
-          seg_upbound--;
-          i--;
-        }
-      }
-      else
-      {
-        segments.erase(segments.begin() + i);
-        RichInfoSegs.erase(RichInfoSegs.begin() + i);
-        seg_upbound--;
-        i--;
-      }
-    }
-    // cout << "A3" << endl;
-
-    // Step 2. Assemble each segment to make up the new control point sequence.
-    // 将每个分段组合起来，组成新的控制点序列
-    if (seg_upbound == 0) // After the erase operation above, segment legth will decrease to 0 again.
-    {
-      std::vector<ControlPoints> oneSeg;
-      oneSeg.push_back(cps_);
-      return oneSeg;
-    }
-
-    // 初始化选择向量
-    std::vector<int> selection(seg_upbound);
-    std::fill(selection.begin(), selection.end(), 0);
-    selection[0] = -1; // init
-    // 计算最大组合数
-    int max_traj_nums = static_cast<int>(pow(VARIS, seg_upbound));
-    for (int i = 0; i < max_traj_nums; i++)
-    {
-      // 2.1 Calculate the selection table.
-      int digit_id = 0;
-      selection[digit_id]++;
-      // 生成一个选择表
-      while (digit_id < seg_upbound && selection[digit_id] >= VARIS)
-      {
-        selection[digit_id] = 0;
-        digit_id++;
-        if (digit_id >= seg_upbound)
-        {
-          RCLCPP_ERROR(rclcpp::get_logger("distinctiveTrajs"), 
-                        "Should not happen!!! digit_id=%d, seg_upbound=%d", digit_id, seg_upbound);
-          
-        }
-        selection[digit_id]++;
-      }
-
-      // 2.2 Assign params according to the selection table.
-      ControlPoints cpsOneSample;
-      cpsOneSample.resize(cps_.size);
-      cpsOneSample.clearance = cps_.clearance;
-      int cp_id = 0, seg_id = 0, cp_of_seg_id = 0;
-      // 遍历所有控制点
-      while (/*seg_id < RichInfoSegs.size() ||*/ cp_id < cps_.size)
-      {
-        // cout << "A ";
-        //  if ( seg_id >= RichInfoSegs.size() )
-        //  {
-        //    cout << "seg_id=" << seg_id << " RichInfoSegs.size()=" << RichInfoSegs.size() << endl;
-        //  }
-        //  if ( cp_id >= cps_.base_point.size() )
-        //  {
-        //    cout << "cp_id=" << cp_id << " cps_.base_point.size()=" << cps_.base_point.size() << endl;
-        //  }
-        //  if ( cp_of_seg_id >= RichInfoSegs[seg_id].first.base_point.size() )
-        //  {
-        //    cout << "cp_of_seg_id=" << cp_of_seg_id << " RichInfoSegs[seg_id].first.base_point.size()=" << RichInfoSegs[seg_id].first.base_point.size() << endl;
-        //  }
-        //  判断控制点是否在当前控制范围内
-        //  如果不在则直接从原始控制点集中复制数据
-        if (seg_id >= seg_upbound || cp_id < segments[seg_id].first || cp_id > segments[seg_id].second)
-        {
-          cpsOneSample.points.col(cp_id) = cps_.points.col(cp_id);
-          cpsOneSample.base_point[cp_id] = cps_.base_point[cp_id];
-          cpsOneSample.direction[cp_id] = cps_.direction[cp_id];
-        }
-        // 如果 cp_id 位于当前片段范围内，根据 selection[seg_id] 的值选择片段的第一套或第二套基准点和方向
-        else if (cp_id >= segments[seg_id].first && cp_id <= segments[seg_id].second)
-        {
-          if (!selection[seg_id]) // zx-todo
-          {
-            cpsOneSample.points.col(cp_id) = RichInfoSegs[seg_id].first.points.col(cp_of_seg_id);
-            cpsOneSample.base_point[cp_id] = RichInfoSegs[seg_id].first.base_point[cp_of_seg_id];
-            cpsOneSample.direction[cp_id] = RichInfoSegs[seg_id].first.direction[cp_of_seg_id];
-            cp_of_seg_id++;
-          }
-          else
-          {
-            if (RichInfoSegs[seg_id].second.size)
-            {
-              cpsOneSample.points.col(cp_id) = RichInfoSegs[seg_id].second.points.col(cp_of_seg_id);
-              cpsOneSample.base_point[cp_id] = RichInfoSegs[seg_id].second.base_point[cp_of_seg_id];
-              cpsOneSample.direction[cp_id] = RichInfoSegs[seg_id].second.direction[cp_of_seg_id];
-              cp_of_seg_id++;
-            }
-            else
-            {
-              // Abandon this trajectory.
-              goto abandon_this_trajectory;
-            }
-          }
-
-          // 当遍历到片段的最后一个控制点时，将 cp_of_seg_id 重置为 0，并将 seg_id 指向下一个片段
-          if (cp_id == segments[seg_id].second)
-          {
-            cp_of_seg_id = 0;
-            seg_id++;
-          }
-        }
-        else
-        {
-          RCLCPP_ERROR(rclcpp::get_logger("distinctiveTrajs"), 
-                    "Shold not happen!!!!, cp_id=%d, seg_id=%d, segments.front().first=%d, segments.back().second=%d, segments[seg_id].first=%d, segments[seg_id].second=%d",
-                    cp_id, seg_id, segments.front().first, segments.back().second, segments[seg_id].first, segments[seg_id].second);
-        }
-
-        cp_id++;
-      }
-
-      control_pts_buf.push_back(cpsOneSample);
-
-    abandon_this_trajectory:;
-    }
-
-    return control_pts_buf;
-  } // namespace ego_planner
 
   /* This function is very similar to check_collision_and_rebound().
    * It was written separately, just because I did it once and it has been running stably since March 2020.
@@ -884,6 +456,8 @@ namespace ego_planner
   }
 
   // 急停情况下提前退出
+
+  // 急停情况下提前退出
   int BsplineOptimizer::earlyExit(void *func_data, const double *x, const double *g, const double fx, const double xnorm, const double gnorm, const double step, int n, int k, int ls)
   {
     BsplineOptimizer *opt = reinterpret_cast<BsplineOptimizer *>(func_data);
@@ -914,60 +488,6 @@ namespace ego_planner
 
     opt->iter_num_ += 1;
     return cost;
-  }
-
-  // 几个计算损失的函数
-  void BsplineOptimizer::calcSwarmCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
-  {
-    cost = 0.0;
-    int end_idx = q.cols() - order_ - (double)(q.cols() - 2 * order_) * 1.0 / 3.0; // Only check the first 2/3 points
-    const double CLEARANCE = swarm_clearance_ * 2;
-    double t_now = rclcpp::Clock().now().seconds();
-    constexpr double a = 2.0, b = 1.0, inv_a2 = 1 / a / a, inv_b2 = 1 / b / b;
-
-    for (int i = order_; i < end_idx; i++)
-    {
-      double glb_time = t_now + ((double)(order_ - 1) / 2 + (i - order_ + 1)) * bspline_interval_;
-
-      for (size_t id = 0; id < swarm_trajs_->size(); id++)
-      {
-        if ((swarm_trajs_->at(id).drone_id != (int)id) || swarm_trajs_->at(id).drone_id == drone_id_)
-        {
-          continue;
-        }
-
-        double traj_i_satrt_time = swarm_trajs_->at(id).start_time_.seconds();
-        if (glb_time < traj_i_satrt_time + swarm_trajs_->at(id).duration_ - 0.1)
-        {
-          /* def cost=(c-sqrt([Q-O]'D[Q-O]))^2, D=[1/b^2,0,0;0,1/b^2,0;0,0,1/a^2] */
-          Eigen::Vector3d swarm_prid = swarm_trajs_->at(id).position_traj_.evaluateDeBoorT(glb_time - traj_i_satrt_time);
-          Eigen::Vector3d dist_vec = cps_.points.col(i) - swarm_prid;
-          double ellip_dist = sqrt(dist_vec(2) * dist_vec(2) * inv_a2 + (dist_vec(0) * dist_vec(0) + dist_vec(1) * dist_vec(1)) * inv_b2);
-          double dist_err = CLEARANCE - ellip_dist;
-
-          Eigen::Vector3d dist_grad = cps_.points.col(i) - swarm_prid;
-          Eigen::Vector3d Coeff;
-          Coeff(0) = -2 * (CLEARANCE / ellip_dist - 1) * inv_b2;
-          Coeff(1) = Coeff(0);
-          Coeff(2) = -2 * (CLEARANCE / ellip_dist - 1) * inv_a2;
-
-          if (dist_err < 0)
-          {
-            /* do nothing */
-          }
-          else
-          {
-            cost += pow(dist_err, 2);
-            gradient.col(i) += (Coeff.array() * dist_grad.array()).matrix();
-          }
-
-          if (min_ellip_dist_ > dist_err)
-          {
-            min_ellip_dist_ = dist_err;
-          }
-        }
-      }
-    }
   }
 
   void BsplineOptimizer::calcMovingObjCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
@@ -1603,7 +1123,6 @@ namespace ego_planner
     {
       /* ---------- prepare ---------- */
       min_cost_ = std::numeric_limits<double>::max();
-      min_ellip_dist_ = INIT_min_ellip_dist_;
       iter_num_ = 0;
       flag_force_return = false;
       flag_occ = false;
@@ -1640,19 +1159,6 @@ namespace ego_planner
       {
         // ROS_WARN("Solver error in planning!, return = %s", lbfgs::lbfgs_strerror(result));
         flag_force_return = false;
-
-        /*** collision check, phase 1 ***/
-        if ((min_ellip_dist_ != INIT_min_ellip_dist_) && (min_ellip_dist_ > swarm_clearance_))
-        {
-          success = false;
-          restart_nums++;
-          initControlPoints(cps_.points, false);
-          new_lambda2_ *= 2; // 提高规避权重
-
-          printf("\033[32miter(+1)=%d,time(ms)=%5.3f, swarm too close, keep optimizing\n\033[0m", iter_num_, time_ms);
-
-          continue;
-        }
 
         /*** collision check, phase 2 ***/
         // 创建均匀的B样条曲线
@@ -1764,7 +1270,7 @@ namespace ego_planner
       }
 
     } while (
-        ((flag_occ || ((min_ellip_dist_ != INIT_min_ellip_dist_) && (min_ellip_dist_ > swarm_clearance_))) && restart_nums < MAX_RESART_NUMS_SET) ||
+        (flag_occ && restart_nums < MAX_RESART_NUMS_SET) ||
         (flag_force_return && force_stop_type_ == STOP_FOR_REBOUND && rebound_times <= 20));
 
     return success;
@@ -1851,36 +1357,25 @@ namespace ego_planner
   // 计算损失
   void BsplineOptimizer::combineCostRebound(const double *x, double *grad, double &f_combine, const int n)
   {
-    // cout << "drone_id_=" << drone_id_ << endl;
-    // cout << "cps_.points.size()=" << cps_.points.size() << endl;
-    // cout << "n=" << n << endl;
-    // cout << "sizeof(x[0])=" << sizeof(x[0]) << endl;
-
     memcpy(cps_.points.data() + 3 * order_, x, n * sizeof(x[0]));
     enforcePlanningZOnControlPoints();
 
     /* ---------- evaluate cost and gradient ---------- */
-    double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_swarm, f_terminal;
+    double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_terminal;
 
     Eigen::MatrixXd g_smoothness = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_distance = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_feasibility = Eigen::MatrixXd::Zero(3, cps_.size);
-    // Eigen::MatrixXd g_mov_objs = Eigen::MatrixXd::Zero(3, cps_.size);
-    Eigen::MatrixXd g_swarm = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_terminal = Eigen::MatrixXd::Zero(3, cps_.size);
 
     calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
     calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
     calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
-    // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
-    calcSwarmCost(cps_.points, f_swarm, g_swarm);
     calcTerminalCost(cps_.points, f_terminal, g_terminal);
 
-    f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
-    // f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_mov_objs;
-    // printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
+    f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + lambda2_ * f_terminal;
 
-    Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
+    Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + lambda2_ * g_terminal;
     enforcePlanningZOnGradient(grad_3D);
     // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;
     memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));

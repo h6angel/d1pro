@@ -36,7 +36,7 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
   const double control_rate_hz = declare_parameter<double>("control_rate_hz", 100.0);
   log_cmd_vel_ = declare_parameter<bool>("log_cmd_vel", true);
   log_cmd_vel_period_ms_ = declare_parameter<int>("log_cmd_vel_period_ms", 500);
-  cmd_vel_ema_alpha_ = declare_parameter<double>("cmd_vel_ema_alpha", 0.35);
+  cmd_vel_ema_alpha_ = declare_parameter<double>("cmd_vel_ema_alpha", 0.8);
   hard_stop_plan_speed_ = declare_parameter<double>("hard_stop_plan_speed", 0.005);
 
   pos_cmd_sub_ = create_subscription<quadrotor_msgs::msg::PositionCommand>(
@@ -75,7 +75,7 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
   p.yaw_rate_ff = declare_parameter<double>("yaw_rate_ff", 1.0);
   p.max_yaw_dot_ff = declare_parameter<double>("max_yaw_dot_ff", 0.5);
   p.project_velocity_to_body = declare_parameter<bool>("project_velocity_to_body", true);
-  p.min_vx = declare_parameter<double>("min_vx", 0.08);
+  p.min_vx = declare_parameter<double>("min_vx", 0.05);
   p.vx_deadband = declare_parameter<double>("vx_deadband", 0.01);
   p.max_wz_yaw_p = declare_parameter<double>("max_wz_yaw_p", 0.5);
   p.min_turn_wz = declare_parameter<double>("min_turn_wz", 0.5);

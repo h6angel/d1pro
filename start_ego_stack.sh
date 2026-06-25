@@ -18,9 +18,30 @@ REALSENSE_WS="${D1ROBOT_DIR}/realsense"
 OPENVINS_WS="${D1ROBOT_DIR}/openvins"
 EGO_WS="${SCRIPT_DIR}"
 
-# D1 底盘速度上限（规划 / traj_server / bridge 共用，改此处即可）
-D1_MAX_VX=0.6
-D1_MAX_WZ=0.5
+load_d1_robot_config() {
+  local cfg
+  for cfg in \
+    "${EGO_WS}/install/ego_planner/share/ego_planner/config/d1_robot.yaml" \
+    "${EGO_WS}/src/planner/plan_manage/config/d1_robot.yaml"; do
+    if [[ -f "${cfg}" ]]; then
+      D1_CONFIG="${cfg}"
+      eval "$(python3 - "${cfg}" <<'PY'
+import sys, yaml
+c = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+lim = c["limits"]
+print(f"D1_MAX_VX={lim['max_vel']}")
+print(f"D1_MAX_WZ={lim['max_wz']}")
+print(f"D1_MAX_ACC={lim['max_acc']}")
+PY
+)"
+      return 0
+    fi
+  done
+  echo "[错误] 未找到 d1_robot.yaml（请先 colcon build ego_planner）" >&2
+  exit 1
+}
+
+load_d1_robot_config
 
 ENABLE_RVIZ=true
 SKIP_WAIT=false
@@ -161,7 +182,8 @@ log "        openvins=${OPENVINS_WS}"
 log "        ego_control=${EGO_WS}"
 log "日志目录: ${LOG_DIR}"
 log "enable_tag_tracking=${ENABLE_TAG_TRACKING}"
-log "D1 limits: max_vx=${D1_MAX_VX} m/s max_wz=${D1_MAX_WZ} rad/s"
+log "D1 config: ${D1_CONFIG}"
+log "D1 limits: max_vx=${D1_MAX_VX} m/s max_wz=${D1_MAX_WZ} rad/s max_acc=${D1_MAX_ACC} m/s^2"
 
 # 1. RealSense D435i
 launch_bg realsense \
@@ -199,18 +221,16 @@ if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
   fi
 fi
 
-# 4. EGO 规划
+# 4. EGO 规划（速度/话题默认来自 d1_robot.yaml）
 launch_bg ego_planner \
   ros2 launch ego_planner single_run.launch.py \
-  enable_tag_tracking:=${ENABLE_TAG_TRACKING} \
-  max_vel:=${D1_MAX_VX} max_wz:=${D1_MAX_WZ}
+  enable_tag_tracking:=${ENABLE_TAG_TRACKING}
 
 sleep 2 || exit 130
 
 # 5. D1 底盘桥接
 launch_bg d1_bridge \
-  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py \
-  max_vx:=${D1_MAX_VX} max_wz:=${D1_MAX_WZ}
+  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 
 # 6. 可选 RViz（Fixed Frame 选 global）
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then

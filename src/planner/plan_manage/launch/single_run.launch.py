@@ -5,6 +5,7 @@ Prerequisites (separate terminals):
   ros2 launch ov_msckf d435i_openvins.launch.py
   ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 
+Topics / speed limits: edit config/d1_robot.yaml (installed with ego_planner).
 Depth intrinsics: override cx/cy/fx/fy from
   ros2 topic echo /camera/camera/depth/camera_info --once
 """
@@ -16,6 +17,7 @@ _launch_dir = os.path.dirname(os.path.abspath(__file__))
 if _launch_dir not in sys.path:
     sys.path.insert(0, _launch_dir)
 from launch_log_utils import default_ego_log_dir, maybe_reexec_with_log
+from d1_robot_config import load_d1_robot_config
 
 _DEFAULT_LOG_DIR = default_ego_log_dir(__file__)
 maybe_reexec_with_log('ego_planner', 'single_run', _DEFAULT_LOG_DIR)
@@ -28,32 +30,33 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from ament_index_python.packages import get_package_share_directory
 
+_d1 = load_d1_robot_config()
+_topics = _d1['topics']
+_limits = _d1['limits']
+_camera = _d1['camera']
+
 
 def generate_launch_description():
     map_size_x = LaunchConfiguration('map_size_x', default=40.0)
     map_size_y = LaunchConfiguration('map_size_y', default=40.0)
     map_size_z = LaunchConfiguration('map_size_z', default=3.0)
     flight_type = LaunchConfiguration('flight_type', default='1')
-    odom_topic = LaunchConfiguration('odom_topic', default='/ov_msckf/odomimu')
-    pose_topic = LaunchConfiguration('pose_topic', default='/ov_msckf/pose_stamped')
-    depth_topic = LaunchConfiguration(
-        'depth_topic', default='/camera/camera/depth/image_rect_raw')
-    pos_cmd_topic = LaunchConfiguration(
-        'pos_cmd_topic', default='/drone_0_planning/pos_cmd')
-    # D1 chassis limits (keep in sync with d1_bridge.yaml and start_ego_stack.sh)
-    max_vel = LaunchConfiguration('max_vel', default='0.6')
-    max_wz = LaunchConfiguration('max_wz', default='0.5')
-    max_acc = LaunchConfiguration('max_acc', default='1.0')
+    odom_topic = LaunchConfiguration('odom_topic', default=_topics['odom'])
+    pose_topic = LaunchConfiguration('pose_topic', default=_topics['pose'])
+    depth_topic = LaunchConfiguration('depth_topic', default=_topics['depth'])
+    pos_cmd_topic = LaunchConfiguration('pos_cmd_topic', default=_topics['pos_cmd'])
+    max_vel = LaunchConfiguration('max_vel', default=str(_limits['max_vel']))
+    max_wz = LaunchConfiguration('max_wz', default=str(_limits['max_wz']))
+    max_acc = LaunchConfiguration('max_acc', default=str(_limits['max_acc']))
     goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
     enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
     save_log = LaunchConfiguration('save_log', default='true')
     log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
 
-    # D435i depth 640x360 (must match infra); from depth/camera_info on device
-    cx = LaunchConfiguration('cx', default='323.168')
-    cy = LaunchConfiguration('cy', default='180.403')
-    fx = LaunchConfiguration('fx', default='320.244')
-    fy = LaunchConfiguration('fy', default='320.244')
+    cx = LaunchConfiguration('cx', default=str(_camera['cx']))
+    cy = LaunchConfiguration('cy', default=str(_camera['cy']))
+    fx = LaunchConfiguration('fx', default=str(_camera['fx']))
+    fy = LaunchConfiguration('fy', default=str(_camera['fy']))
 
     advanced_param_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(
@@ -65,7 +68,7 @@ def generate_launch_description():
             'odometry_topic': odom_topic,
             'camera_pose_topic': pose_topic,
             'depth_topic': depth_topic,
-            'map_frame_id': 'global',
+            'map_frame_id': _topics['map_frame_id'],
             'cx': cx,
             'cy': cy,
             'fx': fx,
@@ -73,7 +76,6 @@ def generate_launch_description():
             'max_vel': max_vel,
             'max_acc': max_acc,
             'planning_horizon': str(7.5),
-            'use_distinctive_trajs': 'False',
             'flight_type': flight_type,
             'goal_reach_thresh': goal_reach_thresh,
             'enable_tag_tracking': enable_tag_tracking,
@@ -128,22 +130,28 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('map_size_x', default_value=map_size_x))
     ld.add_action(DeclareLaunchArgument('map_size_y', default_value=map_size_y))
     ld.add_action(DeclareLaunchArgument('map_size_z', default_value=map_size_z))
-    ld.add_action(DeclareLaunchArgument('odom_topic', default_value=odom_topic,
-                                        description='VIO odom in global frame'))
-    ld.add_action(DeclareLaunchArgument('pose_topic', default_value=pose_topic,
-                                        description='Camera pose for depth sync'))
-    ld.add_action(DeclareLaunchArgument('depth_topic', default_value=depth_topic))
-    ld.add_action(DeclareLaunchArgument('pos_cmd_topic', default_value=pos_cmd_topic))
+    ld.add_action(DeclareLaunchArgument(
+        'odom_topic', default_value=odom_topic,
+        description='VIO odom in global frame (default from d1_robot.yaml)'))
+    ld.add_action(DeclareLaunchArgument(
+        'pose_topic', default_value=pose_topic,
+        description='Camera pose for depth sync (default from d1_robot.yaml)'))
+    ld.add_action(DeclareLaunchArgument(
+        'depth_topic', default_value=depth_topic,
+        description='Depth image topic (default from d1_robot.yaml)'))
+    ld.add_action(DeclareLaunchArgument(
+        'pos_cmd_topic', default_value=pos_cmd_topic,
+        description='PositionCommand output (default from d1_robot.yaml)'))
     ld.add_action(DeclareLaunchArgument('flight_type', default_value=flight_type))
     ld.add_action(DeclareLaunchArgument(
         'max_vel', default_value=max_vel,
-        description='Planner max speed (m/s per axis); match d1_bridge max_vx'))
+        description='Planner max speed (m/s); default from d1_robot.yaml'))
     ld.add_action(DeclareLaunchArgument(
         'max_wz', default_value=max_wz,
-        description='traj_server yaw_dot cap (rad/s); match d1_bridge max_wz'))
+        description='traj_server yaw_dot cap (rad/s); default from d1_robot.yaml'))
     ld.add_action(DeclareLaunchArgument(
         'max_acc', default_value=max_acc,
-        description='Planner max acceleration (m/s^2)'))
+        description='Planner max acceleration (m/s^2); default from d1_robot.yaml'))
     ld.add_action(DeclareLaunchArgument('goal_reach_thresh', default_value=goal_reach_thresh))
     ld.add_action(DeclareLaunchArgument(
         'enable_tag_tracking', default_value=enable_tag_tracking,

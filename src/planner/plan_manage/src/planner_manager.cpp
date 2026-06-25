@@ -42,8 +42,6 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     node->declare_parameter("manager/feasibility_tolerance", 0.0);
     node->declare_parameter("manager/control_points_distance", -1.0);
     node->declare_parameter("manager/planning_horizon", 5.0);
-    node->declare_parameter("manager/use_distinctive_trajs", false);
-    node->declare_parameter("manager/drone_id", -1);
     node->declare_parameter("manager/use_robot_z_planning", true);
 
     node->get_parameter("manager/max_vel", pp_.max_vel_);
@@ -52,8 +50,6 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     node->get_parameter("manager/feasibility_tolerance", pp_.feasibility_tolerance_);
     node->get_parameter("manager/control_points_distance", pp_.ctrl_pt_dist);
     node->get_parameter("manager/planning_horizon", pp_.planning_horizen_);
-    node->get_parameter("manager/use_distinctive_trajs", pp_.use_distinctive_trajs);
-    node->get_parameter("manager/drone_id", pp_.drone_id);
     node->get_parameter("manager/use_robot_z_planning", use_robot_z_planning_);
 
     local_data_.traj_id_ = 0;
@@ -86,7 +82,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
                                         Eigen::Vector3d local_target_vel, bool flag_polyInit, bool flag_randomPolyTraj)
   {
     static int count = 0;
-    printf("\033[47;30m\n[drone %d replan %d]==============================================\033[0m\n", pp_.drone_id, count++);
+    printf("\033[47;30m\n[replan %d]==============================================\033[0m\n", count++);
 
     if ((start_pt - local_target_pt).norm() < 0.2)
     {
@@ -282,7 +278,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
       flattenPointSetZ(bspline_optimizer_->getPlanningZ(), point_set);
 
     // 将轨迹变为B样条轨迹
-    Eigen::MatrixXd ctrl_pts, ctrl_pts_temp;
+    Eigen::MatrixXd ctrl_pts;
     UniformBspline::parameterizeToBspline(ts, point_set, start_end_derivatives, ctrl_pts);
 
     // Hybrid warm-start: stitch from previous traj, anchor start to measured odom (fixed during L-BFGS).
@@ -305,55 +301,10 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
 
     /*** STEP 2: OPTIMIZE ***/
     bool flag_step_1_success = false;
-    vector<vector<Eigen::Vector3d>> vis_trajs;
 
-    if (pp_.use_distinctive_trajs)
-    {
-      // cout << "enter" << endl;
-      std::vector<ControlPoints> trajs = bspline_optimizer_->distinctiveTrajs(segments);
-      cout << "\033[1;33m"
-           << "multi-trajs=" << trajs.size() << "\033[1;0m" << endl;
-
-      double final_cost, min_cost = 999999.0;
-      for (int i = trajs.size() - 1; i >= 0; i--)
-      {
-        if (bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts_temp, final_cost, trajs[i], ts))
-        {
-
-          cout << "traj " << trajs.size() - i << " success." << endl;
-
-          flag_step_1_success = true;
-          if (final_cost < min_cost)
-          {
-            min_cost = final_cost;
-            ctrl_pts = ctrl_pts_temp;
-          }
-
-          // visualization
-          point_set.clear();
-          for (int j = 0; j < ctrl_pts_temp.cols(); j++)
-          {
-            point_set.push_back(ctrl_pts_temp.col(j));
-          }
-          vis_trajs.push_back(point_set);
-        }
-        else
-        {
-          cout << "traj " << trajs.size() - i << " failed." << endl;
-        }
-      }
-
-      t_opt = rclcpp::Clock().now() - t_start;
-
-      visualization_->displayMultiInitPathList(vis_trajs, 0.2);
-    }
-    else
-    {
-      flag_step_1_success = bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts, ts);
-      t_opt = rclcpp::Clock().now() - t_start;
-      // static int vis_id = 0;
-      visualization_->displayInitPathList(point_set, 0.2, 0);
-    }
+    flag_step_1_success = bspline_optimizer_->BsplineOptimizeTrajRebound(ctrl_pts, ts);
+    t_opt = rclcpp::Clock().now() - t_start;
+    visualization_->displayInitPathList(point_set, 0.2, 0);
 
     cout << "plan_success=" << flag_step_1_success << endl;
     if (!flag_step_1_success)
@@ -372,10 +323,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     pos.setPhysicalLimits(pp_.max_vel_, pp_.max_acc_, pp_.feasibility_tolerance_);
 
     /*** STEP 3: REFINE(RE-ALLOCATE TIME) IF NECESSARY ***/
-    // Note: Only adjust time in single drone mode. But we still allow drone_0 to adjust its time profile.
-    if (pp_.drone_id <= 0)
     {
-
       double ratio;
       bool flag_step_2_success = true;
       if (!pos.checkFeasibility(ratio, false))
@@ -393,15 +341,6 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
         printf("\033[34mThis refined trajectory hits obstacles. It doesn't matter if appeares occasionally. But if continously appearing, Increase parameter \"lambda_fitness\".\n\033[0m");
         continous_failures_count_++;
         return false;
-      }
-    }
-    else
-    {
-      static bool print_once = true;
-      if (print_once)
-      {
-        print_once = false;
-        RCLCPP_ERROR(rclcpp::get_logger("ego_planner"), "IN SWARM MODE, REFINE DISABLED!");
       }
     }
 
@@ -437,31 +376,6 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     updateTrajInfo(UniformBspline(control_points, 3, 1.0), rclcpp::Clock().now());
 
     return true;
-  }
-
-  bool EGOPlannerManager::checkCollision(int drone_id)
-  {
-    // if (local_data_.start_time_.toSec() < 1e9) // It means my first planning has not started
-    if (local_data_.start_time_.seconds() < 1e9)
-      return false;
-
-    // double my_traj_start_time = local_data_.start_time_.toSec();
-    // double other_traj_start_time = swarm_trajs_buf_[drone_id].start_time_.toSec();
-    double my_traj_start_time = local_data_.start_time_.seconds();
-    double other_traj_start_time = swarm_trajs_buf_[drone_id].start_time_.seconds();
-
-    double t_start = max(my_traj_start_time, other_traj_start_time);
-    double t_end = min(my_traj_start_time + local_data_.duration_ * 2 / 3, other_traj_start_time + swarm_trajs_buf_[drone_id].duration_);
-
-    for (double t = t_start; t < t_end; t += 0.03)
-    {
-      if ((local_data_.position_traj_.evaluateDeBoorT(t - my_traj_start_time) - swarm_trajs_buf_[drone_id].position_traj_.evaluateDeBoorT(t - other_traj_start_time)).norm() < bspline_optimizer_->getSwarmClearance())
-      {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   bool EGOPlannerManager::planGlobalTrajWaypoints(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
