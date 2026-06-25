@@ -54,24 +54,17 @@ namespace ego_planner
     node_->declare_parameter("fsm/enable_tag_tracking", false);
     node_->declare_parameter("fsm/tag_pose_topic", "/apriltag/target_pose_global");
     node_->declare_parameter("fsm/tag_detected_topic", "/apriltag/target_detected");
-    node_->declare_parameter("fsm/tag_follow_offset_x", 0.0);
-    node_->declare_parameter("fsm/tag_follow_offset_y", -0.3);
-    node_->declare_parameter("fsm/tag_follow_offset_z", 0.0);
+    node_->declare_parameter("fsm/tag_stop_dist", 0.25);
     node_->declare_parameter("fsm/tag_update_min_dist", 0.08);
     node_->declare_parameter("fsm/tag_replan_min_period", 0.5);
-    node_->declare_parameter("fsm/tag_lost_timeout_sec", 30.0);
 
     node_->get_parameter("fsm/enable_tag_tracking", enable_tag_tracking_);
     node_->get_parameter("fsm/tag_pose_topic", tag_pose_topic_);
     node_->get_parameter("fsm/tag_detected_topic", tag_detected_topic_);
-    double tag_off_x = 0.0, tag_off_y = -0.3, tag_off_z = 0.0;
-    node_->get_parameter("fsm/tag_follow_offset_x", tag_off_x);
-    node_->get_parameter("fsm/tag_follow_offset_y", tag_off_y);
-    node_->get_parameter("fsm/tag_follow_offset_z", tag_off_z);
-    tag_follow_offset_ = Eigen::Vector3d(tag_off_x, tag_off_y, tag_off_z);
+    node_->get_parameter("fsm/tag_stop_dist", tag_stop_dist_);
+    tag_stop_dist_ = std::max(tag_stop_dist_, 0.05);
     node_->get_parameter("fsm/tag_update_min_dist", tag_update_min_dist_);
     node_->get_parameter("fsm/tag_replan_min_period", tag_replan_min_period_);
-    node_->get_parameter("fsm/tag_lost_timeout_sec", tag_lost_timeout_sec_);
 
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
@@ -113,9 +106,8 @@ namespace ego_planner
     {
       RCLCPP_INFO(
           node_->get_logger(),
-          "AprilTag tracking enabled: pose=%s detected=%s offset=(%.2f,%.2f,%.2f)",
-          tag_pose_topic_.c_str(), tag_detected_topic_.c_str(),
-          tag_follow_offset_.x(), tag_follow_offset_.y(), tag_follow_offset_.z());
+          "AprilTag tracking enabled: pose=%s detected=%s stop_dist=%.2f m",
+          tag_pose_topic_.c_str(), tag_detected_topic_.c_str(), tag_stop_dist_);
 
       tag_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
           tag_pose_topic_, 10,
@@ -439,10 +431,18 @@ namespace ego_planner
 
     case EMERGENCY_STOP:
     {
-      if (enable_fail_safe_ && odom_vel_.norm() < 0.1)
+      if (odom_vel_.norm() < 0.1)
       {
-        pending_estop_global_replan_ = true;
-        changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+        if (pending_tag_estop_to_wait_target_)
+        {
+          pending_tag_estop_to_wait_target_ = false;
+          changeFSMExecState(WAIT_TARGET, "TAG_DONE");
+        }
+        else if (enable_fail_safe_)
+        {
+          pending_estop_global_replan_ = true;
+          changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+        }
       }
       break;
     }
@@ -881,15 +881,15 @@ namespace ego_planner
 
   Eigen::Vector3d EGOReplanFSM::computeFollowGoal(const Eigen::Vector3d &tag_pos) const
   {
-    Eigen::Vector3d goal = tag_pos + tag_follow_offset_;
+    Eigen::Vector3d goal = tag_pos;
     if (have_odom_)
       goal.z() = odom_pos_.z();
     return goal;
   }
 
-  bool EGOReplanFSM::isAtFollowGoal(const Eigen::Vector3d &goal) const
+  bool EGOReplanFSM::isCloseToTag(const Eigen::Vector3d &tag_pos) const
   {
-    return (odom_pos_.head<2>() - goal.head<2>()).norm() <= goal_reach_thresh_;
+    return (odom_pos_.head<2>() - tag_pos.head<2>()).norm() <= tag_stop_dist_;
   }
 
   bool EGOReplanFSM::shouldReplanForTagGoal(const Eigen::Vector3d &new_goal) const
@@ -921,15 +921,19 @@ namespace ego_planner
 
   void EGOReplanFSM::finishTagTracking(const string &reason)
   {
+    const double dist_tag =
+        have_tag_pose_ ? (odom_pos_.head<2>() - tag_pos_last_.head<2>()).norm() : -1.0;
     RCLCPP_INFO(
         node_->get_logger(),
-        "[tag_track] DONE (%s) odom=%s goal=%s -> WAIT_TARGET",
+        "[tag_track] DONE (%s) odom=%s tag=%s dist_xy=%.3f -> EMERGENCY_STOP",
         reason.c_str(),
         traj_utils::formatVec3(odom_pos_).c_str(),
-        traj_utils::formatVec3(end_pt_).c_str());
+        traj_utils::formatVec3(tag_pos_last_).c_str(),
+        dist_tag);
     tag_track_state_ = TagTrackState::DONE;
     have_target_ = false;
-    changeFSMExecState(WAIT_TARGET, "TAG_DONE");
+    pending_tag_estop_to_wait_target_ = true;
+    enterEmergencyStop("TAG_DONE");
   }
 
   void EGOReplanFSM::processTagDetection(bool detected)
@@ -946,7 +950,6 @@ namespace ego_planner
       {
         tag_pos_frozen_ = tag_pos_last_;
         tag_track_state_ = TagTrackState::HOLD;
-        tag_lost_since_ = node_->now();
         tag_force_replan_ = true;
         const Eigen::Vector3d goal = computeFollowGoal(tag_pos_frozen_);
         RCLCPP_INFO(
@@ -954,7 +957,7 @@ namespace ego_planner
             "[tag_track] HOLD tag=%s goal=%s",
             traj_utils::formatVec3(tag_pos_frozen_).c_str(),
             traj_utils::formatVec3(goal).c_str());
-        if (shouldReplanForTagGoal(goal))
+        if (!isCloseToTag(tag_pos_frozen_) && shouldReplanForTagGoal(goal))
           applyTagGoal(goal);
       }
       return;
@@ -973,22 +976,40 @@ namespace ego_planner
     tag_track_state_ = TagTrackState::ACTIVE;
     tag_force_replan_ = first_seen || resume;
 
-    const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);
-    if (shouldReplanForTagGoal(goal))
-      applyTagGoal(goal);
+    if (!isCloseToTag(tag_pos_last_))
+    {
+      const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);
+      if (shouldReplanForTagGoal(goal))
+        applyTagGoal(goal);
+    }
   }
 
   void EGOReplanFSM::updateTagTrackingOnExecTick()
   {
+    std::lock_guard<std::mutex> lock(tag_mutex_);
+
+    if (tag_track_state_ == TagTrackState::ACTIVE && tag_detected_ && have_tag_pose_)
+    {
+      if (isCloseToTag(tag_pos_last_))
+      {
+        const double dist = (odom_pos_.head<2>() - tag_pos_last_.head<2>()).norm();
+        RCLCPP_INFO(
+            node_->get_logger(),
+            "[tag_track] close to tag dist_xy=%.3f thresh=%.3f",
+            dist, tag_stop_dist_);
+        finishTagTracking("close to tag");
+        return;
+      }
+    }
+
     if (tag_track_state_ != TagTrackState::HOLD)
       return;
 
-    std::lock_guard<std::mutex> lock(tag_mutex_);
-    const Eigen::Vector3d goal_last = computeFollowGoal(tag_pos_frozen_);
-    const bool at_goal = isAtFollowGoal(goal_last);
-    const double t_lost = (node_->now() - tag_lost_since_).seconds();
-    if (at_goal && t_lost >= tag_lost_timeout_sec_)
-      finishTagTracking("lost timeout and at follow goal");
+    if (isCloseToTag(tag_pos_frozen_))
+    {
+      finishTagTracking("close to frozen tag");
+      return;
+    }
   }
 
   void EGOReplanFSM::tagPoseCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
@@ -1019,11 +1040,15 @@ namespace ego_planner
       tag_track_state_ = TagTrackState::ACTIVE;
       tag_force_replan_ = true;
       RCLCPP_INFO(node_->get_logger(), "[tag_track] ACTIVE (first detection, pose)");
-      applyTagGoal(computeFollowGoal(tag_pos_last_));
+      if (!isCloseToTag(tag_pos_last_))
+        applyTagGoal(computeFollowGoal(tag_pos_last_));
       return;
     }
 
     if (tag_track_state_ != TagTrackState::ACTIVE)
+      return;
+
+    if (isCloseToTag(tag_pos_last_))
       return;
 
     const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);

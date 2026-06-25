@@ -65,12 +65,10 @@ def generate_launch_description():
         'tag_pose_topic', default='/apriltag/target_pose_global')
     tag_detected_topic = LaunchConfiguration(
         'tag_detected_topic', default='/apriltag/target_detected')
-    tag_follow_offset_x = LaunchConfiguration('tag_follow_offset_x', default='0.0')
-    tag_follow_offset_y = LaunchConfiguration('tag_follow_offset_y', default='-0.3')
-    tag_follow_offset_z = LaunchConfiguration('tag_follow_offset_z', default='0.0')
+    tag_stop_dist = LaunchConfiguration(
+        'tag_stop_dist', default=str(_planner['tag_stop_dist']))
     tag_update_min_dist = LaunchConfiguration('tag_update_min_dist', default='0.08')
     tag_replan_min_period = LaunchConfiguration('tag_replan_min_period', default='0.5')
-    tag_lost_timeout_sec = LaunchConfiguration('tag_lost_timeout_sec', default='30.0')
 
     ego_planner_node = Node(
         package='ego_planner',
@@ -107,12 +105,9 @@ def generate_launch_description():
             {'fsm/enable_tag_tracking': enable_tag_tracking},
             {'fsm/tag_pose_topic': tag_pose_topic},
             {'fsm/tag_detected_topic': tag_detected_topic},
-            {'fsm/tag_follow_offset_x': tag_follow_offset_x},
-            {'fsm/tag_follow_offset_y': tag_follow_offset_y},
-            {'fsm/tag_follow_offset_z': tag_follow_offset_z},
+            {'fsm/tag_stop_dist': tag_stop_dist},
             {'fsm/tag_update_min_dist': tag_update_min_dist},
             {'fsm/tag_replan_min_period': tag_replan_min_period},
-            {'fsm/tag_lost_timeout_sec': tag_lost_timeout_sec},
             {'grid_map/resolution': 0.1},
             {'grid_map/map_size_x': map_size_x},
             {'grid_map/map_size_y': map_size_y},
@@ -254,12 +249,11 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('fy', default_value=fy))
     ld.add_action(DeclareLaunchArgument('tag_pose_topic', default_value=tag_pose_topic))
     ld.add_action(DeclareLaunchArgument('tag_detected_topic', default_value=tag_detected_topic))
-    ld.add_action(DeclareLaunchArgument('tag_follow_offset_x', default_value=tag_follow_offset_x))
-    ld.add_action(DeclareLaunchArgument('tag_follow_offset_y', default_value=tag_follow_offset_y))
-    ld.add_action(DeclareLaunchArgument('tag_follow_offset_z', default_value=tag_follow_offset_z))
+    ld.add_action(DeclareLaunchArgument(
+        'tag_stop_dist', default_value=tag_stop_dist,
+        description='AprilTag tracking stop distance to tag center (m, XY)'))
     ld.add_action(DeclareLaunchArgument('tag_update_min_dist', default_value=tag_update_min_dist))
     ld.add_action(DeclareLaunchArgument('tag_replan_min_period', default_value=tag_replan_min_period))
-    ld.add_action(DeclareLaunchArgument('tag_lost_timeout_sec', default_value=tag_lost_timeout_sec))
     ld.add_action(ego_planner_node)
     ld.add_action(traj_server_node)
 

@@ -132,13 +132,11 @@ namespace ego_planner
 
     std::string tag_detected_topic_{"/apriltag/target_detected"};
 
-    Eigen::Vector3d tag_follow_offset_{0.0, -0.3, 0.0};
+    double tag_stop_dist_{0.25};
 
     double tag_update_min_dist_{0.08};
 
     double tag_replan_min_period_{0.5};
-
-    double tag_lost_timeout_sec_{30.0};
 
     TagTrackState tag_track_state_{TagTrackState::NEVER_SEEN};
 
@@ -152,8 +150,6 @@ namespace ego_planner
 
     Eigen::Vector3d tag_pos_frozen_{0.0, 0.0, 0.0};
 
-    rclcpp::Time tag_lost_since_{0, 0, RCL_ROS_TIME};
-
     rclcpp::Time last_tag_replan_time_{0, 0, RCL_ROS_TIME};
 
     std::mutex tag_mutex_;
@@ -165,6 +161,10 @@ namespace ego_planner
     bool have_target_, have_odom_, have_new_target_;
 
     bool pending_estop_global_replan_{false};
+
+  /// Tag tracking finish: EMERGENCY_STOP until odom speed drops, then WAIT_TARGET (not GEN_NEW_TRAJ).
+
+    bool pending_tag_estop_to_wait_target_{false};
 
     FSM_EXEC_STATE exec_state_;
 
@@ -272,7 +272,7 @@ namespace ego_planner
 
     Eigen::Vector3d computeFollowGoal(const Eigen::Vector3d &tag_pos) const;
 
-    bool isAtFollowGoal(const Eigen::Vector3d &goal) const;
+    bool isCloseToTag(const Eigen::Vector3d &tag_pos) const;
 
     bool shouldReplanForTagGoal(const Eigen::Vector3d &new_goal) const;
 

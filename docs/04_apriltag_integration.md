@@ -2,7 +2,7 @@
 
 本文说明如何把 **AprilTag 检测 + 世界系目标位姿** 并入 `ego_control` 工程，与现有的 **规划（ego_planner）**、**控制（d1_planner_bridge）** 形成统一工作区，而不再依赖独立的 `apriltagdetect` 工作区。
 
-规划侧如何消费目标话题，见根目录 [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md)（FSM 状态机、跟随偏移、重规划节流等）。本文侧重 **感知层怎么迁、怎么接、怎么一键启动**。
+规划侧如何消费目标话题，见 [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md)（FSM 状态机、停车判定、重规划节流等）。本文侧重 **感知层怎么迁、怎么接、怎么一键启动**。
 
 ---
 
@@ -249,7 +249,7 @@ cd ego_control
 ```bash
 ./start_ego_stack.sh enable_tag_tracking=true
 # 脚本自动起 apriltag_ros + target_pose_node
-# Tag 进入视野后 FSM 自动规划跟随点 G = T + offset
+# Tag 进入视野后 FSM 自动规划跟随点 G = Tag 中心
 ```
 
 ### 6.3 分步调试（与一键等价）
@@ -270,7 +270,7 @@ ros2 launch apriltag_detect apriltag.launch.py
 | 模块 | 是否需要改代码 | 说明 |
 |------|----------------|------|
 | `apriltag_detect`（迁入） | 迁包即可 | 发布两个标准话题 |
-| `EGOReplanFSM` | **已实现** | `enable_tag_tracking`、偏移、丢失逻辑见 [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md) |
+| `EGOReplanFSM` | **已实现** | `enable_tag_tracking`、`tag_stop_dist`、丢失 HOLD 逻辑见 [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md) |
 | `d1_planner_bridge` | **不改** | 仍跟 `pos_cmd`，不感知 Tag |
 | `GridMap` | **不改** | 仍用 depth + VIO pose 建图 |
 | `traj_server` | **不改** | 仍采样 B 样条 |
