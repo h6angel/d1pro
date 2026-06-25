@@ -137,7 +137,7 @@ $$
 J = \lambda_1 J_{\text{smooth}} + \lambda_4 J_{\text{fitness}} + \lambda_3 J_{\text{feas}}
 $$
 
-默认 D1 参数（`single_run.launch.py` / `advanced_param.launch.py`）示例：`max_vel=1.6`，`max_acc=2.0`，`optimization/dist0=0.55`，`lambda_fitness=1.5`。
+默认 D1 参数见 `config/d1_robot.yaml`（`single_run.launch.py` 加载）示例：`max_vel=0.6`，`max_acc=1.0`，`optimization/dist0=0.55`，`lambda_fitness=1.5`。
 
 ### 4.1 平滑项 $J_{\text{smooth}}$（Jerk）
 
@@ -257,7 +257,7 @@ start_vel_(2) = start_acc_(2) = local_target_vel_(2) = 0;
 
 `reboundReplan` 入口还对 `start_pt`、`local_target_pt`、`point_set`、`ctrl_pts` 调用 `flatten*Z`。
 
-参数：`manager/use_robot_z_planning`（`advanced_param.launch.py` 默认 `true`）。
+参数：`manager/use_robot_z_planning`（`single_run.launch.py` / `d1_robot.yaml`，默认 `true`）。
 
 ### 6.2 随机脱困仅在 XY
 

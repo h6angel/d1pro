@@ -198,8 +198,7 @@ flowchart LR
 
 | 文件 | 内容 |
 |------|------|
-| `src/planner/plan_manage/launch/single_run.launch.py` | 地图、速度、重规划周期、traj_server |
-| `src/planner/plan_manage/launch/advanced_param.launch.py` | 优化权重、膨胀、FSM 阈值 |
+| `src/planner/plan_manage/launch/single_run.launch.py` | 规划节点 + traj_server；参数见 `config/d1_robot.yaml` |
 | `src/d1_planner_bridge/config/d1_bridge.yaml` | 底盘跟踪增益与限幅 |
 
 ### 5.3 常见“一冲一停”
