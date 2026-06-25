@@ -8,6 +8,8 @@ Prerequisites (separate terminals):
 Topics / speed limits: edit config/d1_robot.yaml (installed with ego_planner).
 Depth intrinsics: override cx/cy/fx/fy from
   ros2 topic echo /camera/camera/depth/camera_info --once
+
+Logs: use ./start_ego_stack.sh (writes ego_log/stack_*/*.log).
 """
 
 import os
@@ -16,11 +18,7 @@ import sys
 _launch_dir = os.path.dirname(os.path.abspath(__file__))
 if _launch_dir not in sys.path:
     sys.path.insert(0, _launch_dir)
-from launch_log_utils import default_ego_log_dir, maybe_reexec_with_log
 from d1_robot_config import load_d1_robot_config
-
-_DEFAULT_LOG_DIR = default_ego_log_dir(__file__)
-maybe_reexec_with_log('ego_planner', 'single_run', _DEFAULT_LOG_DIR)
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -50,8 +48,6 @@ def generate_launch_description():
     max_acc = LaunchConfiguration('max_acc', default=str(_limits['max_acc']))
     goal_reach_thresh = LaunchConfiguration('goal_reach_thresh', default='0.3')
     enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
-    save_log = LaunchConfiguration('save_log', default='true')
-    log_dir = LaunchConfiguration('log_dir', default=_DEFAULT_LOG_DIR)
 
     cx = LaunchConfiguration('cx', default=str(_camera['cx']))
     cy = LaunchConfiguration('cy', default=str(_camera['cy']))
@@ -156,8 +152,6 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument(
         'enable_tag_tracking', default_value=enable_tag_tracking,
         description='true: AprilTag tracking; false: RViz 2D Goal'))
-    ld.add_action(DeclareLaunchArgument('save_log', default_value=save_log))
-    ld.add_action(DeclareLaunchArgument('log_dir', default_value=log_dir))
     ld.add_action(DeclareLaunchArgument('cx', default_value=cx))
     ld.add_action(DeclareLaunchArgument('cy', default_value=cy))
     ld.add_action(DeclareLaunchArgument('fx', default_value=fx))

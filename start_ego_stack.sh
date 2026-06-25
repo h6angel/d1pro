@@ -245,7 +245,7 @@ log "  OpenVINS   -> ${LOG_DIR}/openvins.log"
 if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
   log "  AprilTag   -> ${LOG_DIR}/apriltag.log"
 fi
-log "  EGO 规划   -> ${LOG_DIR}/ego_planner.log (+ ego_log/ 内 launch tee)"
+log "  EGO 规划   -> ${LOG_DIR}/ego_planner.log"
 log "  D1 桥接    -> ${LOG_DIR}/d1_bridge.log"
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
   log "  RViz       -> ${LOG_DIR}/rviz.log"

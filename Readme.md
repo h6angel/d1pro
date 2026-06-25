@@ -65,4 +65,4 @@ ros2 launch ego_planner single_run.launch.py odom_topic:=/your_vio/odom pose_top
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py odom_topic:=/your_vio/odom
 ```
 
-终端日志默认写在工程根目录 `ego_log/`。关闭：`save_log:=false`。
+一键启动时日志写在 `ego_log/stack_YYYYMMDD_HHMMSS/`（见 `start_ego_stack.sh`）。

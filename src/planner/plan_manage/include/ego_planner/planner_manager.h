@@ -5,7 +5,6 @@
 
 #include <bspline_opt/bspline_optimizer.h>
 #include <bspline_opt/uniform_bspline.h>
-#include <traj_utils/msg/data_disp.hpp>
 #include <plan_env/grid_map.h>
 #include <plan_env/obj_predictor.h>
 #include <traj_utils/plan_container.hpp>

@@ -183,14 +183,9 @@ flowchart LR
 
 ### 5.1 终端日志
 
-默认写入工作空间根目录 **`ego_log/`**（与 colcon `log/` 分开）：
+一键启动时日志由 `start_ego_stack.sh` 写入 `ego_log/stack_YYYYMMDD_HHMMSS/`（各节点独立 `.log` 文件）。
 
-```bash
-ros2 launch ego_planner single_run.launch.py
-ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
-```
-
-关闭：`save_log:=false`；改目录：`log_dir:=/path`。
+单独 `ros2 launch` 时输出在终端；需要落盘请用 `./start_ego_stack.sh`。
 
 | 标签 | 节点 | 内容 |
 |------|------|------|

@@ -136,7 +136,6 @@ def generate_launch_description():
         remappings=[
             ('odom_world', odometry_topic),
             ('planning/bspline', 'drone_0_planning/bspline'),
-            ('planning/data_display', 'drone_0_planning/data_display'),
 
             ('goal_point', 'drone_0_plan_vis/goal_point'),
             ('global_list', 'drone_0_plan_vis/global_list'),

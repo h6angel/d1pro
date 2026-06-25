@@ -118,7 +118,6 @@ namespace ego_planner
     // std::bind(&EGOReplanFSM::odometryCallback, this, std::placeholders::_1));
 
     bspline_pub_ = node_->create_publisher<traj_utils::msg::Bspline>("planning/bspline", 10);
-    data_disp_pub_ = node_->create_publisher<traj_utils::msg::DataDisp>("planning/data_display", 100);
 
     if (target_type_ == TARGET_TYPE::MANUAL_TARGET)
     {
@@ -548,9 +547,6 @@ namespace ego_planner
       break;
     }
     }
-
-    data_disp_.header.stamp = rclcpp::Clock().now();
-    data_disp_pub_->publish(data_disp_);
 
   force_return:;
     // exec_timer_.start();
