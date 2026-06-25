@@ -2,6 +2,10 @@ std_msgs/Header header
 geometry_msgs/Point position
 geometry_msgs/Vector3 velocity
 geometry_msgs/Vector3 acceleration
+# Closest point on active B-spline to odom (global); used for cross-track error in d1_planner_bridge.
+geometry_msgs/Point track_point
+# Path tangent yaw (rad) at track_point; atan2 from spline velocity at closest time.
+float64 track_yaw
 float64 yaw
 float64 yaw_dot
 float64[3] kx

@@ -62,6 +62,22 @@ double closestTimeOnTrajXY(const Eigen::Vector2d & query_xy)
   return best_t;
 }
 
+double tangentYawAtTrajTime(double t)
+{
+  t = std::max(0.0, std::min(t, traj_duration_));
+  const Eigen::Vector3d v = traj_[1].evaluateDeBoorT(t);
+  if (v.head<2>().norm() > 1e-3) {
+    return std::atan2(v(1), v(0));
+  }
+  const double tf = std::min(t + time_forward_, traj_duration_);
+  const Eigen::Vector3d p0 = traj_[0].evaluateDeBoorT(t);
+  const Eigen::Vector3d dir = traj_[0].evaluateDeBoorT(tf) - p0;
+  if (dir.head<2>().norm() > 0.05) {
+    return std::atan2(dir(1), dir(0));
+  }
+  return std::isfinite(last_yaw_) ? last_yaw_ : 0.0;
+}
+
 void publishExecBsplinePath(const rclcpp::Time & stamp)
 {
   if (!exec_bspline_path_pub || !receive_traj_)
@@ -399,6 +415,19 @@ void cmdCallback()
   if (!std::isfinite(cmd.velocity.z)) cmd.velocity.z = 0.0;
   if (!std::isfinite(cmd.yaw)) cmd.yaw = std::isfinite(last_yaw_) ? last_yaw_ : 0.0;
   if (!std::isfinite(cmd.yaw_dot)) cmd.yaw_dot = 0.0;
+
+  double t_track = std::max(0.0, std::min(t_cur, traj_duration_));
+  if (use_odom_progress_ && have_odom_) {
+    t_track = closestTimeOnTrajXY(odom_pos_.head<2>());
+  }
+  const Eigen::Vector3d track_pos = traj_[0].evaluateDeBoorT(t_track);
+  cmd.track_point.x = track_pos(0);
+  cmd.track_point.y = track_pos(1);
+  cmd.track_point.z = track_pos(2);
+  cmd.track_yaw = tangentYawAtTrajTime(t_track);
+  if (!std::isfinite(cmd.track_yaw)) {
+    cmd.track_yaw = cmd.yaw;
+  }
 
   last_yaw_ = cmd.yaw;
 

@@ -29,7 +29,7 @@ struct TrackerParams
   double align_heading_thresh_rad{1.0471975511965976};  // 60 deg
   bool allow_reverse{false};
 
-  /// Cross-track correction: pos_cmd.position vs odom (carrot on traj_server lookahead point).
+  /// Cross-track correction: track_point (path closest to odom) + track_yaw from traj_server.
   bool enable_lateral_correction{true};
   double lateral_kp{0.9};
   double lateral_error_deadband{0.05};

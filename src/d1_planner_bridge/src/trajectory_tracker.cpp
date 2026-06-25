@@ -180,8 +180,16 @@ GroundTwist TrajectoryTracker::compute(
 
       if (params_.enable_lateral_correction && plan_speed_ok) {
         const auto & p = odom->pose.pose.position;
+        double lat_ref_x = cmd.position.x;
+        double lat_ref_y = cmd.position.y;
+        double lat_path_yaw = path_yaw;
+        if (std::isfinite(cmd.track_yaw)) {
+          lat_ref_x = cmd.track_point.x;
+          lat_ref_y = cmd.track_point.y;
+          lat_path_yaw = cmd.track_yaw;
+        }
         out.lateral_error = signedLateralError(
-          p.x, p.y, cmd.position.x, cmd.position.y, path_yaw);
+          p.x, p.y, lat_ref_x, lat_ref_y, lat_path_yaw);
 
         if (std::abs(out.lateral_error) <= params_.max_lateral_error_m) {
           double e_lat = out.lateral_error;
