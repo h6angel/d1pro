@@ -38,7 +38,6 @@ def generate_launch_description():
     map_size_x = LaunchConfiguration('map_size_x', default=40.0)
     map_size_y = LaunchConfiguration('map_size_y', default=40.0)
     map_size_z = LaunchConfiguration('map_size_z', default=3.0)
-    flight_type = LaunchConfiguration('flight_type', default='1')
     odom_topic = LaunchConfiguration('odom_topic', default=_topics['odom'])
     pose_topic = LaunchConfiguration('pose_topic', default=_topics['pose'])
     depth_topic = LaunchConfiguration('depth_topic', default=_topics['depth'])
@@ -72,29 +71,12 @@ def generate_launch_description():
             'max_vel': max_vel,
             'max_acc': max_acc,
             'planning_horizon': str(7.5),
-            'flight_type': flight_type,
             'goal_reach_thresh': goal_reach_thresh,
             'enable_tag_tracking': enable_tag_tracking,
             'thresh_replan_time': '2.5',
             'obstacles_inflation': '0.09',
             'optimization_dist0': '0.55',
             'lambda_fitness': '1.5',
-            'point_num': str(1),
-            'point0_x': str(5.0),
-            'point0_y': str(0.0),
-            'point0_z': str(0.0),
-            'point1_x': str(-5.0),
-            'point1_y': str(0.0),
-            'point1_z': str(0.0),
-            'point2_x': str(5.0),
-            'point2_y': str(0.0),
-            'point2_z': str(0.0),
-            'point3_x': str(-5.0),
-            'point3_y': str(0.0),
-            'point3_z': str(0.0),
-            'point4_x': str(5.0),
-            'point4_y': str(0.0),
-            'point4_z': str(0.0),
         }.items(),
     )
 
@@ -138,7 +120,6 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument(
         'pos_cmd_topic', default_value=pos_cmd_topic,
         description='PositionCommand output (default from d1_robot.yaml)'))
-    ld.add_action(DeclareLaunchArgument('flight_type', default_value=flight_type))
     ld.add_action(DeclareLaunchArgument(
         'max_vel', default_value=max_vel,
         description='Planner max speed (m/s); default from d1_robot.yaml'))

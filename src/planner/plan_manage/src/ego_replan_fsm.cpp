@@ -12,12 +12,10 @@ namespace ego_planner
   {
     node_ = node;
     
-    current_wp_ = 0;
     exec_state_ = FSM_EXEC_STATE::INIT;
     have_target_ = false;
     have_odom_ = false;
 
-    node_->declare_parameter("fsm/flight_type", -1);
     node_->declare_parameter("fsm/thresh_replan_time", -1.0);
     node_->declare_parameter("fsm/thresh_no_replan_meter", -1.0);
     node_->declare_parameter("fsm/thresh_goal_reach_meter", -1.0);
@@ -26,14 +24,12 @@ namespace ego_planner
     node_->declare_parameter("fsm/emergency_time", 1.0);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
     node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.22);
-    node_->declare_parameter("fsm/realworld_experiment", true);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
     node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
     node_->declare_parameter("fsm/gen_new_traj_backoff_base_sec", 0.25);
     node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
 
-    node_->get_parameter("fsm/flight_type", target_type_);
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
     node_->get_parameter("fsm/thresh_no_replan_meter", no_replan_thresh_);
     node_->get_parameter("fsm/thresh_goal_reach_meter", goal_reach_thresh_);
@@ -45,7 +41,6 @@ namespace ego_planner
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
     node_->get_parameter("fsm/odom_traj_mismatch_thresh", odom_traj_mismatch_thresh_);
     odom_traj_mismatch_thresh_ = std::max(odom_traj_mismatch_thresh_, 0.01);
-    node_->get_parameter("fsm/realworld_experiment", flag_realworld_experiment_);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
     node_->get_parameter("fsm/gen_new_traj_max_failures", gen_new_traj_max_failures_);
@@ -78,22 +73,6 @@ namespace ego_planner
     node_->get_parameter("fsm/tag_replan_min_period", tag_replan_min_period_);
     node_->get_parameter("fsm/tag_lost_timeout_sec", tag_lost_timeout_sec_);
 
-    have_trigger_ = !flag_realworld_experiment_;
-
-    node_->declare_parameter("fsm/waypoint_num", -1);
-    node_->get_parameter("fsm/waypoint_num", waypoint_num_);
-
-    for (int i = 0; i < waypoint_num_; i++)
-    {
-      node_->declare_parameter("fsm/waypoint" + to_string(i) + "_x", -1.0);
-      node_->declare_parameter("fsm/waypoint" + to_string(i) + "_y", -1.0);
-      node_->declare_parameter("fsm/waypoint" + to_string(i) + "_z", -1.0);
-
-      node_->get_parameter("fsm/waypoint" + to_string(i) + "_x", waypoints_[i][0]);
-      node_->get_parameter("fsm/waypoint" + to_string(i) + "_y", waypoints_[i][1]);
-      node_->get_parameter("fsm/waypoint" + to_string(i) + "_z", waypoints_[i][2]);
-    }
-
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
 
@@ -119,7 +98,7 @@ namespace ego_planner
 
     bspline_pub_ = node_->create_publisher<traj_utils::msg::Bspline>("planning/bspline", 10);
 
-    if (target_type_ == TARGET_TYPE::MANUAL_TARGET)
+    if (!enable_tag_tracking_)
     {
       waypoint_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
           "/move_base_simple/goal",
@@ -129,36 +108,6 @@ namespace ego_planner
             this->waypointCallback(msg);
           });
     }
-    else if (target_type_ == TARGET_TYPE::PRESET_TARGET)
-    {
-      trigger_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
-          "/traj_start_trigger",
-          1,
-          [this](const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
-          {
-            this->triggerCallback(msg);
-          });
-
-      RCLCPP_INFO(node_->get_logger(), "Wait for 1 second.");
-      int count = 0;
-      while (rclcpp::ok() && count++ < 1000)
-      {
-        rclcpp::spin_some(node_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-
-      RCLCPP_WARN(node_->get_logger(), "Waiting for trigger from [n3ctrl] from RC");
-
-      while (rclcpp::ok() && (!have_odom_ || !have_trigger_))
-      {
-        rclcpp::spin_some(node_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-
-      readGivenWps();
-    }
-    else
-      cout << "Wrong target_type_ value! target_type_=" << target_type_ << endl;
 
     if (enable_tag_tracking_)
     {
@@ -182,35 +131,6 @@ namespace ego_planner
             this->tagDetectedCallback(msg);
           });
     }
-  }
-
-  void EGOReplanFSM::readGivenWps()
-
-  {
-    if (waypoint_num_ <= 0)
-    {
-      RCLCPP_ERROR(node_->get_logger(), "Wrong waypoint_num_ = %d", waypoint_num_);
-      return;
-    }
-
-    wps_.resize(waypoint_num_);
-    for (int i = 0; i < waypoint_num_; i++)
-    {
-      wps_[i](0) = waypoints_[i][0];
-      wps_[i](1) = waypoints_[i][1];
-      wps_[i](2) = waypoints_[i][2];
-    }
-
-    // 用 visualization_->displayGoalPoint() 方法对waypoint进行可视化
-    for (size_t i = 0; i < (size_t)waypoint_num_; i++)
-    {
-      visualization_->displayGoalPoint(wps_[i], Eigen::Vector4d(0, 0.5, 0.5, 1), 0.3, i);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-
-    // plan first global waypoint
-    wp_id_ = 0;
-    planNextWaypoint(wps_[wp_id_]);
   }
 
   void EGOReplanFSM::planNextWaypoint(const Eigen::Vector3d next_wp)
@@ -252,14 +172,6 @@ namespace ego_planner
     }
   }
 
-  void EGOReplanFSM::triggerCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
-  {
-    have_trigger_ = true;
-    resetGenNewTrajRetry();
-    cout << "Triggered!" << endl;
-    init_pt_ = odom_pos_;
-  }
-
   void EGOReplanFSM::resetGenNewTrajRetry()
   {
     gen_new_traj_fail_count_ = 0;
@@ -282,7 +194,7 @@ namespace ego_planner
         "Holding stop; fix depth/VIO and re-send goal.",
         gen_new_traj_fail_count_);
       resetGenNewTrajRetry();
-      have_trigger_ = false;
+      have_target_ = false;
       if (have_odom_)
         callEmergencyStop(odom_pos_);
       changeFSMExecState(WAIT_TARGET, "FSM");
@@ -376,7 +288,7 @@ namespace ego_planner
       if (!have_odom_)
         cout << "no odom." << endl;
       if (!have_target_)
-        cout << "wait for goal or trigger." << endl;
+        cout << "wait for goal." << endl;
       fsm_num = 0;
     }
 
@@ -394,7 +306,7 @@ namespace ego_planner
 
     case WAIT_TARGET:
     {
-      if (!have_target_ || !have_trigger_)
+      if (!have_target_)
         goto force_return;
       else
       {
@@ -443,7 +355,6 @@ namespace ego_planner
         if (!isTagFollowing() && dist_to_goal < goal_reach_thresh_)
         {
           have_target_ = false;
-          have_trigger_ = false;
           changeFSMExecState(WAIT_TARGET, "FSM");
         }
         else
@@ -476,14 +387,7 @@ namespace ego_planner
         local_target_is_goal || dist_to_goal_xy < planning_horizen_;
 
       /* && (end_pt_ - pos).norm() < 0.5 */
-      if ((target_type_ == TARGET_TYPE::PRESET_TARGET) &&
-          (wp_id_ < waypoint_num_ - 1) &&
-          (end_pt_ - pos).norm() < no_replan_thresh_)
-      {
-        wp_id_++;
-        planNextWaypoint(wps_[wp_id_]);
-      }
-      else if (near_goal_phase)
+      if (near_goal_phase)
       {
         RCLCPP_INFO_THROTTLE(
           node_->get_logger(), *node_->get_clock(),
@@ -504,13 +408,6 @@ namespace ego_planner
               traj_utils::formatVec3(end_pt_).c_str(),
               dist_to_goal_xy);
             have_target_ = false;
-            have_trigger_ = false;
-
-            if (target_type_ == TARGET_TYPE::PRESET_TARGET)
-            {
-              wp_id_ = 0;
-              planNextWaypoint(wps_[wp_id_]);
-            }
 
             changeFSMExecState(WAIT_TARGET, "FSM");
             goto force_return;
@@ -1029,7 +926,6 @@ namespace ego_planner
         traj_utils::formatVec3(end_pt_).c_str());
     tag_track_state_ = TagTrackState::DONE;
     have_target_ = false;
-    have_trigger_ = false;
     changeFSMExecState(WAIT_TARGET, "TAG_DONE");
   }
 

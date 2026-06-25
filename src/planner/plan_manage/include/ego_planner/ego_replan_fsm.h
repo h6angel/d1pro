@@ -82,18 +82,6 @@ namespace ego_planner
 
     };
 
-    enum TARGET_TYPE
-
-    {
-
-      MANUAL_TARGET = 1,
-
-      PRESET_TARGET = 2
-
-    };
-
-
-
     /* planning utils */
 
     EGOPlannerManager::Ptr planner_manager_;
@@ -104,15 +92,9 @@ namespace ego_planner
 
     /* parameters */
 
-    int target_type_; // 1 mannual select, 2 hard code
-
     double no_replan_thresh_, replan_thresh_, goal_reach_thresh_;
 
     int log_trace_period_ms_{500};
-
-    double waypoints_[50][3];
-
-    int waypoint_num_, wp_id_;
 
     double planning_horizen_, planning_horizen_time_;
 
@@ -123,8 +105,6 @@ namespace ego_planner
     /// Odom farther than this from the time-sampled traj point => stale traj / jump, force replan.
 
     double odom_traj_mismatch_thresh_{0.22};
-
-    bool flag_realworld_experiment_;
 
     bool enable_fail_safe_;
 
@@ -182,7 +162,7 @@ namespace ego_planner
 
     /* planning data */
 
-    bool have_trigger_, have_target_, have_odom_, have_new_target_;
+    bool have_target_, have_odom_, have_new_target_;
 
     bool pending_estop_global_replan_{false};
 
@@ -224,10 +204,6 @@ namespace ego_planner
 
     Eigen::Vector3d local_target_pt_, local_target_vel_;                     // local target state
 
-    std::vector<Eigen::Vector3d> wps_;
-
-    int current_wp_;
-
 
 
     /* ROS utils */
@@ -241,8 +217,6 @@ namespace ego_planner
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr waypoint_sub_;
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
-
-    rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr trigger_sub_;
 
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr tag_pose_sub_;
 
@@ -284,8 +258,6 @@ namespace ego_planner
 
 
 
-    void readGivenWps();
-
     void planNextWaypoint(const Eigen::Vector3d next_wp);
 
     void getLocalTarget();
@@ -321,8 +293,6 @@ namespace ego_planner
     void checkCollisionCallback();
 
     void waypointCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg);
-
-    void triggerCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg);
 
     void odometryCallback(const std::shared_ptr<const nav_msgs::msg::Odometry> &msg);
 

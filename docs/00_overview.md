@@ -53,7 +53,7 @@ flowchart TB
 | `/ov_msckf/odomimu` | `nav_msgs/Odometry` | OpenVINS | 规划、traj_server、bridge | 位姿与速度闭环（global 系） |
 | `/ov_msckf/pose_stamped` | `geometry_msgs/PoseStamped` | OpenVINS | `GridMap` | 与深度图同步投影建图 |
 | `/camera/camera/depth/image_rect_raw` | `sensor_msgs/Image` | RealSense | `GridMap` | 深度图（16UC1 mm） |
-| `/move_base_simple/goal` | `geometry_msgs/PoseStamped` | RViz | FSM | `flight_type=1` 时设目标 |
+| `/move_base_simple/goal` | `geometry_msgs/PoseStamped` | RViz | FSM | RViz 2D Goal 设目标 |
 | `drone_0_planning/bspline` | `traj_utils/Bspline` | `ego_planner_node` | `traj_server` | 优化后的轨迹 |
 | `/drone_0_planning/pos_cmd` | `quadrotor_msgs/PositionCommand` | `traj_server` | `d1_planner_bridge` | 位置/速度/加速度/yaw |
 | `/command/cmd_twist` | `geometry_msgs/Twist` | bridge | D1 控制器 | 仅 `linear.x`、`angular.z` |
@@ -128,8 +128,8 @@ stateDiagram-v2
 
 ### 3.3 目标来源
 
-- `flight_type=1`：RViz **2D Goal** → `/move_base_simple/goal`
-- `flight_type=2`：`single_run.launch.py` 中预设航点
+- RViz **2D Goal** → `/move_base_simple/goal`
+- `enable_tag_tracking=true`：AprilTag 跟随（launch 参数）
 
 ### 3.4 重规划与到达判定（相对原版的重要改动）
 
