@@ -240,6 +240,7 @@ namespace ego_planner
     // odom_acc_ = estimateAcc( msg );
 
     have_odom_ = true;
+    planner_manager_->updateRobotPosition(odom_pos_);
   }
 
   void EGOReplanFSM::changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call)

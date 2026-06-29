@@ -77,6 +77,12 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     bspline_optimizer_->setPlanningZ(z);
   }
 
+  void EGOPlannerManager::updateRobotPosition(const Eigen::Vector3d &pos)
+  {
+    if (grid_map_)
+      grid_map_->updateRobotPosition(pos);
+  }
+
   bool EGOPlannerManager::reboundReplan(Eigen::Vector3d start_pt, Eigen::Vector3d start_vel,
                                         Eigen::Vector3d start_acc, Eigen::Vector3d local_target_pt,
                                         Eigen::Vector3d local_target_vel, bool flag_polyInit, bool flag_randomPolyTraj)

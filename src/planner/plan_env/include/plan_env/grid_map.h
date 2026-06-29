@@ -208,6 +208,8 @@ public:
 
   bool hasDepthObservation();
   bool odomValid();
+  /// Robot pose from the single odom subscription in ego_planner_node (FSM forwards here).
+  void updateRobotPosition(const Eigen::Vector3d &pos);
   void getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size);
   inline double getResolution();
   Eigen::Vector3d getOrigin();
@@ -227,7 +229,6 @@ private:
                          const geometry_msgs::msg::PoseStamped::ConstPtr &pose);
   void extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom);
   void depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img, const nav_msgs::msg::Odometry::ConstPtr &odom);
-  void odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom);
 
   // update occupancy by raycasting
   void updateOccupancyCallback();
@@ -266,7 +267,6 @@ private:
   SynchronizerImagePose sync_image_pose_;
   SynchronizerImageOdom sync_image_odom_;
 
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr indep_odom_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr extrinsic_sub_;
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;

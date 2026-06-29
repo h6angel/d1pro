@@ -83,6 +83,7 @@ def generate_launch_description():
             ('init_list', 'drone_0_plan_vis/init_list'),
             ('optimal_list', 'drone_0_plan_vis/optimal_list'),
             ('a_star_list', 'drone_0_plan_vis/a_star_list'),
+            # grid_map/odom: only used when grid_map/pose_type=2 (ODOMETRY depth sync)
             ('grid_map/odom', odom_topic),
             ('grid_map/pose', pose_topic),
             ('grid_map/depth', depth_topic),

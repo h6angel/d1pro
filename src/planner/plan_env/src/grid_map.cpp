@@ -189,9 +189,6 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
         std::bind(&GridMap::depthOdomCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
 
-  indep_odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
-      "grid_map/odom", 10, std::bind(&GridMap::odomCallback, this, std::placeholders::_1));
-
   // 定时器
   occ_timer_ = node_->create_wall_timer(
       std::chrono::duration<double>(0.05),
@@ -982,20 +979,15 @@ void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
   md_.flag_use_depth_fusion = true;
 }
 
-void GridMap::odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
+void GridMap::updateRobotPosition(const Eigen::Vector3d &pos)
 {
-  md_.robot_pos_(0) = odom->pose.pose.position.x;
-  md_.robot_pos_(1) = odom->pose.pose.position.y;
-  md_.robot_pos_(2) = odom->pose.pose.position.z;
+  md_.robot_pos_ = pos;
   md_.has_robot_pos_ = true;
 
-  if (md_.has_first_depth_)
+  if (mp_.pose_type_ != ODOMETRY || md_.has_first_depth_)
     return;
 
-  md_.camera_pos_(0) = odom->pose.pose.position.x;
-  md_.camera_pos_(1) = odom->pose.pose.position.y;
-  md_.camera_pos_(2) = odom->pose.pose.position.z;
-
+  md_.camera_pos_ = pos;
   md_.has_odom_ = true;
 }
 
@@ -1130,6 +1122,11 @@ void GridMap::extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom)
 void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                 const nav_msgs::msg::Odometry::ConstPtr &odom)
 {
+  md_.robot_pos_(0) = odom->pose.pose.position.x;
+  md_.robot_pos_(1) = odom->pose.pose.position.y;
+  md_.robot_pos_(2) = odom->pose.pose.position.z;
+  md_.has_robot_pos_ = true;
+
   /* get pose */
   Eigen::Quaterniond body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
                                                  odom->pose.pose.orientation.x,

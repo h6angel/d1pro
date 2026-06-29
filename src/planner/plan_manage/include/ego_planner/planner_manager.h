@@ -38,6 +38,7 @@ namespace ego_planner
     void initPlanModules(rclcpp::Node::SharedPtr &node, PlanningVisualization::Ptr vis = NULL);
 
     void setRobotPlanningZ(double z);
+    void updateRobotPosition(const Eigen::Vector3d &pos);
 
     PlanParameters pp_;
     LocalTrajData local_data_;
