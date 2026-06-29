@@ -227,7 +227,6 @@ private:
   // get depth image and camera pose
   void depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                          const geometry_msgs::msg::PoseStamped::ConstPtr &pose);
-  void extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom);
   void depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img, const nav_msgs::msg::Odometry::ConstPtr &odom);
 
   // update occupancy by raycasting
@@ -266,8 +265,6 @@ private:
   std::shared_ptr<message_filters::Subscriber<nav_msgs::msg::Odometry>> odom_sub_;
   SynchronizerImagePose sync_image_pose_;
   SynchronizerImageOdom sync_image_odom_;
-
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr extrinsic_sub_;
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_inf_pub_;

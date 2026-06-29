@@ -164,10 +164,6 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   depth_sub_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
       node_, "grid_map/depth", rclcpp::QoS(50).get_rmw_qos_profile());
 
-  extrinsic_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
-      "/vins_estimator/extrinsic", 10,
-      std::bind(&GridMap::extrinsicCallback, this, std::placeholders::_1));
-
   if (mp_.pose_type_ == POSE_STAMPED)
   {
     pose_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(
@@ -1103,20 +1099,6 @@ Eigen::Vector3d GridMap::getOrigin() { return mp_.map_origin_; }
 void GridMap::getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size)
 {
   ori = mp_.map_origin_, size = mp_.map_size_;
-}
-
-void GridMap::extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom)
-{
-  Eigen::Quaterniond cam2body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
-                                                     odom->pose.pose.orientation.x,
-                                                     odom->pose.pose.orientation.y,
-                                                     odom->pose.pose.orientation.z);
-  Eigen::Matrix3d cam2body_r_m = cam2body_q.toRotationMatrix();
-  md_.cam2body_.block<3, 3>(0, 0) = cam2body_r_m;
-  md_.cam2body_(0, 3) = odom->pose.pose.position.x;
-  md_.cam2body_(1, 3) = odom->pose.pose.position.y;
-  md_.cam2body_(2, 3) = odom->pose.pose.position.z;
-  md_.cam2body_(3, 3) = 1.0;
 }
 
 void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
