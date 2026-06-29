@@ -27,36 +27,89 @@ double TrajectoryTracker::wrapPi(double a)
   return a;
 }
 
-double TrajectoryTracker::yawFromOdom(const nav_msgs::msg::Odometry & odom)
+TrajectoryTracker::BodyForwardHoriz TrajectoryTracker::bodyForwardHoriz(
+  const nav_msgs::msg::Odometry & odom)
 {
+  BodyForwardHoriz out;
   const auto & q = odom.pose.pose.orientation;
   const double n2 = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z;
   if (!std::isfinite(n2) || n2 < 1e-8) {
-    return 0.0;
+    return out;
   }
   const double inv_n = 1.0 / std::sqrt(n2);
   const double w = q.w * inv_n;
   const double x = q.x * inv_n;
   const double y = q.y * inv_n;
   const double z = q.z * inv_n;
-  const double siny_cosp = 2.0 * (w * z + x * y);
-  const double cosy_cosp = 1.0 - 2.0 * (y * y + z * z);
-  const double yaw = std::atan2(siny_cosp, cosy_cosp);
-  return std::isfinite(yaw) ? yaw : 0.0;
+
+  // Body +Z axis in global (OpenVINS imu / camera optical forward).
+  const double zx = 2.0 * (x * z + w * y);
+  const double zy = 2.0 * (y * z - w * x);
+  const double horiz = std::hypot(zx, zy);
+  if (!std::isfinite(horiz) || horiz < 1e-6) {
+    return out;
+  }
+  out.dir_x = zx / horiz;
+  out.dir_y = zy / horiz;
+  out.yaw = std::atan2(zy, zx);
+  if (!std::isfinite(out.yaw)) {
+    out.yaw = 0.0;
+  }
+  return out;
 }
 
-double TrajectoryTracker::pathYawFromCmd(const quadrotor_msgs::msg::PositionCommand & cmd)
+double TrajectoryTracker::forwardYawFromOdom(const nav_msgs::msg::Odometry & odom)
+{
+  return bodyForwardHoriz(odom).yaw;
+}
+
+double TrajectoryTracker::velocityYawFromCmd(
+  const quadrotor_msgs::msg::PositionCommand & cmd)
 {
   const double vx = std::isfinite(cmd.velocity.x) ? cmd.velocity.x : 0.0;
   const double vy = std::isfinite(cmd.velocity.y) ? cmd.velocity.y : 0.0;
   const double vxy = std::hypot(vx, vy);
-  if (vxy > 0.05) {
-    const double yaw = std::atan2(vy, vx);
-    if (std::isfinite(yaw)) {
-      return yaw;
+  if (vxy < 1e-6) {
+    return 0.0;
+  }
+  const double yaw = std::atan2(vy, vx);
+  return std::isfinite(yaw) ? yaw : 0.0;
+}
+
+double TrajectoryTracker::selectPathYaw(
+  const quadrotor_msgs::msg::PositionCommand & cmd,
+  double robot_yaw, double robot_x, double robot_y,
+  const BodyForwardHoriz & forward)
+{
+  constexpr double kOvershootVelDot = -0.02;
+  constexpr double kMinCarrotDist = 0.05;
+
+  const double vel_x = std::isfinite(cmd.velocity.x) ? cmd.velocity.x : 0.0;
+  const double vel_y = std::isfinite(cmd.velocity.y) ? cmd.velocity.y : 0.0;
+  const double vxy = std::hypot(vel_x, vel_y);
+  const double vel_yaw = velocityYawFromCmd(cmd);
+  const double cmd_yaw = std::isfinite(cmd.yaw) ? cmd.yaw : vel_yaw;
+  const double vx_body = forward.dir_x * vel_x + forward.dir_y * vel_y;
+
+  // Overshoot: plan velocity points backward — steer toward carrot, not rear tangent.
+  if (vx_body < kOvershootVelDot && vxy > 1e-3) {
+    const double dx = cmd.position.x - robot_x;
+    const double dy = cmd.position.y - robot_y;
+    if (std::hypot(dx, dy) > kMinCarrotDist) {
+      const double carrot_yaw = std::atan2(dy, dx);
+      if (std::isfinite(carrot_yaw)) {
+        return carrot_yaw;
+      }
     }
   }
-  return std::isfinite(cmd.yaw) ? cmd.yaw : 0.0;
+
+  if (vxy < 1e-3) {
+    return std::isfinite(cmd.yaw) ? cmd_yaw : vel_yaw;
+  }
+
+  const double err_cmd = std::abs(wrapPi(cmd_yaw - robot_yaw));
+  const double err_vel = std::abs(wrapPi(vel_yaw - robot_yaw));
+  return (err_vel < err_cmd) ? vel_yaw : cmd_yaw;
 }
 
 double TrajectoryTracker::signedLateralError(
@@ -82,20 +135,22 @@ GroundTwist TrajectoryTracker::compute(
   const double vel_x = std::isfinite(cmd.velocity.x) ? cmd.velocity.x : 0.0;
   const double vel_y = std::isfinite(cmd.velocity.y) ? cmd.velocity.y : 0.0;
   const double v_plan = std::hypot(vel_x, vel_y);
-  const double path_yaw = pathYawFromCmd(cmd);
+  out.path_yaw_vel = velocityYawFromCmd(cmd);
 
   out.lateral_error = 0.0;
   out.heading_error = 0.0;
 
   if (odom != nullptr && params_.project_velocity_to_body) {
-    const double robot_yaw = yawFromOdom(*odom);
+    const BodyForwardHoriz forward = bodyForwardHoriz(*odom);
+    const double robot_yaw = forward.yaw;
+    const auto & pos = odom->pose.pose.position;
+    const double path_yaw = selectPathYaw(cmd, robot_yaw, pos.x, pos.y, forward);
+    out.path_yaw = path_yaw;
     if (!std::isfinite(robot_yaw) || !std::isfinite(path_yaw)) {
       return out;
     }
 
-    const double cos_yaw = std::cos(robot_yaw);
-    const double sin_yaw = std::sin(robot_yaw);
-    double vx = cos_yaw * vel_x + sin_yaw * vel_y;
+    double vx = forward.dir_x * vel_x + forward.dir_y * vel_y;
 
     const double yaw_err_path = wrapPi(path_yaw - robot_yaw);
     out.heading_error = yaw_err_path;
@@ -125,8 +180,16 @@ GroundTwist TrajectoryTracker::compute(
 
       if (params_.enable_lateral_correction && plan_speed_ok) {
         const auto & p = odom->pose.pose.position;
+        double lat_ref_x = cmd.position.x;
+        double lat_ref_y = cmd.position.y;
+        double lat_path_yaw = path_yaw;
+        if (std::isfinite(cmd.track_yaw)) {
+          lat_ref_x = cmd.track_point.x;
+          lat_ref_y = cmd.track_point.y;
+          lat_path_yaw = cmd.track_yaw;
+        }
         out.lateral_error = signedLateralError(
-          p.x, p.y, cmd.position.x, cmd.position.y, path_yaw);
+          p.x, p.y, lat_ref_x, lat_ref_y, lat_path_yaw);
 
         if (std::abs(out.lateral_error) <= params_.max_lateral_error_m) {
           double e_lat = out.lateral_error;
@@ -148,9 +211,14 @@ GroundTwist TrajectoryTracker::compute(
 
       if (!params_.allow_reverse) {
         vx = std::max(0.0, vx);
+      } else if (vx < 0.0 && params_.min_vx > 0.0) {
+        const double av = std::abs(vx);
+        if (av > params_.vx_deadband && av < params_.min_vx) {
+          vx = -params_.min_vx;
+        }
       }
 
-      if (params_.min_vx > 0.0) {
+      if (params_.min_vx > 0.0 && vx >= 0.0) {
         const double av = std::abs(vx);
         if (av > params_.vx_deadband && av < params_.min_vx) {
           vx = params_.min_vx;
@@ -161,6 +229,8 @@ GroundTwist TrajectoryTracker::compute(
     out.vx = std::clamp(vx, -params_.max_vx, params_.max_vx);
     out.wz = std::clamp(wz, -params_.max_wz, params_.max_wz);
   } else {
+    const double path_yaw = std::isfinite(cmd.yaw) ? cmd.yaw : out.path_yaw_vel;
+    out.path_yaw = path_yaw;
     const double yaw_dot_raw = std::isfinite(cmd.yaw_dot) ? cmd.yaw_dot : 0.0;
     const double yaw_dot_ff = std::clamp(
       yaw_dot_raw, -params_.max_yaw_dot_ff, params_.max_yaw_dot_ff);

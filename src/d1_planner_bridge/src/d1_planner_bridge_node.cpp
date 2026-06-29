@@ -36,7 +36,8 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
   const double control_rate_hz = declare_parameter<double>("control_rate_hz", 100.0);
   log_cmd_vel_ = declare_parameter<bool>("log_cmd_vel", true);
   log_cmd_vel_period_ms_ = declare_parameter<int>("log_cmd_vel_period_ms", 500);
-  cmd_vel_ema_alpha_ = declare_parameter<double>("cmd_vel_ema_alpha", 0.35);
+  cmd_vel_ema_alpha_ = declare_parameter<double>("cmd_vel_ema_alpha", 0.8);
+  hard_stop_plan_speed_ = declare_parameter<double>("hard_stop_plan_speed", 0.005);
 
   pos_cmd_sub_ = create_subscription<quadrotor_msgs::msg::PositionCommand>(
     pos_cmd_topic_, rclcpp::QoS(10),
@@ -74,7 +75,7 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
   p.yaw_rate_ff = declare_parameter<double>("yaw_rate_ff", 1.0);
   p.max_yaw_dot_ff = declare_parameter<double>("max_yaw_dot_ff", 0.5);
   p.project_velocity_to_body = declare_parameter<bool>("project_velocity_to_body", true);
-  p.min_vx = declare_parameter<double>("min_vx", 0.08);
+  p.min_vx = declare_parameter<double>("min_vx", 0.05);
   p.vx_deadband = declare_parameter<double>("vx_deadband", 0.01);
   p.max_wz_yaw_p = declare_parameter<double>("max_wz_yaw_p", 0.5);
   p.min_turn_wz = declare_parameter<double>("min_turn_wz", 0.5);
@@ -127,7 +128,6 @@ void D1PlannerBridgeNode::controlTimerCallback()
     return;
   }
 
-  constexpr double kHardStopPlanSpeed = 0.02;
   const double v_plan_cmd = std::hypot(cmd->velocity.x, cmd->velocity.y);
 
   if (have_last_traj_id_ && cmd->trajectory_id != last_traj_id_) {
@@ -136,7 +136,7 @@ void D1PlannerBridgeNode::controlTimerCallback()
   last_traj_id_ = cmd->trajectory_id;
   have_last_traj_id_ = true;
 
-  if (v_plan_cmd < kHardStopPlanSpeed) {
+  if (v_plan_cmd < hard_stop_plan_speed_) {
     resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
     twist.linear.x = 0.0;
     twist.angular.z = 0.0;
@@ -188,23 +188,23 @@ void D1PlannerBridgeNode::controlTimerCallback()
       if (odom) {
         odom_x = odom->pose.pose.position.x;
         odom_y = odom->pose.pose.position.y;
-        const auto & q = odom->pose.pose.orientation;
-        odom_yaw = std::atan2(
-          2.0 * (q.w * q.z + q.x * q.y),
-          1.0 - 2.0 * (q.y * q.y + q.z * q.z));
+        odom_yaw = TrajectoryTracker::forwardYawFromOdom(*odom);
       }
       const double dist_odom_cmd = odom ?
         std::hypot(
           odom_x - cmd->position.x,
           odom_y - cmd->position.y) :
         -1.0;
+      const double cmd_yaw = std::isfinite(cmd->yaw) ? cmd->yaw : 0.0;
       RCLCPP_INFO_THROTTLE(
         get_logger(), *get_clock(), throttle_ms,
         "[cmd_vel_pub] odom=(%.3f,%.3f,yaw=%.3f) cmd_pos=(%.3f,%.3f) cmd_vel=(%.3f,%.3f) "
-        "twist=(%.3f,%.3f) dist=%.3f e_lat=%.3f h_err=%.3f traj_id=%u",
+        "cmd_yaw=%.3f path_yaw=%.3f path_yaw_vel=%.3f twist=(%.3f,%.3f) "
+        "dist=%.3f e_lat=%.3f h_err=%.3f traj_id=%u",
         odom_x, odom_y, odom_yaw,
         cmd->position.x, cmd->position.y,
         cmd->velocity.x, cmd->velocity.y,
+        cmd_yaw, ground.path_yaw, ground.path_yaw_vel,
         twist.linear.x, twist.angular.z,
         dist_odom_cmd, ground.lateral_error, ground.heading_error,
         cmd->trajectory_id);

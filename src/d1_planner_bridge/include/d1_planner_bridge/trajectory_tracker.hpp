@@ -29,7 +29,7 @@ struct TrackerParams
   double align_heading_thresh_rad{1.0471975511965976};  // 60 deg
   bool allow_reverse{false};
 
-  /// Cross-track correction: pos_cmd.position vs odom (carrot on traj_server lookahead point).
+  /// Cross-track correction: track_point (path closest to odom) + track_yaw from traj_server.
   bool enable_lateral_correction{true};
   double lateral_kp{0.9};
   double lateral_error_deadband{0.05};
@@ -50,8 +50,12 @@ struct GroundTwist
   bool valid{false};
   /// Signed lateral offset (m): robot left of path heading is positive.
   double lateral_error{0.0};
-  /// wrapPi(path_or_cmd_yaw - robot_yaw)
+  /// wrapPi(path_yaw - robot_forward_yaw); forward = body +Z in global XY.
   double heading_error{0.0};
+  /// Heading reference used for control (selected path tangent / carrot).
+  double path_yaw{0.0};
+  /// atan2(cmd.velocity) for debug comparison with path_yaw.
+  double path_yaw_vel{0.0};
 };
 
 /// Maps EGO pos_cmd to D1 cmd_twist: velocity feedforward + yaw & lateral error feedback.
@@ -69,10 +73,26 @@ public:
 
   geometry_msgs::msg::Twist toTwistMsg(const GroundTwist & g) const;
 
+  /// Yaw of body +Z (optical / OpenVINS IMU forward) projected onto global XY.
+  static double forwardYawFromOdom(const nav_msgs::msg::Odometry & odom);
+
 private:
+  struct BodyForwardHoriz
+  {
+    double yaw{0.0};
+    double dir_x{1.0};
+    double dir_y{0.0};
+  };
+
   static double wrapPi(double a);
-  static double yawFromOdom(const nav_msgs::msg::Odometry & odom);
-  static double pathYawFromCmd(const quadrotor_msgs::msg::PositionCommand & cmd);
+  static BodyForwardHoriz bodyForwardHoriz(const nav_msgs::msg::Odometry & odom);
+  /// Instantaneous velocity bearing in global XY.
+  static double velocityYawFromCmd(const quadrotor_msgs::msg::PositionCommand & cmd);
+  /// Pick cmd.yaw vs velocity yaw (and carrot on overshoot) to minimize heading error.
+  static double selectPathYaw(
+    const quadrotor_msgs::msg::PositionCommand & cmd,
+    double robot_yaw, double robot_x, double robot_y,
+    const BodyForwardHoriz & forward);
   static double signedLateralError(
     double robot_x, double robot_y, double ref_x, double ref_y, double path_yaw);
 

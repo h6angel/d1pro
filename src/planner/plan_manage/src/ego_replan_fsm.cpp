@@ -1,4 +1,5 @@
 
+#include <algorithm>
 #include <limits>
 
 #include <ego_planner/ego_replan_fsm.h>
@@ -11,13 +12,10 @@ namespace ego_planner
   {
     node_ = node;
     
-    current_wp_ = 0;
     exec_state_ = FSM_EXEC_STATE::INIT;
     have_target_ = false;
     have_odom_ = false;
-    have_recv_pre_agent_ = false;
 
-    node_->declare_parameter("fsm/flight_type", -1);
     node_->declare_parameter("fsm/thresh_replan_time", -1.0);
     node_->declare_parameter("fsm/thresh_no_replan_meter", -1.0);
     node_->declare_parameter("fsm/thresh_goal_reach_meter", -1.0);
@@ -25,11 +23,13 @@ namespace ego_planner
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
-    node_->declare_parameter("fsm/realworld_experiment", true);
+    node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.22);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
+    node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
+    node_->declare_parameter("fsm/gen_new_traj_backoff_base_sec", 0.25);
+    node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
 
-    node_->get_parameter("fsm/flight_type", target_type_);
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
     node_->get_parameter("fsm/thresh_no_replan_meter", no_replan_thresh_);
     node_->get_parameter("fsm/thresh_goal_reach_meter", goal_reach_thresh_);
@@ -39,47 +39,32 @@ namespace ego_planner
     node_->get_parameter("fsm/planning_horizen_time", planning_horizen_time_);
     node_->get_parameter("fsm/emergency_time", emergency_time_);
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
-    node_->get_parameter("fsm/realworld_experiment", flag_realworld_experiment_);
+    node_->get_parameter("fsm/odom_traj_mismatch_thresh", odom_traj_mismatch_thresh_);
+    odom_traj_mismatch_thresh_ = std::max(odom_traj_mismatch_thresh_, 0.01);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
+    node_->get_parameter("fsm/gen_new_traj_max_failures", gen_new_traj_max_failures_);
+    node_->get_parameter("fsm/gen_new_traj_backoff_base_sec", gen_new_traj_backoff_base_sec_);
+    node_->get_parameter("fsm/gen_new_traj_backoff_max_sec", gen_new_traj_backoff_max_sec_);
+    gen_new_traj_max_failures_ = std::max(gen_new_traj_max_failures_, 1);
+    gen_new_traj_backoff_base_sec_ = std::max(gen_new_traj_backoff_base_sec_, 0.05);
+    gen_new_traj_backoff_max_sec_ = std::max(
+      gen_new_traj_backoff_max_sec_, gen_new_traj_backoff_base_sec_);
 
     node_->declare_parameter("fsm/enable_tag_tracking", false);
     node_->declare_parameter("fsm/tag_pose_topic", "/apriltag/target_pose_global");
     node_->declare_parameter("fsm/tag_detected_topic", "/apriltag/target_detected");
-    node_->declare_parameter("fsm/tag_follow_offset_x", 0.0);
-    node_->declare_parameter("fsm/tag_follow_offset_y", -0.3);
-    node_->declare_parameter("fsm/tag_follow_offset_z", 0.0);
+    node_->declare_parameter("fsm/tag_stop_dist", 0.25);
     node_->declare_parameter("fsm/tag_update_min_dist", 0.08);
     node_->declare_parameter("fsm/tag_replan_min_period", 0.5);
-    node_->declare_parameter("fsm/tag_lost_timeout_sec", 30.0);
 
     node_->get_parameter("fsm/enable_tag_tracking", enable_tag_tracking_);
     node_->get_parameter("fsm/tag_pose_topic", tag_pose_topic_);
     node_->get_parameter("fsm/tag_detected_topic", tag_detected_topic_);
-    double tag_off_x = 0.0, tag_off_y = -0.3, tag_off_z = 0.0;
-    node_->get_parameter("fsm/tag_follow_offset_x", tag_off_x);
-    node_->get_parameter("fsm/tag_follow_offset_y", tag_off_y);
-    node_->get_parameter("fsm/tag_follow_offset_z", tag_off_z);
-    tag_follow_offset_ = Eigen::Vector3d(tag_off_x, tag_off_y, tag_off_z);
+    node_->get_parameter("fsm/tag_stop_dist", tag_stop_dist_);
+    tag_stop_dist_ = std::max(tag_stop_dist_, 0.05);
     node_->get_parameter("fsm/tag_update_min_dist", tag_update_min_dist_);
     node_->get_parameter("fsm/tag_replan_min_period", tag_replan_min_period_);
-    node_->get_parameter("fsm/tag_lost_timeout_sec", tag_lost_timeout_sec_);
-
-    have_trigger_ = !flag_realworld_experiment_;
-
-    node_->declare_parameter("fsm/waypoint_num", -1);
-    node_->get_parameter("fsm/waypoint_num", waypoint_num_);
-
-    for (int i = 0; i < waypoint_num_; i++)
-    {
-      node_->declare_parameter("fsm/waypoint" + to_string(i) + "_x", -1.0);
-      node_->declare_parameter("fsm/waypoint" + to_string(i) + "_y", -1.0);
-      node_->declare_parameter("fsm/waypoint" + to_string(i) + "_z", -1.0);
-
-      node_->get_parameter("fsm/waypoint" + to_string(i) + "_x", waypoints_[i][0]);
-      node_->get_parameter("fsm/waypoint" + to_string(i) + "_y", waypoints_[i][1]);
-      node_->get_parameter("fsm/waypoint" + to_string(i) + "_z", waypoints_[i][2]);
-    }
 
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
@@ -87,9 +72,6 @@ namespace ego_planner
     planner_manager_.reset(new EGOPlannerManager);
 
     planner_manager_->initPlanModules(node_, visualization_);
-
-    planner_manager_->deliverTrajToOptimizer(); // store trajectories
-    planner_manager_->setDroneIdtoOpt();
 
     /* callback*/
     exec_timer_ = node_->create_wall_timer(std::chrono::milliseconds(10),
@@ -107,45 +89,9 @@ namespace ego_planner
         });
     // std::bind(&EGOReplanFSM::odometryCallback, this, std::placeholders::_1));
 
-    if (planner_manager_->pp_.drone_id >= 1)
-    {
-      string sub_topic_name = string("/drone_") + std::to_string(planner_manager_->pp_.drone_id - 1) + string("_planning/swarm_trajs");
-      swarm_trajs_sub_ = node_->create_subscription<traj_utils::msg::MultiBsplines>(
-          sub_topic_name,
-          10,
-          [this](const std::shared_ptr<const traj_utils::msg::MultiBsplines> &msg)
-          {
-            this->swarmTrajsCallback(msg);
-          });
-    }
-
-    // ros2 中topic名字中不能出现负号，单机id是-1需要处理
-    // string pub_topic_name = string("/drone_") + std::to_string(planner_manager_->pp_.drone_id) + string("_planning/swarm_trajs");
-    string pub_topic_name;
-    if (planner_manager_->pp_.drone_id <= -1)
-    {
-      RCLCPP_INFO(node_->get_logger(), "single drone:%d", planner_manager_->pp_.drone_id);
-      pub_topic_name = string("/drone_") + "single" + string("_planning/swarm_trajs");
-    }else
-    {
-      pub_topic_name = string("/drone_") + std::to_string(planner_manager_->pp_.drone_id) + string("_planning/swarm_trajs");
-    }
-    
-    swarm_trajs_pub_ = node_->create_publisher<traj_utils::msg::MultiBsplines>(pub_topic_name, 10);
-
-    broadcast_bspline_pub_ = node_->create_publisher<traj_utils::msg::Bspline>("planning/broadcast_bspline_from_planner", 10);
-    broadcast_bspline_sub_ = node_->create_subscription<traj_utils::msg::Bspline>(
-        "planning/broadcast_bspline_to_planner",
-        100,
-        [this](const std::shared_ptr<const traj_utils::msg::Bspline> &msg)
-        {
-          this->BroadcastBsplineCallback(msg);
-        });
-
     bspline_pub_ = node_->create_publisher<traj_utils::msg::Bspline>("planning/bspline", 10);
-    data_disp_pub_ = node_->create_publisher<traj_utils::msg::DataDisp>("planning/data_display", 100);
 
-    if (target_type_ == TARGET_TYPE::MANUAL_TARGET)
+    if (!enable_tag_tracking_)
     {
       waypoint_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
           "/move_base_simple/goal",
@@ -155,44 +101,13 @@ namespace ego_planner
             this->waypointCallback(msg);
           });
     }
-    else if (target_type_ == TARGET_TYPE::PRESET_TARGET)
-    {
-      trigger_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
-          "/traj_start_trigger",
-          1,
-          [this](const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
-          {
-            this->triggerCallback(msg);
-          });
-
-      RCLCPP_INFO(node_->get_logger(), "Wait for 1 second.");
-      int count = 0;
-      while (rclcpp::ok() && count++ < 1000)
-      {
-        rclcpp::spin_some(node_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-
-      RCLCPP_WARN(node_->get_logger(), "Waiting for trigger from [n3ctrl] from RC");
-
-      while (rclcpp::ok() && (!have_odom_ || !have_trigger_))
-      {
-        rclcpp::spin_some(node_);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-      }
-
-      readGivenWps();
-    }
-    else
-      cout << "Wrong target_type_ value! target_type_=" << target_type_ << endl;
 
     if (enable_tag_tracking_)
     {
       RCLCPP_INFO(
           node_->get_logger(),
-          "AprilTag tracking enabled: pose=%s detected=%s offset=(%.2f,%.2f,%.2f)",
-          tag_pose_topic_.c_str(), tag_detected_topic_.c_str(),
-          tag_follow_offset_.x(), tag_follow_offset_.y(), tag_follow_offset_.z());
+          "AprilTag tracking enabled: pose=%s detected=%s stop_dist=%.2f m",
+          tag_pose_topic_.c_str(), tag_detected_topic_.c_str(), tag_stop_dist_);
 
       tag_pose_sub_ = node_->create_subscription<geometry_msgs::msg::PoseStamped>(
           tag_pose_topic_, 10,
@@ -208,35 +123,6 @@ namespace ego_planner
             this->tagDetectedCallback(msg);
           });
     }
-  }
-
-  void EGOReplanFSM::readGivenWps()
-
-  {
-    if (waypoint_num_ <= 0)
-    {
-      RCLCPP_ERROR(node_->get_logger(), "Wrong waypoint_num_ = %d", waypoint_num_);
-      return;
-    }
-
-    wps_.resize(waypoint_num_);
-    for (int i = 0; i < waypoint_num_; i++)
-    {
-      wps_[i](0) = waypoints_[i][0];
-      wps_[i](1) = waypoints_[i][1];
-      wps_[i](2) = waypoints_[i][2];
-    }
-
-    // 用 visualization_->displayGoalPoint() 方法对waypoint进行可视化
-    for (size_t i = 0; i < (size_t)waypoint_num_; i++)
-    {
-      visualization_->displayGoalPoint(wps_[i], Eigen::Vector4d(0, 0.5, 0.5, 1), 0.3, i);
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-
-    // plan first global waypoint
-    wp_id_ = 0;
-    planNextWaypoint(wps_[wp_id_]);
   }
 
   void EGOReplanFSM::planNextWaypoint(const Eigen::Vector3d next_wp)
@@ -264,6 +150,7 @@ namespace ego_planner
       have_new_target_ = true;
 
       /*** FSM: schedule replan on next exec tick (never spin node from a callback) ***/
+      resetGenNewTrajRetry();
       if (exec_state_ == WAIT_TARGET)
         changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
       else
@@ -277,11 +164,40 @@ namespace ego_planner
     }
   }
 
-  void EGOReplanFSM::triggerCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
+  void EGOReplanFSM::resetGenNewTrajRetry()
   {
-    have_trigger_ = true;
-    cout << "Triggered!" << endl;
-    init_pt_ = odom_pos_;
+    gen_new_traj_fail_count_ = 0;
+    gen_new_traj_next_attempt_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+  }
+
+  void EGOReplanFSM::onGenNewTrajPlanFailed()
+  {
+    gen_new_traj_fail_count_++;
+    const double backoff = std::min(
+      gen_new_traj_backoff_max_sec_,
+      gen_new_traj_backoff_base_sec_ * static_cast<double>(gen_new_traj_fail_count_));
+    gen_new_traj_next_attempt_ = node_->now() + rclcpp::Duration::from_seconds(backoff);
+
+    if (gen_new_traj_fail_count_ >= gen_new_traj_max_failures_)
+    {
+      RCLCPP_ERROR(
+        node_->get_logger(),
+        "GEN_NEW_TRAJ failed %d times (stale map / in obstacle?). "
+        "Holding stop; fix depth/VIO and re-send goal.",
+        gen_new_traj_fail_count_);
+      resetGenNewTrajRetry();
+      have_target_ = false;
+      if (have_odom_)
+        callEmergencyStop(odom_pos_);
+      changeFSMExecState(WAIT_TARGET, "FSM");
+      return;
+    }
+
+    RCLCPP_WARN_THROTTLE(
+      node_->get_logger(), *node_->get_clock(),
+      std::max(log_trace_period_ms_, 500),
+      "GEN_NEW_TRAJ plan failed (%d/%d), retry in %.2fs",
+      gen_new_traj_fail_count_, gen_new_traj_max_failures_, backoff);
   }
 
   void EGOReplanFSM::waypointCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
@@ -309,187 +225,21 @@ namespace ego_planner
     odom_pos_(1) = msg->pose.pose.position.y;
     odom_pos_(2) = msg->pose.pose.position.z;
 
-    odom_vel_(0) = msg->twist.twist.linear.x;
-    odom_vel_(1) = msg->twist.twist.linear.y;
-    odom_vel_(2) = msg->twist.twist.linear.z;
-
-    // odom_acc_ = estimateAcc( msg );
-
     odom_orient_.w() = msg->pose.pose.orientation.w;
     odom_orient_.x() = msg->pose.pose.orientation.x;
     odom_orient_.y() = msg->pose.pose.orientation.y;
     odom_orient_.z() = msg->pose.pose.orientation.z;
 
+    // OpenVINS odomimu: twist.linear is in child_frame (imu/body); planning uses global.
+    const Eigen::Vector3d v_body(
+      msg->twist.twist.linear.x,
+      msg->twist.twist.linear.y,
+      msg->twist.twist.linear.z);
+    odom_vel_ = odom_orient_ * v_body;
+
+    // odom_acc_ = estimateAcc( msg );
+
     have_odom_ = true;
-  }
-
-  void EGOReplanFSM::BroadcastBsplineCallback(const std::shared_ptr<const traj_utils::msg::Bspline> &msg)
-  {
-    size_t id = msg->drone_id;
-    if ((int)id == planner_manager_->pp_.drone_id)
-      return;
-
-    // if (abs((ros::Time::now() - msg->start_time).toSec()) > 0.25)
-    rclcpp::Clock clock(RCL_SYSTEM_TIME);  // 确保使用当前节点的时间源
-    auto msg_time = rclcpp::Time(msg->start_time, clock.get_clock_type());
-    // RCLCPP_INFO(node_->get_logger(), "Clock type: %d", rclcpp::Clock().now().get_clock_type());
-    // RCLCPP_INFO(node_->get_logger(), "Start time clock type: %d", rclcpp::Time(msg->start_time).get_clock_type());
-    // RCLCPP_INFO(node_->get_logger(), "msg_time: %d", msg_time.get_clock_type());
-    if (abs((rclcpp::Clock().now() - msg_time).seconds()) > 0.25)
-    {
-      // ROS_ERROR("Time difference is too large! Local - Remote Agent %d = %fs", msg->drone_id, (ros::Time::now() - msg->start_time).toSec());
-      RCLCPP_ERROR(node_->get_logger(), "Time difference is too large! Local - Remote Agent %d = %fs",
-                   msg->drone_id, (rclcpp::Clock().now() - msg_time).seconds());
-      return;
-    }
-
-    // 路径缓冲区初始化
-    if (planner_manager_->swarm_trajs_buf_.size() <= id)
-    {
-      for (size_t i = planner_manager_->swarm_trajs_buf_.size(); i <= id; i++)
-      {
-        OneTrajDataOfSwarm blank;
-        blank.drone_id = -1;
-        planner_manager_->swarm_trajs_buf_.push_back(blank);
-      }
-    }
-
-    /* Test distance to the agent */
-    Eigen::Vector3d cp0(msg->pos_pts[0].x, msg->pos_pts[0].y, msg->pos_pts[0].z);
-    Eigen::Vector3d cp1(msg->pos_pts[1].x, msg->pos_pts[1].y, msg->pos_pts[1].z);
-    Eigen::Vector3d cp2(msg->pos_pts[2].x, msg->pos_pts[2].y, msg->pos_pts[2].z);
-    Eigen::Vector3d swarm_start_pt = (cp0 + 4 * cp1 + cp2) / 6;
-    if ((swarm_start_pt - odom_pos_).norm() > planning_horizen_ * 4.0f / 3.0f)
-    {
-      planner_manager_->swarm_trajs_buf_[id].drone_id = -1;
-      return; // if the current drone is too far to the received agent.
-    }
-
-    /* Store data */
-    Eigen::MatrixXd pos_pts(3, msg->pos_pts.size());
-    Eigen::VectorXd knots(msg->knots.size());
-    for (size_t j = 0; j < msg->knots.size(); ++j)
-    {
-      knots(j) = msg->knots[j];
-    }
-    for (size_t j = 0; j < msg->pos_pts.size(); ++j)
-    {
-      pos_pts(0, j) = msg->pos_pts[j].x;
-      pos_pts(1, j) = msg->pos_pts[j].y;
-      pos_pts(2, j) = msg->pos_pts[j].z;
-    }
-
-    planner_manager_->swarm_trajs_buf_[id].drone_id = id;
-
-    // 计算路径持续时间
-    if (msg->order % 2)
-    {
-      double cutback = (double)msg->order / 2 + 1.5;
-      planner_manager_->swarm_trajs_buf_[id].duration_ = msg->knots[msg->knots.size() - ceil(cutback)];
-    }
-    else
-    {
-      double cutback = (double)msg->order / 2 + 1.5;
-      planner_manager_->swarm_trajs_buf_[id].duration_ = (msg->knots[msg->knots.size() - floor(cutback)] + msg->knots[msg->knots.size() - ceil(cutback)]) / 2;
-    }
-
-    // 生成bspline并存储
-    UniformBspline pos_traj(pos_pts, msg->order, msg->knots[1] - msg->knots[0]);
-    pos_traj.setKnot(knots);
-    planner_manager_->swarm_trajs_buf_[id].position_traj_ = pos_traj;
-
-    planner_manager_->swarm_trajs_buf_[id].start_pos_ = planner_manager_->swarm_trajs_buf_[id].position_traj_.evaluateDeBoorT(0);
-
-    planner_manager_->swarm_trajs_buf_[id].start_time_ = msg->start_time;
-
-    /* Check Collision */
-    if (planner_manager_->checkCollision(id))
-    {
-      changeFSMExecState(REPLAN_TRAJ, "TRAJ_CHECK");
-    }
-  }
-
-  void EGOReplanFSM::swarmTrajsCallback(const std::shared_ptr<const traj_utils::msg::MultiBsplines> &msg)
-  {
-
-    multi_bspline_msgs_buf_.traj.clear();
-    multi_bspline_msgs_buf_ = *msg;
-
-    if (!have_odom_)
-    {
-      RCLCPP_ERROR(node_->get_logger(), "swarmTrajsCallback(): no odom!, return.");
-      return;
-    }
-
-    if ((int)msg->traj.size() != msg->drone_id_from + 1) // drone_id must start from 0
-    {
-      RCLCPP_ERROR(node_->get_logger(), "Wrong trajectory size!msg->traj.size()=%d, msg->drone_id_from+1=%d", (int)msg->traj.size(), msg->drone_id_from + 1);
-      return;
-    }
-
-    if (msg->traj[0].order != 3) // only support B-spline order equals 3.
-    {
-      RCLCPP_ERROR(node_->get_logger(), "Only support B-spline order equals 3.");
-      return;
-    }
-
-    // Step 1. receive the trajectories
-    planner_manager_->swarm_trajs_buf_.clear();
-    planner_manager_->swarm_trajs_buf_.resize(msg->traj.size());
-
-    // 处理每条路径
-    for (size_t i = 0; i < msg->traj.size(); i++)
-    {
-
-      Eigen::Vector3d cp0(msg->traj[i].pos_pts[0].x, msg->traj[i].pos_pts[0].y, msg->traj[i].pos_pts[0].z);
-      Eigen::Vector3d cp1(msg->traj[i].pos_pts[1].x, msg->traj[i].pos_pts[1].y, msg->traj[i].pos_pts[1].z);
-      Eigen::Vector3d cp2(msg->traj[i].pos_pts[2].x, msg->traj[i].pos_pts[2].y, msg->traj[i].pos_pts[2].z);
-      Eigen::Vector3d swarm_start_pt = (cp0 + 4 * cp1 + cp2) / 6;
-      if ((swarm_start_pt - odom_pos_).norm() > planning_horizen_ * 4.0f / 3.0f)
-      {
-        planner_manager_->swarm_trajs_buf_[i].drone_id = -1;
-        continue;
-      }
-
-      // 存储路径控制点和节点
-      Eigen::MatrixXd pos_pts(3, msg->traj[i].pos_pts.size());
-      Eigen::VectorXd knots(msg->traj[i].knots.size());
-      for (size_t j = 0; j < msg->traj[i].knots.size(); ++j)
-      {
-        knots(j) = msg->traj[i].knots[j];
-      }
-      for (size_t j = 0; j < msg->traj[i].pos_pts.size(); ++j)
-      {
-        pos_pts(0, j) = msg->traj[i].pos_pts[j].x;
-        pos_pts(1, j) = msg->traj[i].pos_pts[j].y;
-        pos_pts(2, j) = msg->traj[i].pos_pts[j].z;
-      }
-
-      planner_manager_->swarm_trajs_buf_[i].drone_id = i;
-
-      // 计算路径持续时间
-      if (msg->traj[i].order % 2)
-      {
-        double cutback = (double)msg->traj[i].order / 2 + 1.5;
-        planner_manager_->swarm_trajs_buf_[i].duration_ = msg->traj[i].knots[msg->traj[i].knots.size() - ceil(cutback)];
-      }
-      else
-      {
-        double cutback = (double)msg->traj[i].order / 2 + 1.5;
-        planner_manager_->swarm_trajs_buf_[i].duration_ = (msg->traj[i].knots[msg->traj[i].knots.size() - floor(cutback)] + msg->traj[i].knots[msg->traj[i].knots.size() - ceil(cutback)]) / 2;
-      }
-
-      // planner_manager_->swarm_trajs_buf_[i].position_traj_ =
-      UniformBspline pos_traj(pos_pts, msg->traj[i].order, msg->traj[i].knots[1] - msg->traj[i].knots[0]);
-      pos_traj.setKnot(knots);
-      planner_manager_->swarm_trajs_buf_[i].position_traj_ = pos_traj;
-
-      planner_manager_->swarm_trajs_buf_[i].start_pos_ = planner_manager_->swarm_trajs_buf_[i].position_traj_.evaluateDeBoorT(0);
-
-      planner_manager_->swarm_trajs_buf_[i].start_time_ = msg->traj[i].start_time;
-    }
-
-    have_recv_pre_agent_ = true;
   }
 
   void EGOReplanFSM::changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call)
@@ -500,7 +250,7 @@ namespace ego_planner
     else
       continously_called_times_ = 1;
 
-    static string state_str[8] = {"INIT", "WAIT_TARGET", "GEN_NEW_TRAJ", "REPLAN_TRAJ", "EXEC_TRAJ", "EMERGENCY_STOP", "SEQUENTIAL_START"};
+    static string state_str[6] = {"INIT", "WAIT_TARGET", "GEN_NEW_TRAJ", "REPLAN_TRAJ", "EXEC_TRAJ", "EMERGENCY_STOP"};
     int pre_s = int(exec_state_);
     exec_state_ = new_state;
     cout << "[" + pos_call + "]: from " + state_str[pre_s] + " to " + state_str[int(new_state)] << endl;
@@ -513,7 +263,7 @@ namespace ego_planner
 
   void EGOReplanFSM::printFSMExecState()
   {
-    static string state_str[8] = {"INIT", "WAIT_TARGET", "GEN_NEW_TRAJ", "REPLAN_TRAJ", "EXEC_TRAJ", "EMERGENCY_STOP", "SEQUENTIAL_START"};
+    static string state_str[6] = {"INIT", "WAIT_TARGET", "GEN_NEW_TRAJ", "REPLAN_TRAJ", "EXEC_TRAJ", "EMERGENCY_STOP"};
 
     cout << "[FSM]: state: " + state_str[int(exec_state_)] << endl;
   }
@@ -533,7 +283,7 @@ namespace ego_planner
       if (!have_odom_)
         cout << "no odom." << endl;
       if (!have_target_)
-        cout << "wait for goal or trigger." << endl;
+        cout << "wait for goal." << endl;
       fsm_num = 0;
     }
 
@@ -551,45 +301,23 @@ namespace ego_planner
 
     case WAIT_TARGET:
     {
-      if (!have_target_ || !have_trigger_)
+      if (!have_target_)
         goto force_return;
       else
       {
-        changeFSMExecState(SEQUENTIAL_START, "FSM");
+        changeFSMExecState(GEN_NEW_TRAJ, "FSM");
       }
-      break;
-    }
-
-    case SEQUENTIAL_START: // for swarm
-    {
-      if (planner_manager_->pp_.drone_id <= 0 || (planner_manager_->pp_.drone_id >= 1 && have_recv_pre_agent_))
-      {
-        if (have_odom_ && have_target_ && have_trigger_)
-        {
-          bool success = planFromGlobalTraj(10); // zx-todo
-          if (success)
-          {
-            changeFSMExecState(EXEC_TRAJ, "FSM");
-
-            publishSwarmTrajs(true);
-          }
-          else
-          {
-            RCLCPP_ERROR(node_->get_logger(), "Failed to generate the first trajectory!!!");
-            changeFSMExecState(SEQUENTIAL_START, "FSM");
-          }
-        }
-        else
-        {
-          RCLCPP_ERROR(node_->get_logger(), "No odom or no target! have_odom_=%d, have_target_=%d", have_odom_, have_target_);
-        }
-      }
-
       break;
     }
 
     case GEN_NEW_TRAJ:
     {
+      if (gen_new_traj_next_attempt_.nanoseconds() > 0 &&
+          node_->now() < gen_new_traj_next_attempt_)
+      {
+        goto force_return;
+      }
+
       if (pending_estop_global_replan_)
       {
         pending_estop_global_replan_ = false;
@@ -599,12 +327,12 @@ namespace ego_planner
       bool success = planFromGlobalTraj(10); // zx-todo
       if (success)
       {
+        resetGenNewTrajRetry();
         changeFSMExecState(EXEC_TRAJ, "FSM");
-        publishSwarmTrajs(false);
       }
       else
       {
-        changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+        onGenNewTrajPlanFailed();
       }
       break;
     }
@@ -615,7 +343,6 @@ namespace ego_planner
       if (planFromCurrentTraj(1))
       {
         changeFSMExecState(EXEC_TRAJ, "FSM");
-        publishSwarmTrajs(false);
       }
       else
       {
@@ -623,7 +350,6 @@ namespace ego_planner
         if (!isTagFollowing() && dist_to_goal < goal_reach_thresh_)
         {
           have_target_ = false;
-          have_trigger_ = false;
           changeFSMExecState(WAIT_TARGET, "FSM");
         }
         else
@@ -656,14 +382,7 @@ namespace ego_planner
         local_target_is_goal || dist_to_goal_xy < planning_horizen_;
 
       /* && (end_pt_ - pos).norm() < 0.5 */
-      if ((target_type_ == TARGET_TYPE::PRESET_TARGET) &&
-          (wp_id_ < waypoint_num_ - 1) &&
-          (end_pt_ - pos).norm() < no_replan_thresh_)
-      {
-        wp_id_++;
-        planNextWaypoint(wps_[wp_id_]);
-      }
-      else if (near_goal_phase)
+      if (near_goal_phase)
       {
         RCLCPP_INFO_THROTTLE(
           node_->get_logger(), *node_->get_clock(),
@@ -684,13 +403,6 @@ namespace ego_planner
               traj_utils::formatVec3(end_pt_).c_str(),
               dist_to_goal_xy);
             have_target_ = false;
-            have_trigger_ = false;
-
-            if (target_type_ == TARGET_TYPE::PRESET_TARGET)
-            {
-              wp_id_ = 0;
-              planNextWaypoint(wps_[wp_id_]);
-            }
 
             changeFSMExecState(WAIT_TARGET, "FSM");
             goto force_return;
@@ -719,17 +431,22 @@ namespace ego_planner
 
     case EMERGENCY_STOP:
     {
-      if (enable_fail_safe_ && odom_vel_.norm() < 0.1)
+      if (odom_vel_.norm() < 0.1)
       {
-        pending_estop_global_replan_ = true;
-        changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+        if (pending_tag_estop_to_wait_target_)
+        {
+          pending_tag_estop_to_wait_target_ = false;
+          changeFSMExecState(WAIT_TARGET, "TAG_DONE");
+        }
+        else if (enable_fail_safe_)
+        {
+          pending_estop_global_replan_ = true;
+          changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+        }
       }
       break;
     }
     }
-
-    data_disp_.header.stamp = rclcpp::Clock().now();
-    data_disp_pub_->publish(data_disp_);
 
   force_return:;
     // exec_timer_.start();
@@ -762,6 +479,16 @@ namespace ego_planner
     return false;
   }
 
+  bool EGOReplanFSM::isOdomBodyInObstacle() const
+  {
+    if (!have_odom_)
+      return false;
+
+    const auto map = planner_manager_->grid_map_;
+    Eigen::Vector3d p = odom_pos_;
+    return map->getInflateOccupancyNoFootprint(p) > 0;
+  }
+
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
   {
     if (!have_odom_)
@@ -786,6 +513,16 @@ namespace ego_planner
       if (callReboundReplan(false, flag_random_poly_init))
         return true;
     }
+
+    // Odom jump / stale warm-start ctrl pts: retry from polynomial init when body is free.
+    if (!isOdomBodyInObstacle())
+    {
+      for (int i = 0; i < trial_times; i++)
+      {
+        if (callReboundReplan(true, flag_random_poly_init))
+          return true;
+      }
+    }
     return false;
   }
 
@@ -795,19 +532,30 @@ namespace ego_planner
     LocalTrajData *info = &planner_manager_->local_data_;
     auto map = planner_manager_->grid_map_;
     
-    if (exec_state_ == WAIT_TARGET || info->start_time_.seconds() < 1e-5)
+    if (exec_state_ == WAIT_TARGET || exec_state_ == INIT ||
+        info->start_time_.seconds() < 1e-5)
       return;
 
     /* ---------- check lost of depth ---------- */
     if (map->getOdomDepthTimeout())
     {
-      if (exec_state_ != EMERGENCY_STOP)
+      if (exec_state_ == EXEC_TRAJ || exec_state_ == REPLAN_TRAJ)
       {
         RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
         enterEmergencyStop("SAFETY");
       }
+      else if (exec_state_ == GEN_NEW_TRAJ)
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(),
+          std::max(log_trace_period_ms_, 500),
+          "Depth stale during GEN_NEW_TRAJ recovery (no re-estop)");
+      }
       return;
     }
+
+    if (exec_state_ != EXEC_TRAJ && exec_state_ != REPLAN_TRAJ)
+      return;
 
     /* ---------- check trajectory ---------- */
     constexpr double time_step = 0.01;
@@ -815,9 +563,17 @@ namespace ego_planner
     double t_cur = (rclcpp::Clock().now() - info->start_time_).seconds();
 
     Eigen::Vector3d p_cur = info->position_traj_.evaluateDeBoorT(t_cur);
-    const double CLEARANCE = 1.0 * planner_manager_->getSwarmClearance();
-    // double t_cur_global = ros::Time::now().toSec();
-    double t_cur_global = rclcpp::Clock().now().seconds();
+    const double odom_traj_xy_dist = (odom_pos_.head<2>() - p_cur.head<2>()).norm();
+    if (odom_traj_xy_dist > odom_traj_mismatch_thresh_)
+    {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(), *node_->get_clock(),
+        std::max(log_trace_period_ms_, 500),
+        "Odom-traj mismatch %.3fm (>%.3fm), force replan (odom jump / stale traj).",
+        odom_traj_xy_dist, odom_traj_mismatch_thresh_);
+      changeFSMExecState(REPLAN_TRAJ, "ODOM_JUMP");
+      return;
+    }
 
     double t_2_3 = info->duration_ * 2 / 3;
     for (double t = t_cur; t < info->duration_; t += time_step)
@@ -830,36 +586,26 @@ namespace ego_planner
       p_chk(2) = odom_pos_(2);
       occ |= map->getInflateOccupancy(p_chk);
 
-      for (size_t id = 0; id < planner_manager_->swarm_trajs_buf_.size(); id++)
-      {
-        if ((planner_manager_->swarm_trajs_buf_.at(id).drone_id != (int)id) || (planner_manager_->swarm_trajs_buf_.at(id).drone_id == planner_manager_->pp_.drone_id))
-        {
-          continue;
-        }
-
-        double t_X = t_cur_global - planner_manager_->swarm_trajs_buf_.at(id).start_time_.seconds();
-        Eigen::Vector3d swarm_pridicted = planner_manager_->swarm_trajs_buf_.at(id).position_traj_.evaluateDeBoorT(t_X);
-        double dist = (p_cur - swarm_pridicted).norm();
-
-        if (dist < CLEARANCE)
-        {
-          occ = true;
-          break;
-        }
-      }
-
       if (occ)
       {
 
         if (planFromCurrentTraj()) // Make a chance
         {
           changeFSMExecState(EXEC_TRAJ, "SAFETY");
-          publishSwarmTrajs(false);
           return;
         }
         else
         {
-          if (t - t_cur < emergency_time_) // 0.8s of emergency time
+          const bool odom_in_obstacle = isOdomBodyInObstacle();
+          if (!odom_in_obstacle)
+          {
+            RCLCPP_WARN(
+              node_->get_logger(),
+              "Trajectory collision but odom body free (odom-traj dist=%.3fm, dt=%.3fs), replan.",
+              odom_traj_xy_dist, t - t_cur);
+            changeFSMExecState(REPLAN_TRAJ, "SAFETY");
+          }
+          else if (t - t_cur < emergency_time_)
           {
             RCLCPP_WARN(node_->get_logger(), "Suddenly discovered obstacles. emergency stop! time=%f", t - t_cur);
 
@@ -940,65 +686,11 @@ namespace ego_planner
         traj_utils::formatVec3(start_pt_).c_str(),
         traj_utils::formatControlPointsSummary(pos_pts).c_str());
 
-      /* 2. publish traj to the next drone of swarm */
-
-      /* 3. publish traj for visualization */
+      /* publish traj for visualization */
       visualization_->displayOptimalList(info->position_traj_.get_control_points(), 0);
     }
 
     return plan_and_refine_success;
-  }
-
-  void EGOReplanFSM::publishSwarmTrajs(bool startup_pub)
-  {
-    auto info = &planner_manager_->local_data_;
-
-    traj_utils::msg::Bspline bspline;
-    bspline.order = 3;
-    bspline.start_time = info->start_time_;
-    bspline.drone_id = planner_manager_->pp_.drone_id;
-    bspline.traj_id = info->traj_id_;
-
-    Eigen::MatrixXd pos_pts = info->position_traj_.getControlPoint();
-    bspline.pos_pts.reserve(pos_pts.cols());
-    for (int i = 0; i < pos_pts.cols(); ++i)
-    {
-      geometry_msgs::msg::Point pt;
-      pt.x = pos_pts(0, i);
-      pt.y = pos_pts(1, i);
-      pt.z = pos_pts(2, i);
-      bspline.pos_pts.push_back(pt);
-    }
-
-    Eigen::VectorXd knots = info->position_traj_.getKnot();
-
-    bspline.knots.reserve(knots.rows());
-    for (int i = 0; i < knots.rows(); ++i)
-    {
-      bspline.knots.push_back(knots(i));
-    }
-
-    if (startup_pub)
-    {
-      multi_bspline_msgs_buf_.drone_id_from = planner_manager_->pp_.drone_id; // zx-todo
-      if ((int)multi_bspline_msgs_buf_.traj.size() == planner_manager_->pp_.drone_id + 1)
-      {
-        multi_bspline_msgs_buf_.traj.back() = bspline;
-      }
-      else if ((int)multi_bspline_msgs_buf_.traj.size() == planner_manager_->pp_.drone_id)
-      {
-        multi_bspline_msgs_buf_.traj.push_back(bspline);
-      }
-      else
-      {
-        RCLCPP_ERROR(node_->get_logger(), "Wrong traj nums and drone_id pair!!! traj.size()=%d, drone_id=%d", (int)multi_bspline_msgs_buf_.traj.size(), planner_manager_->pp_.drone_id);
-        // return plan_and_refine_success;
-      }
-      // swarm_trajs_pub_.publish(multi_bspline_msgs_buf_);
-      swarm_trajs_pub_->publish(multi_bspline_msgs_buf_);
-    }
-
-    broadcast_bspline_pub_->publish(bspline);
   }
 
   void EGOReplanFSM::enterEmergencyStop(const string &pos_call, bool disable_fail_safe)
@@ -1189,15 +881,15 @@ namespace ego_planner
 
   Eigen::Vector3d EGOReplanFSM::computeFollowGoal(const Eigen::Vector3d &tag_pos) const
   {
-    Eigen::Vector3d goal = tag_pos + tag_follow_offset_;
+    Eigen::Vector3d goal = tag_pos;
     if (have_odom_)
       goal.z() = odom_pos_.z();
     return goal;
   }
 
-  bool EGOReplanFSM::isAtFollowGoal(const Eigen::Vector3d &goal) const
+  bool EGOReplanFSM::isCloseToTag(const Eigen::Vector3d &tag_pos) const
   {
-    return (odom_pos_.head<2>() - goal.head<2>()).norm() <= goal_reach_thresh_;
+    return (odom_pos_.head<2>() - tag_pos.head<2>()).norm() <= tag_stop_dist_;
   }
 
   bool EGOReplanFSM::shouldReplanForTagGoal(const Eigen::Vector3d &new_goal) const
@@ -1229,16 +921,19 @@ namespace ego_planner
 
   void EGOReplanFSM::finishTagTracking(const string &reason)
   {
+    const double dist_tag =
+        have_tag_pose_ ? (odom_pos_.head<2>() - tag_pos_last_.head<2>()).norm() : -1.0;
     RCLCPP_INFO(
         node_->get_logger(),
-        "[tag_track] DONE (%s) odom=%s goal=%s -> WAIT_TARGET",
+        "[tag_track] DONE (%s) odom=%s tag=%s dist_xy=%.3f -> EMERGENCY_STOP",
         reason.c_str(),
         traj_utils::formatVec3(odom_pos_).c_str(),
-        traj_utils::formatVec3(end_pt_).c_str());
+        traj_utils::formatVec3(tag_pos_last_).c_str(),
+        dist_tag);
     tag_track_state_ = TagTrackState::DONE;
     have_target_ = false;
-    have_trigger_ = false;
-    changeFSMExecState(WAIT_TARGET, "TAG_DONE");
+    pending_tag_estop_to_wait_target_ = true;
+    enterEmergencyStop("TAG_DONE");
   }
 
   void EGOReplanFSM::processTagDetection(bool detected)
@@ -1255,7 +950,6 @@ namespace ego_planner
       {
         tag_pos_frozen_ = tag_pos_last_;
         tag_track_state_ = TagTrackState::HOLD;
-        tag_lost_since_ = node_->now();
         tag_force_replan_ = true;
         const Eigen::Vector3d goal = computeFollowGoal(tag_pos_frozen_);
         RCLCPP_INFO(
@@ -1263,7 +957,7 @@ namespace ego_planner
             "[tag_track] HOLD tag=%s goal=%s",
             traj_utils::formatVec3(tag_pos_frozen_).c_str(),
             traj_utils::formatVec3(goal).c_str());
-        if (shouldReplanForTagGoal(goal))
+        if (!isCloseToTag(tag_pos_frozen_) && shouldReplanForTagGoal(goal))
           applyTagGoal(goal);
       }
       return;
@@ -1282,22 +976,40 @@ namespace ego_planner
     tag_track_state_ = TagTrackState::ACTIVE;
     tag_force_replan_ = first_seen || resume;
 
-    const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);
-    if (shouldReplanForTagGoal(goal))
-      applyTagGoal(goal);
+    if (!isCloseToTag(tag_pos_last_))
+    {
+      const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);
+      if (shouldReplanForTagGoal(goal))
+        applyTagGoal(goal);
+    }
   }
 
   void EGOReplanFSM::updateTagTrackingOnExecTick()
   {
+    std::lock_guard<std::mutex> lock(tag_mutex_);
+
+    if (tag_track_state_ == TagTrackState::ACTIVE && tag_detected_ && have_tag_pose_)
+    {
+      if (isCloseToTag(tag_pos_last_))
+      {
+        const double dist = (odom_pos_.head<2>() - tag_pos_last_.head<2>()).norm();
+        RCLCPP_INFO(
+            node_->get_logger(),
+            "[tag_track] close to tag dist_xy=%.3f thresh=%.3f",
+            dist, tag_stop_dist_);
+        finishTagTracking("close to tag");
+        return;
+      }
+    }
+
     if (tag_track_state_ != TagTrackState::HOLD)
       return;
 
-    std::lock_guard<std::mutex> lock(tag_mutex_);
-    const Eigen::Vector3d goal_last = computeFollowGoal(tag_pos_frozen_);
-    const bool at_goal = isAtFollowGoal(goal_last);
-    const double t_lost = (node_->now() - tag_lost_since_).seconds();
-    if (at_goal && t_lost >= tag_lost_timeout_sec_)
-      finishTagTracking("lost timeout and at follow goal");
+    if (isCloseToTag(tag_pos_frozen_))
+    {
+      finishTagTracking("close to frozen tag");
+      return;
+    }
   }
 
   void EGOReplanFSM::tagPoseCallback(const std::shared_ptr<const geometry_msgs::msg::PoseStamped> &msg)
@@ -1328,11 +1040,15 @@ namespace ego_planner
       tag_track_state_ = TagTrackState::ACTIVE;
       tag_force_replan_ = true;
       RCLCPP_INFO(node_->get_logger(), "[tag_track] ACTIVE (first detection, pose)");
-      applyTagGoal(computeFollowGoal(tag_pos_last_));
+      if (!isCloseToTag(tag_pos_last_))
+        applyTagGoal(computeFollowGoal(tag_pos_last_));
       return;
     }
 
     if (tag_track_state_ != TagTrackState::ACTIVE)
+      return;
+
+    if (isCloseToTag(tag_pos_last_))
       return;
 
     const Eigen::Vector3d goal = computeFollowGoal(tag_pos_last_);

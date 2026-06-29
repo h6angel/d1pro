@@ -85,10 +85,15 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# 安装 launch 文件
+# 安装 launch 与 D1 共享配置
 install(
   DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(
+  DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
 )
 
 ament_package()

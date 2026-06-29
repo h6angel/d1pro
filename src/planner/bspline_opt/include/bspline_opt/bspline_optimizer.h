@@ -101,8 +101,6 @@ namespace ego_planner
     // required inputs
     void setControlPoints(const Eigen::MatrixXd &points);
     void setBsplineInterval(const double &ts);
-    void setSwarmTrajs(SwarmTrajData *swarm_trajs_ptr);
-    void setDroneId(const int drone_id);
 
     // optional inputs
     void setGuidePath(const vector<Eigen::Vector3d> &guide_pt);
@@ -127,20 +125,16 @@ namespace ego_planner
     AStar::Ptr a_star_;
     std::vector<Eigen::Vector3d> ref_pts_;
 
-    std::vector<ControlPoints> distinctiveTrajs(vector<std::pair<int, int>> segments);
     std::vector<std::pair<int, int>> initControlPoints(Eigen::MatrixXd &init_points, bool flag_first_init = true);
     bool BsplineOptimizeTrajRebound(Eigen::MatrixXd &optimal_points, double ts); // must be called after initControlPoints()
     bool BsplineOptimizeTrajRebound(Eigen::MatrixXd &optimal_points, double &final_cost, const ControlPoints &control_points, double ts);
     bool BsplineOptimizeTrajRefine(const Eigen::MatrixXd &init_points, const double ts, Eigen::MatrixXd &optimal_points);
 
     inline int getOrder(void) { return order_; }
-    inline double getSwarmClearance(void) { return swarm_clearance_; }
 
   private:
     GridMap::Ptr grid_map_;
     fast_planner::ObjPredictor::Ptr moving_objs_;
-    SwarmTrajData *swarm_trajs_{NULL}; // Can not use shared_ptr and no need to free
-    int drone_id_;
 
     enum FORCE_STOP_OPTIMIZE_TYPE
     {
@@ -172,7 +166,7 @@ namespace ego_planner
 
     int a;
     //
-    double dist0_, swarm_clearance_; // safe distance
+    double dist0_; // safe distance
     double max_vel_, max_acc_;       // dynamic limits
 
     int variable_num_;              // optimization variables
@@ -191,9 +185,6 @@ namespace ego_planner
     void enforcePlanningZOnSolverGrad(double *grad, int n);
     void enforcePlanningZOnSolverVars(double *q, int n);
 
-#define INIT_min_ellip_dist_ 123456789.0123456789
-    double min_ellip_dist_;
-
     ControlPoints cps_;
 
     /* cost function */
@@ -208,7 +199,6 @@ namespace ego_planner
     void calcTerminalCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcDistanceCostRebound(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient, int iter_num, double smoothness_cost);
     void calcMovingObjCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
-    void calcSwarmCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     bool check_collision_and_rebound(void);
 

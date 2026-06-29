@@ -155,34 +155,6 @@ namespace ego_planner
     displayMarkerList(global_list_pub, init_pts, scale, color, id);
   }
 
-  void PlanningVisualization::displayMultiInitPathList(vector<vector<Eigen::Vector3d>> init_trajs, const double scale)
-  {
-
-    if (init_list_pub->get_subscription_count() == 0)
-    {
-      return;
-    }
-
-    static int last_nums = 0;
-
-    for (int id = 0; id < last_nums; id++)
-    {
-      Eigen::Vector4d color(0, 0, 0, 0);
-      vector<Eigen::Vector3d> blank;
-      displayMarkerList(init_list_pub, blank, scale, color, id, false);
-      rclcpp::sleep_for(std::chrono::milliseconds(1));
-    }
-    last_nums = 0;
-
-    for (int id = 0; id < init_trajs.size(); id++)
-    {
-      Eigen::Vector4d color(0, 0, 1, 0.7);
-      displayMarkerList(init_list_pub, init_trajs[id], scale, color, id, false);
-      rclcpp::sleep_for(std::chrono::milliseconds(1));
-      last_nums++;
-    }
-  }
-
   void PlanningVisualization::displayInitPathList(vector<Eigen::Vector3d> init_pts, const double scale, int id)
   {
 

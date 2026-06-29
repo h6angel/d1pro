@@ -53,7 +53,7 @@ flowchart TB
 | `/ov_msckf/odomimu` | `nav_msgs/Odometry` | OpenVINS | 规划、traj_server、bridge | 位姿与速度闭环（global 系） |
 | `/ov_msckf/pose_stamped` | `geometry_msgs/PoseStamped` | OpenVINS | `GridMap` | 与深度图同步投影建图 |
 | `/camera/camera/depth/image_rect_raw` | `sensor_msgs/Image` | RealSense | `GridMap` | 深度图（16UC1 mm） |
-| `/move_base_simple/goal` | `geometry_msgs/PoseStamped` | RViz | FSM | `flight_type=1` 时设目标 |
+| `/move_base_simple/goal` | `geometry_msgs/PoseStamped` | RViz | FSM | RViz 2D Goal 设目标 |
 | `drone_0_planning/bspline` | `traj_utils/Bspline` | `ego_planner_node` | `traj_server` | 优化后的轨迹 |
 | `/drone_0_planning/pos_cmd` | `quadrotor_msgs/PositionCommand` | `traj_server` | `d1_planner_bridge` | 位置/速度/加速度/yaw |
 | `/command/cmd_twist` | `geometry_msgs/Twist` | bridge | D1 控制器 | 仅 `linear.x`、`angular.z` |
@@ -128,8 +128,8 @@ stateDiagram-v2
 
 ### 3.3 目标来源
 
-- `flight_type=1`：RViz **2D Goal** → `/move_base_simple/goal`
-- `flight_type=2`：`single_run.launch.py` 中预设航点
+- RViz **2D Goal** → `/move_base_simple/goal`
+- `enable_tag_tracking=true`：AprilTag 跟随（launch 参数）
 
 ### 3.4 重规划与到达判定（相对原版的重要改动）
 
@@ -183,14 +183,9 @@ flowchart LR
 
 ### 5.1 终端日志
 
-默认写入工作空间根目录 **`ego_log/`**（与 colcon `log/` 分开）：
+一键启动时日志由 `start_ego_stack.sh` 写入 `ego_log/stack_YYYYMMDD_HHMMSS/`（各节点独立 `.log` 文件）。
 
-```bash
-ros2 launch ego_planner single_run.launch.py
-ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
-```
-
-关闭：`save_log:=false`；改目录：`log_dir:=/path`。
+单独 `ros2 launch` 时输出在终端；需要落盘请用 `./start_ego_stack.sh`。
 
 | 标签 | 节点 | 内容 |
 |------|------|------|
@@ -203,8 +198,7 @@ ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 
 | 文件 | 内容 |
 |------|------|
-| `src/planner/plan_manage/launch/single_run.launch.py` | 地图、速度、重规划周期、traj_server |
-| `src/planner/plan_manage/launch/advanced_param.launch.py` | 优化权重、膨胀、FSM 阈值 |
+| `src/planner/plan_manage/launch/single_run.launch.py` | 规划节点 + traj_server；参数见 `config/d1_robot.yaml` |
 | `src/d1_planner_bridge/config/d1_bridge.yaml` | 底盘跟踪增益与限幅 |
 
 ### 5.3 常见“一冲一停”
