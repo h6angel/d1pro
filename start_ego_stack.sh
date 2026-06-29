@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# 一键启动：RealSense 相机 + OpenVINS (rs_d435i) + EGO 规划 + D1 桥接 (+ 可选 RViz)
+# 一键启动：RealSense + OpenVINS (rs_d435i) + EGO 规划 + D1 桥接 (+ 可选 RViz / AprilTag)
+#
+# 感知栈（与 Readme / docs/00_overview 一致）：
+#   1. ros2 launch realsense2_camera rs_launch.py
+#   2. ros2 launch ov_msckf subscribe.launch.py config:=rs_d435i use_stereo:=true max_cameras:=2
 #
 # 用法:
 #   ./start_ego_stack.sh                        # 默认：RViz 手动设点

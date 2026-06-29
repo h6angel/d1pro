@@ -32,21 +32,51 @@ echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-## 运行
+## 运行（推荐）
+
+实机默认使用仓库根目录一键脚本（RealSense + OpenVINS + 规划 + D1 桥接 + 可选 RViz / AprilTag）：
 
 ```bash
-# 终端 1：相机 + OpenVINS
-ros2 launch ov_msckf d435i_openvins.launch.py
+cd ego_control
+./start_ego_stack.sh                        # 默认：RViz 手动 2D Goal
+./start_ego_stack.sh enable_tag_tracking=true  # AprilTag 追踪模式
+./start_ego_stack.sh --no-rviz              # 不启动 RViz
+./start_ego_stack.sh --skip-wait              # 跳过话题就绪检测（调试用）
+```
 
-# 终端 2：规划（地图系 global，与 OpenVINS 一致）
+脚本内部依次拉起：
+
+1. `realsense2_camera`（`rs_launch.py`）
+2. OpenVINS（`ov_msckf subscribe.launch.py config:=rs_d435i use_stereo:=true max_cameras:=2`）
+3. [可选] `apriltag_detect`（`enable_tag_tracking=true` 时）
+4. `ego_planner single_run.launch.py`
+5. `d1_planner_bridge`
+6. [可选] RViz（Fixed Frame 选 `global`）
+
+日志目录：`ego_log/stack_YYYYMMDD_HHMMSS/`（各节点独立 `.log`）。
+
+## 手动分终端（调试）
+
+需要单独重启某一环时，与脚本等价的手动顺序：
+
+```bash
+# 终端 1：RealSense
+ros2 launch realsense2_camera rs_launch.py
+
+# 终端 2：OpenVINS（需已 source ../openvins/install/setup.bash）
+ros2 launch ov_msckf subscribe.launch.py config:=rs_d435i use_stereo:=true max_cameras:=2
+
+# 终端 3：规划
 ros2 launch ego_planner single_run.launch.py
 
-# 终端 3：底盘桥接
+# 终端 4：底盘桥接
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
 
-# 可选 RViz：Fixed Frame 选 global
+# 可选 RViz
 ros2 launch ego_planner rviz.launch.py
 ```
+
+AprilTag 追踪时，在规划前增加：`ros2 launch apriltag_detect apriltag.launch.py`，并给规划传 `enable_tag_tracking:=true`。
 
 深度内参请用 `ros2 topic echo /camera/camera/depth/camera_info --once` 核对后覆盖 launch 的 `cx/cy/fx/fy`。
 
@@ -64,5 +94,3 @@ ros2 launch ego_planner rviz.launch.py
 ros2 launch ego_planner single_run.launch.py odom_topic:=/your_vio/odom pose_topic:=/your_vio/pose_stamped
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py odom_topic:=/your_vio/odom
 ```
-
-一键启动时日志写在 `ego_log/stack_YYYYMMDD_HHMMSS/`（见 `start_ego_stack.sh`）。

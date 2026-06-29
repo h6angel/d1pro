@@ -1,14 +1,13 @@
 """
 EGO planner + traj_server for D1 real robot (OpenVINS + RealSense depth mapping).
 
-Prerequisites (separate terminals):
-  ros2 launch ov_msckf d435i_openvins.launch.py
-  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
+Prerequisites: run ../start_ego_stack.sh (recommended), or launch RealSense + OpenVINS
+  manually before this node — see Readme.md.
 
 Topics / limits / planner tuning: config/d1_robot.yaml
 Depth intrinsics override: ros2 topic echo /camera/camera/depth/camera_info --once
 
-Logs: ./start_ego_stack.sh (ego_log/stack_*/*.log)
+Logs: ./start_ego_stack.sh -> ego_log/stack_*/*.log
 """
 
 import os

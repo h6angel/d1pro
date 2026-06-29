@@ -58,13 +58,28 @@ flowchart TB
 | `/drone_0_planning/pos_cmd` | `quadrotor_msgs/PositionCommand` | `traj_server` | `d1_planner_bridge` | 位置/速度/加速度/yaw |
 | `/command/cmd_twist` | `geometry_msgs/Twist` | bridge | D1 控制器 | 仅 `linear.x`、`angular.z` |
 
-### 建议启动顺序
+### 推荐启动方式
+
+实机默认使用仓库根目录 **`start_ego_stack.sh`** 一键启动（与 [Readme.md](../Readme.md) 一致）：
 
 ```bash
-ros2 launch ov_msckf d435i_openvins.launch.py
+./start_ego_stack.sh                        # RViz 手动设点
+./start_ego_stack.sh enable_tag_tracking=true  # AprilTag 追踪
+./start_ego_stack.sh --no-rviz
+```
+
+脚本内部：RealSense `rs_launch.py` → OpenVINS `subscribe.launch.py config:=rs_d435i` → [可选 AprilTag] → `ego_planner` → `d1_planner_bridge` → [可选 RViz]。
+
+### 手动分终端（调试）
+
+与脚本等价、便于单独重启某一节点：
+
+```bash
+ros2 launch realsense2_camera rs_launch.py
+ros2 launch ov_msckf subscribe.launch.py config:=rs_d435i use_stereo:=true max_cameras:=2
 ros2 launch ego_planner single_run.launch.py
 ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
-ros2 launch ego_planner rviz.launch.py   # 可选
+ros2 launch ego_planner rviz.launch.py   # 可选，Fixed Frame: global
 ```
 
 ---
