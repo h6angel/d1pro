@@ -6,7 +6,6 @@
 #include <bspline_opt/bspline_optimizer.h>
 #include <bspline_opt/uniform_bspline.h>
 #include <plan_env/grid_map.h>
-#include <plan_env/obj_predictor.h>
 #include <traj_utils/plan_container.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <traj_utils/planning_visualization.h>
@@ -44,7 +43,6 @@ namespace ego_planner
     LocalTrajData local_data_;
     GlobalTrajData global_data_;
     GridMap::Ptr grid_map_;
-    fast_planner::ObjPredictor::Ptr obj_predictor_;
 
   private:
     /* main planning algorithms & modules */

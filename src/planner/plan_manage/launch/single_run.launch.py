@@ -168,9 +168,6 @@ def generate_launch_description():
             {'bspline/limit_vel': max_vel},
             {'bspline/limit_acc': max_acc},
             {'bspline/limit_ratio': 1.1},
-            {'prediction/obj_num': 0},
-            {'prediction/lambda': 1.0},
-            {'prediction/predict_rate': 1.0},
         ],
     )
 
