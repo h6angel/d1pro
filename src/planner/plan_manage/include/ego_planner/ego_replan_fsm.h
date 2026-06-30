@@ -235,6 +235,9 @@ namespace ego_planner
 
     bool callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj); // front-end and back-end method
 
+    /// warm-start (optional) → poly init → random poly escape when body is free.
+    bool callReboundReplanWithEscape(int trial_times, bool try_warm_start);
+
     bool callEmergencyStop(Eigen::Vector3d stop_pos);                          // front-end and back-end method
 
     void enterEmergencyStop(const string &pos_call, bool disable_fail_safe = false);
