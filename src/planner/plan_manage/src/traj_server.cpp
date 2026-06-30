@@ -479,8 +479,9 @@ int main(int argc, char **argv)
       10,
       bsplineCallback);
 
+  // High-rate VIO odom: best_effort + keep_last(1) (latest-sample-wins, no backlog).
   auto odom_sub = node->create_subscription<nav_msgs::msg::Odometry>(
-      "odom", 10, odomCallback);
+      "odom", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(), odomCallback);
 
   // Relative name so launch remapping (position_cmd -> /drone_0_planning/pos_cmd) applies.
   pos_cmd_pub = node->create_publisher<quadrotor_msgs::msg::PositionCommand>(

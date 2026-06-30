@@ -48,8 +48,9 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
     pos_cmd_topic_, rclcpp::QoS(10),
     std::bind(&D1PlannerBridgeNode::posCmdCallback, this, std::placeholders::_1));
 
+  // High-rate VIO odom: best_effort + keep_last(1) (latest-sample-wins, no backlog).
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-    odom_topic_, rclcpp::QoS(10),
+    odom_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
     std::bind(&D1PlannerBridgeNode::odomCallback, this, std::placeholders::_1));
 
   cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);

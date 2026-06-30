@@ -80,9 +80,11 @@ namespace ego_planner
     safety_timer_ = node_->create_wall_timer(std::chrono::milliseconds(50),
                                              std::bind(&EGOReplanFSM::checkCollisionCallback, this));
 
+    // High-rate VIO odom: best_effort + keep_last(1) -> always act on the freshest sample,
+    // no reliable retransmission/backlog. best_effort sub is compatible with any publisher.
     odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
         "odom_world",
-        1,
+        rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
         [this](const std::shared_ptr<const nav_msgs::msg::Odometry> &msg)
         {
           this->odometryCallback(msg);
