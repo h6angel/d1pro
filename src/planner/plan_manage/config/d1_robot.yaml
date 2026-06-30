@@ -1,6 +1,6 @@
-# D1 实机部署 — 话题、限速、相机内参与规划子集配置
+# D1 实机部署 — 单一配置源
 # 使用者: single_run.launch.py, d1_planner_bridge.launch.py, start_ego_stack.sh
-# 注意: grid_map / fsm 细项 / 优化器权重仍在 single_run.launch.py 硬编码
+# launch 仅负责起节点与少量 runtime 覆盖（enable_tag_tracking、话题名等）
 
 topics:
   odom: "/ov_msckf/odomimu"
@@ -22,7 +22,7 @@ camera:
   fx: 320.244
   fy: 320.244
 
-# ego_planner_node / GridMap / FSM / 优化器（single_run.launch.py）
+# 跨模块共享的规划尺度（注入 fsm / manager / grid_map / optimization）
 planner:
   map_size_x: 40.0
   map_size_y: 40.0
@@ -31,7 +31,81 @@ planner:
   goal_reach_thresh: 0.3
   tag_stop_dist: 0.25   # AprilTag 追踪：距检测点 XY 距离 ≤ 此值则停车 (m)
   thresh_replan_time: 2.5
-  collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)，≈ map_resolution/2
+  collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)
   obstacles_inflation: 0.09
   optimization_dist0: 0.55
   lambda_fitness: 1.5
+
+fsm:
+  thresh_no_replan_meter: 1.0
+  odom_traj_mismatch_thresh: 0.22
+  planning_horizen_time: 3.0
+  emergency_time: 1.0
+  global_replan_drift_thresh: 0.25
+  fail_safe: true
+  log_trace_period_ms: 500
+  gen_new_traj_max_failures: 8
+  gen_new_traj_backoff_base_sec: 0.25
+  gen_new_traj_backoff_max_sec: 2.0
+  tag_pose_topic: "/apriltag/target_pose_global"
+  tag_detected_topic: "/apriltag/target_detected"
+  tag_update_min_dist: 0.08
+  tag_replan_min_period: 0.5
+
+grid_map:
+  resolution: 0.1
+  local_update_range_x: 12.0
+  local_update_range_y: 8.0
+  local_update_range_z: 4.5
+  local_map_margin: 10
+  ground_height: -0.01
+  use_depth_filter: true
+  depth_filter_tolerance: 0.15
+  depth_filter_maxdist: 5.0
+  depth_filter_mindist: 0.2
+  depth_filter_margin: 2
+  k_depth_scaling_factor: 1000.0
+  skip_pixel: 2
+  p_hit: 0.65
+  p_miss: 0.35
+  p_min: 0.12
+  p_max: 0.90
+  p_occ: 0.80
+  min_ray_length: 0.1
+  max_ray_length: 4.5
+  virtual_ceil_height: 2.9
+  visualization_truncate_height: 1.8
+  show_occ_time: false
+  pose_type: 1
+  occ_confirm_frames: 3
+  occ_clear_frames: 5
+  use_fixed_publish_window: true
+  map_vis_rate: 10.0
+  odom_depth_timeout: 2.5
+  ground_filter_enable: true
+  ground_filter_margin: 0.12
+  inflate_xy_only: true
+  robot_footprint_radius: 0.35
+
+manager:
+  max_jerk: 4.0
+  control_points_distance: 0.4
+  feasibility_tolerance: 0.05
+  use_robot_z_planning: true
+
+optimization:
+  lambda_smooth: 1.0
+  lambda_collision: 0.5
+  lambda_feasibility: 0.1
+
+bspline:
+  limit_ratio: 1.1
+
+traj_server:
+  time_forward: 0.7
+  use_odom_progress: true
+  odom_lookahead_time: 0.5
+  log_trace_period_ms: 500
+  endpoint_approach_dist: 0.35
+  endpoint_stop_dist: 0.08
+  endpoint_vel_gain: 0.8

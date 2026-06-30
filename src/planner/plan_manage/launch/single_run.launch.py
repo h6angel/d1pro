@@ -4,8 +4,8 @@ EGO planner + traj_server for D1 real robot (OpenVINS + RealSense depth mapping)
 Prerequisites: run ../start_ego_stack.sh (recommended), or launch RealSense + OpenVINS
   manually before this node — see Readme.md.
 
-Topics / limits / planner tuning: config/d1_robot.yaml
-Depth intrinsics override: ros2 topic echo /camera/camera/depth/camera_info --once
+All tuning defaults: config/d1_robot.yaml
+Launch args override a subset at runtime (topics, limits, tag mode, camera intrinsics).
 
 Logs: ./start_ego_stack.sh -> ego_log/stack_*/*.log
 """
@@ -16,10 +16,15 @@ import sys
 _launch_dir = os.path.dirname(os.path.abspath(__file__))
 if _launch_dir not in sys.path:
     sys.path.insert(0, _launch_dir)
-from d1_robot_config import load_d1_robot_config
+
+from d1_robot_config import (
+    build_ego_planner_params,
+    build_traj_server_params,
+    load_d1_robot_config,
+)
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -28,6 +33,121 @@ _topics = _d1['topics']
 _limits = _d1['limits']
 _camera = _d1['camera']
 _planner = _d1['planner']
+_fsm = _d1.get('fsm', {})
+
+
+def _launch_setup(context, *args, **kwargs):
+    cfg = load_d1_robot_config()
+
+    def _float(lc):
+        return float(lc.perform(context))
+
+    def _str(lc):
+        return lc.perform(context)
+
+    def _bool(lc):
+        return lc.perform(context).lower() in ('true', '1', 'yes', 'on')
+
+    max_vel = _float(LaunchConfiguration('max_vel'))
+    max_wz = _float(LaunchConfiguration('max_wz'))
+    max_acc = _float(LaunchConfiguration('max_acc'))
+    planning_horizon = _float(LaunchConfiguration('planning_horizon'))
+    goal_reach_thresh = _float(LaunchConfiguration('goal_reach_thresh'))
+    thresh_replan_time = _float(LaunchConfiguration('thresh_replan_time'))
+    collision_check_step = _float(LaunchConfiguration('collision_check_step'))
+    obstacles_inflation = _float(LaunchConfiguration('obstacles_inflation'))
+    optimization_dist0 = _float(LaunchConfiguration('optimization_dist0'))
+    lambda_fitness = _float(LaunchConfiguration('lambda_fitness'))
+    map_size_x = _float(LaunchConfiguration('map_size_x'))
+    map_size_y = _float(LaunchConfiguration('map_size_y'))
+    map_size_z = _float(LaunchConfiguration('map_size_z'))
+    cx = _float(LaunchConfiguration('cx'))
+    cy = _float(LaunchConfiguration('cy'))
+    fx = _float(LaunchConfiguration('fx'))
+    fy = _float(LaunchConfiguration('fy'))
+    tag_stop_dist = _float(LaunchConfiguration('tag_stop_dist'))
+
+    odom_topic = _str(LaunchConfiguration('odom_topic'))
+    pose_topic = _str(LaunchConfiguration('pose_topic'))
+    depth_topic = _str(LaunchConfiguration('depth_topic'))
+    pos_cmd_topic = _str(LaunchConfiguration('pos_cmd_topic'))
+    tag_pose_topic = _str(LaunchConfiguration('tag_pose_topic'))
+    tag_detected_topic = _str(LaunchConfiguration('tag_detected_topic'))
+    tag_update_min_dist = _float(LaunchConfiguration('tag_update_min_dist'))
+    tag_replan_min_period = _float(LaunchConfiguration('tag_replan_min_period'))
+    enable_tag_tracking = _bool(LaunchConfiguration('enable_tag_tracking'))
+
+    ego_overrides = {
+        'fsm/thresh_replan_time': thresh_replan_time,
+        'fsm/collision_check_step': collision_check_step,
+        'fsm/thresh_goal_reach_meter': goal_reach_thresh,
+        'fsm/planning_horizon': planning_horizon,
+        'fsm/enable_tag_tracking': enable_tag_tracking,
+        'fsm/tag_pose_topic': tag_pose_topic,
+        'fsm/tag_detected_topic': tag_detected_topic,
+        'fsm/tag_stop_dist': tag_stop_dist,
+        'fsm/tag_update_min_dist': tag_update_min_dist,
+        'fsm/tag_replan_min_period': tag_replan_min_period,
+        'grid_map/map_size_x': map_size_x,
+        'grid_map/map_size_y': map_size_y,
+        'grid_map/map_size_z': map_size_z,
+        'grid_map/obstacles_inflation': obstacles_inflation,
+        'grid_map/cx': cx,
+        'grid_map/cy': cy,
+        'grid_map/fx': fx,
+        'grid_map/fy': fy,
+        'manager/max_vel': max_vel,
+        'manager/max_acc': max_acc,
+        'manager/planning_horizon': planning_horizon,
+        'optimization/lambda_fitness': lambda_fitness,
+        'optimization/dist0': optimization_dist0,
+        'optimization/max_vel': max_vel,
+        'optimization/max_acc': max_acc,
+        'bspline/limit_vel': max_vel,
+        'bspline/limit_acc': max_acc,
+    }
+
+    traj_overrides = {
+        'traj_server/endpoint_max_vel': max_vel,
+        'traj_server/max_yaw_dot': max_wz,
+    }
+
+    ego_planner_node = Node(
+        package='ego_planner',
+        executable='ego_planner_node',
+        name='drone_0_ego_planner_node',
+        output='screen',
+        remappings=[
+            ('odom_world', odom_topic),
+            ('planning/bspline', 'drone_0_planning/bspline'),
+            ('goal_point', 'drone_0_plan_vis/goal_point'),
+            ('global_list', 'drone_0_plan_vis/global_list'),
+            ('init_list', 'drone_0_plan_vis/init_list'),
+            ('optimal_list', 'drone_0_plan_vis/optimal_list'),
+            ('a_star_list', 'drone_0_plan_vis/a_star_list'),
+            ('grid_map/odom', odom_topic),
+            ('grid_map/pose', pose_topic),
+            ('grid_map/depth', depth_topic),
+            ('grid_map/occupancy_inflate', 'drone_0_grid/grid_map/occupancy_inflate'),
+        ],
+        parameters=[build_ego_planner_params(cfg, ego_overrides)],
+    )
+
+    traj_server_node = Node(
+        package='ego_planner',
+        executable='traj_server',
+        name='drone_0_traj_server',
+        output='screen',
+        remappings=[
+            ('position_cmd', pos_cmd_topic),
+            ('planning/bspline', 'drone_0_planning/bspline'),
+            ('planning/exec_bspline_path', 'drone_0_planning/exec_bspline_path'),
+            ('odom', odom_topic),
+        ],
+        parameters=[build_traj_server_params(cfg, traj_overrides)],
+    )
+
+    return [ego_planner_node, traj_server_node]
 
 
 def generate_launch_description():
@@ -56,146 +176,21 @@ def generate_launch_description():
     lambda_fitness = LaunchConfiguration(
         'lambda_fitness', default=str(_planner['lambda_fitness']))
     enable_tag_tracking = LaunchConfiguration('enable_tag_tracking', default='false')
-
     cx = LaunchConfiguration('cx', default=str(_camera['cx']))
     cy = LaunchConfiguration('cy', default=str(_camera['cy']))
     fx = LaunchConfiguration('fx', default=str(_camera['fx']))
     fy = LaunchConfiguration('fy', default=str(_camera['fy']))
-
     tag_pose_topic = LaunchConfiguration(
-        'tag_pose_topic', default='/apriltag/target_pose_global')
+        'tag_pose_topic', default=_fsm.get('tag_pose_topic', '/apriltag/target_pose_global'))
     tag_detected_topic = LaunchConfiguration(
-        'tag_detected_topic', default='/apriltag/target_detected')
+        'tag_detected_topic',
+        default=_fsm.get('tag_detected_topic', '/apriltag/target_detected'))
     tag_stop_dist = LaunchConfiguration(
         'tag_stop_dist', default=str(_planner['tag_stop_dist']))
-    tag_update_min_dist = LaunchConfiguration('tag_update_min_dist', default='0.08')
-    tag_replan_min_period = LaunchConfiguration('tag_replan_min_period', default='0.5')
-
-    ego_planner_node = Node(
-        package='ego_planner',
-        executable='ego_planner_node',
-        name='drone_0_ego_planner_node',
-        output='screen',
-        remappings=[
-            ('odom_world', odom_topic),
-            ('planning/bspline', 'drone_0_planning/bspline'),
-            ('goal_point', 'drone_0_plan_vis/goal_point'),
-            ('global_list', 'drone_0_plan_vis/global_list'),
-            ('init_list', 'drone_0_plan_vis/init_list'),
-            ('optimal_list', 'drone_0_plan_vis/optimal_list'),
-            ('a_star_list', 'drone_0_plan_vis/a_star_list'),
-            # grid_map/odom: only used when grid_map/pose_type=2 (ODOMETRY depth sync)
-            ('grid_map/odom', odom_topic),
-            ('grid_map/pose', pose_topic),
-            ('grid_map/depth', depth_topic),
-            ('grid_map/occupancy_inflate', 'drone_0_grid/grid_map/occupancy_inflate'),
-        ],
-        parameters=[
-            {'fsm/thresh_replan_time': thresh_replan_time},
-            {'fsm/collision_check_step': collision_check_step},
-            {'fsm/thresh_no_replan_meter': 1.0},
-            {'fsm/odom_traj_mismatch_thresh': 0.22},
-            {'fsm/thresh_goal_reach_meter': goal_reach_thresh},
-            {'fsm/planning_horizon': planning_horizon},
-            {'fsm/planning_horizen_time': 3.0},
-            {'fsm/emergency_time': 1.0},
-            {'fsm/global_replan_drift_thresh': 0.25},
-            {'fsm/fail_safe': True},
-            {'fsm/log_trace_period_ms': 500},
-            {'fsm/gen_new_traj_max_failures': 8},
-            {'fsm/gen_new_traj_backoff_base_sec': 0.25},
-            {'fsm/gen_new_traj_backoff_max_sec': 2.0},
-            {'fsm/enable_tag_tracking': enable_tag_tracking},
-            {'fsm/tag_pose_topic': tag_pose_topic},
-            {'fsm/tag_detected_topic': tag_detected_topic},
-            {'fsm/tag_stop_dist': tag_stop_dist},
-            {'fsm/tag_update_min_dist': tag_update_min_dist},
-            {'fsm/tag_replan_min_period': tag_replan_min_period},
-            {'grid_map/resolution': 0.1},
-            {'grid_map/map_size_x': map_size_x},
-            {'grid_map/map_size_y': map_size_y},
-            {'grid_map/map_size_z': map_size_z},
-            {'grid_map/local_update_range_x': 12.0},
-            {'grid_map/local_update_range_y': 8.0},
-            {'grid_map/local_update_range_z': 4.5},
-            {'grid_map/obstacles_inflation': obstacles_inflation},
-            {'grid_map/local_map_margin': 10},
-            {'grid_map/ground_height': -0.01},
-            {'grid_map/cx': cx},
-            {'grid_map/cy': cy},
-            {'grid_map/fx': fx},
-            {'grid_map/fy': fy},
-            {'grid_map/use_depth_filter': True},
-            {'grid_map/depth_filter_tolerance': 0.15},
-            {'grid_map/depth_filter_maxdist': 5.0},
-            {'grid_map/depth_filter_mindist': 0.2},
-            {'grid_map/depth_filter_margin': 2},
-            {'grid_map/k_depth_scaling_factor': 1000.0},
-            {'grid_map/skip_pixel': 2},
-            {'grid_map/p_hit': 0.65},
-            {'grid_map/p_miss': 0.35},
-            {'grid_map/p_min': 0.12},
-            {'grid_map/p_max': 0.90},
-            {'grid_map/p_occ': 0.80},
-            {'grid_map/min_ray_length': 0.1},
-            {'grid_map/max_ray_length': 4.5},
-            {'grid_map/virtual_ceil_height': 2.9},
-            {'grid_map/visualization_truncate_height': 1.8},
-            {'grid_map/show_occ_time': False},
-            {'grid_map/pose_type': 1},
-            {'grid_map/frame_id': _topics['map_frame_id']},
-            {'grid_map/occ_confirm_frames': 3},
-            {'grid_map/occ_clear_frames': 5},
-            {'grid_map/use_fixed_publish_window': True},
-            {'grid_map/map_vis_rate': 10.0},
-            {'grid_map/odom_depth_timeout': 2.5},
-            {'grid_map/ground_filter_enable': True},
-            {'grid_map/ground_filter_margin': 0.12},
-            {'grid_map/inflate_xy_only': True},
-            {'grid_map/robot_footprint_radius': 0.35},
-            {'manager/max_vel': max_vel},
-            {'manager/max_acc': max_acc},
-            {'manager/max_jerk': 4.0},
-            {'manager/control_points_distance': 0.4},
-            {'manager/feasibility_tolerance': 0.05},
-            {'manager/planning_horizon': planning_horizon},
-            {'manager/use_robot_z_planning': True},
-            {'optimization/lambda_smooth': 1.0},
-            {'optimization/lambda_collision': 0.5},
-            {'optimization/lambda_feasibility': 0.1},
-            {'optimization/lambda_fitness': lambda_fitness},
-            {'optimization/dist0': optimization_dist0},
-            {'optimization/max_vel': max_vel},
-            {'optimization/max_acc': max_acc},
-            {'bspline/limit_vel': max_vel},
-            {'bspline/limit_acc': max_acc},
-            {'bspline/limit_ratio': 1.1},
-        ],
-    )
-
-    traj_server_node = Node(
-        package='ego_planner',
-        executable='traj_server',
-        name='drone_0_traj_server',
-        output='screen',
-        remappings=[
-            ('position_cmd', pos_cmd_topic),
-            ('planning/bspline', 'drone_0_planning/bspline'),
-            ('planning/exec_bspline_path', 'drone_0_planning/exec_bspline_path'),
-            ('odom', odom_topic),
-        ],
-        parameters=[
-            {'traj_server/time_forward': 0.7},
-            {'traj_server/use_odom_progress': True},
-            {'traj_server/odom_lookahead_time': 0.5},
-            {'traj_server/log_trace_period_ms': 500},
-            {'traj_server/endpoint_approach_dist': 0.35},
-            {'traj_server/endpoint_stop_dist': 0.08},
-            {'traj_server/endpoint_vel_gain': 0.8},
-            {'traj_server/endpoint_max_vel': max_vel},
-            {'traj_server/max_yaw_dot': max_wz},
-        ],
-    )
+    tag_update_min_dist = LaunchConfiguration(
+        'tag_update_min_dist', default=str(_fsm.get('tag_update_min_dist', 0.08)))
+    tag_replan_min_period = LaunchConfiguration(
+        'tag_replan_min_period', default=str(_fsm.get('tag_replan_min_period', 0.5)))
 
     ld = LaunchDescription()
     ld.add_action(DeclareLaunchArgument('map_size_x', default_value=map_size_x))
@@ -257,7 +252,6 @@ def generate_launch_description():
         description='AprilTag tracking stop distance to tag center (m, XY)'))
     ld.add_action(DeclareLaunchArgument('tag_update_min_dist', default_value=tag_update_min_dist))
     ld.add_action(DeclareLaunchArgument('tag_replan_min_period', default_value=tag_replan_min_period))
-    ld.add_action(ego_planner_node)
-    ld.add_action(traj_server_node)
+    ld.add_action(OpaqueFunction(function=_launch_setup))
 
     return ld
