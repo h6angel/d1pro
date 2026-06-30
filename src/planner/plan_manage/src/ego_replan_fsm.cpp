@@ -588,12 +588,27 @@ double advanceTForArcStep(
         RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
         enterEmergencyStop("SAFETY");
       }
-      else if (exec_state_ == GEN_NEW_TRAJ)
+      else if (exec_state_ == GEN_NEW_TRAJ || exec_state_ == EMERGENCY_STOP)
       {
         RCLCPP_WARN_THROTTLE(
           node_->get_logger(), *node_->get_clock(),
           std::max(log_trace_period_ms_, 500),
-          "Depth stale during GEN_NEW_TRAJ recovery (no re-estop)");
+          "Depth stale during %s (no re-estop, no traj scan)",
+          exec_state_ == EMERGENCY_STOP ? "EMERGENCY_STOP" : "GEN_NEW_TRAJ");
+      }
+      return;
+    }
+
+    /* EMERGENCY_STOP / GEN_NEW_TRAJ: odom body only — never forward-scan stale local traj. */
+    if (exec_state_ == EMERGENCY_STOP || exec_state_ == GEN_NEW_TRAJ)
+    {
+      if (have_odom_ && isOdomBodyInObstacle())
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(),
+          std::max(log_trace_period_ms_, 500),
+          "[SAFETY] odom body occupied during %s (odom-only check, no traj scan)",
+          exec_state_ == EMERGENCY_STOP ? "EMERGENCY_STOP" : "GEN_NEW_TRAJ");
       }
       return;
     }
