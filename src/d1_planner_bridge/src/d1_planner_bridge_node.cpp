@@ -167,11 +167,8 @@ void D1PlannerBridgeNode::controlTimerCallback()
 
   const double v_plan_cmd = std::hypot(cmd->velocity.x, cmd->velocity.y);
 
-  if (have_last_traj_id_ && cmd->trajectory_id != last_traj_id_) {
-    resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
-  }
-  last_traj_id_ = cmd->trajectory_id;
-  have_last_traj_id_ = true;
+  // Replan bumps traj_id; keep EMA state so vx/wz blend across trajectory switches
+  // (reset only on watchdog / hard_stop / invalid — not on every replan).
 
   if (v_plan_cmd < hard_stop_plan_speed_) {
     resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
