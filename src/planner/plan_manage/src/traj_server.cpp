@@ -284,8 +284,10 @@ void cmdCallback()
   if (!receive_traj_)
     return;
 
-  rclcpp::Clock clock(RCL_ROS_TIME);
-  rclcpp::Time time_now = clock.now();
+  // Use the node ROS clock so wall-clock playback matches start_time_ (set with the
+  // planner node clock) and respects use_sim_time. A standalone rclcpp::Clock is not
+  // driven by /clock and would diverge under simulation.
+  rclcpp::Time time_now = g_node->now();
 
   const Eigen::Vector3d traj_end = traj_[0].evaluateDeBoorT(traj_duration_);
 
@@ -323,7 +325,7 @@ void cmdCallback()
   Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
   std::pair<double, double> yaw_yawdot(0, 0);
 
-  static rclcpp::Time time_last = clock.now();
+  static rclcpp::Time time_last = time_now;
   if (endpoint_hold)
   {
     pos = traj_end;

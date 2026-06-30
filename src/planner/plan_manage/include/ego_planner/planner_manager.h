@@ -48,6 +48,10 @@ namespace ego_planner
     /* main planning algorithms & modules */
     PlanningVisualization::Ptr visualization_;
 
+    // Node handle: trajectory timing (start_time_) must use the node ROS clock
+    // (node_->now()) so it stays consistent with FSM / traj_server and respects use_sim_time.
+    rclcpp::Node::SharedPtr node_;
+
     // ros::Publisher obj_pub_; //zx-todo 
 
     BsplineOptimizer::Ptr bspline_optimizer_;

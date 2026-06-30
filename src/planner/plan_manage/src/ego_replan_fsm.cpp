@@ -366,7 +366,7 @@ namespace ego_planner
     {
       /* determine if need to replan */
       LocalTrajData *info = &planner_manager_->local_data_;
-      rclcpp::Time time_now = rclcpp::Clock().now();
+      rclcpp::Time time_now = node_->now();
       const double t_wall = (time_now - info->start_time_).seconds();
       double t_cur = std::min(info->duration_, t_wall);
 
@@ -560,8 +560,8 @@ namespace ego_planner
 
     /* ---------- check trajectory ---------- */
     constexpr double time_step = 0.01;
-    // double t_cur = (ros::Time::now() - info->start_time_).toSec();
-    double t_cur = (rclcpp::Clock().now() - info->start_time_).seconds();
+    // Use node ROS clock to match start_time_ (set with node_->now() in planner_manager).
+    double t_cur = (node_->now() - info->start_time_).seconds();
 
     Eigen::Vector3d p_cur = info->position_traj_.evaluateDeBoorT(t_cur);
     const double odom_traj_xy_dist = (odom_pos_.head<2>() - p_cur.head<2>()).norm();
