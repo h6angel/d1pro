@@ -193,6 +193,9 @@ public:
   /// Inflated occupancy without robot footprint exemption (for body-in-obstacle checks).
   inline int getInflateOccupancyNoFootprint(Eigen::Vector3d pos);
 
+  /// True if segment p0→p1 crosses an inflated occupied voxel (read-only raycast).
+  bool checkSegmentInflateOccupied(const Eigen::Vector3d &p0, const Eigen::Vector3d &p1);
+
   inline void boundIndex(Eigen::Vector3i &id);
   inline bool isUnknown(const Eigen::Vector3i &id);
   inline bool isUnknown(const Eigen::Vector3d &pos);

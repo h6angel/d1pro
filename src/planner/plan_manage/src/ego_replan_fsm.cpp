@@ -3,10 +3,52 @@
 #include <limits>
 
 #include <ego_planner/ego_replan_fsm.h>
+#include "bspline_opt/uniform_bspline.h"
 #include "traj_utils/trajectory_debug_log.hpp"
 
 namespace ego_planner
 {
+
+namespace
+{
+
+/// Advance along B-spline from t_from toward t_limit until XY chord distance from p_anchor
+/// reaches step_ds, or t_limit is reached (whichever comes first).
+double advanceTForArcStep(
+  UniformBspline &traj,
+  double t_from,
+  double t_limit,
+  const Eigen::Vector3d &p_anchor,
+  double step_ds,
+  double planning_z,
+  Eigen::Vector3d &p_out)
+{
+  constexpr double kProbeDt = 0.02;
+
+  if (t_from >= t_limit - 1e-9)
+  {
+    p_out = traj.evaluateDeBoorT(t_limit);
+    p_out(2) = planning_z;
+    return t_limit;
+  }
+
+  for (double t = t_from + kProbeDt; t <= t_limit + 1e-6; t += kProbeDt)
+  {
+    const double t_s = std::min(t, t_limit);
+    p_out = traj.evaluateDeBoorT(t_s);
+    p_out(2) = planning_z;
+    if ((p_out.head<2>() - p_anchor.head<2>()).norm() >= step_ds)
+      return t_s;
+    if (t_s >= t_limit - 1e-9)
+      break;
+  }
+
+  p_out = traj.evaluateDeBoorT(t_limit);
+  p_out(2) = planning_z;
+  return t_limit;
+}
+
+}  // namespace
 
   void EGOReplanFSM::init(rclcpp::Node::SharedPtr &node)
   {
@@ -24,6 +66,7 @@ namespace ego_planner
     node_->declare_parameter("fsm/emergency_time", 1.0);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
     node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.22);
+    node_->declare_parameter("fsm/collision_check_step", 0.05);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
     node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
@@ -41,6 +84,8 @@ namespace ego_planner
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
     node_->get_parameter("fsm/odom_traj_mismatch_thresh", odom_traj_mismatch_thresh_);
     odom_traj_mismatch_thresh_ = std::max(odom_traj_mismatch_thresh_, 0.01);
+    node_->get_parameter("fsm/collision_check_step", collision_check_step_);
+    collision_check_step_ = std::max(collision_check_step_, 0.01);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
     node_->get_parameter("fsm/gen_new_traj_max_failures", gen_new_traj_max_failures_);
@@ -560,8 +605,7 @@ namespace ego_planner
     if (exec_state_ != EXEC_TRAJ && exec_state_ != REPLAN_TRAJ)
       return;
 
-    /* ---------- check trajectory ---------- */
-    constexpr double time_step = 0.01;
+    /* ---------- check trajectory (segment raycast, arc-length spatial steps) ---------- */
     // Use node ROS clock to match start_time_ (set with node_->now() in planner_manager).
     double t_cur = (node_->now() - info->start_time_).seconds();
 
@@ -578,51 +622,62 @@ namespace ego_planner
       return;
     }
 
-    double t_2_3 = info->duration_ * 2 / 3;
-    for (double t = t_cur; t < info->duration_; t += time_step)
+    const double t_2_3 = info->duration_ * 2 / 3;
+    const double t_end = (t_cur < t_2_3) ? std::min(t_2_3, info->duration_) : info->duration_;
+    const double planning_z = odom_pos_(2);
+
+    Eigen::Vector3d p_prev = p_cur;
+    p_prev(2) = planning_z;
+
+    double t_seg = t_cur;
+    while (t_seg < t_end - 1e-6)
     {
-      if (t_cur < t_2_3 && t >= t_2_3) // If t_cur < t_2_3, only the first 2/3 partition of the trajectory is considered valid and will get checked.
+      if (t_cur < t_2_3 && t_seg >= t_2_3)
         break;
 
-      bool occ = false;
-      Eigen::Vector3d p_chk = info->position_traj_.evaluateDeBoorT(t);
-      p_chk(2) = odom_pos_(2);
-      occ |= map->getInflateOccupancy(p_chk);
+      Eigen::Vector3d p_next;
+      const double t_next = advanceTForArcStep(
+        info->position_traj_, t_seg, t_end, p_prev,
+        collision_check_step_, planning_z, p_next);
 
-      if (occ)
+      if (map->checkSegmentInflateOccupied(p_prev, p_next))
       {
-
-        if (planFromCurrentTraj()) // Make a chance
+        const double t_hit = t_next;
+        if (planFromCurrentTraj())
         {
           changeFSMExecState(EXEC_TRAJ, "SAFETY");
           return;
         }
+
+        const bool odom_in_obstacle = isOdomBodyInObstacle();
+        if (!odom_in_obstacle)
+        {
+          RCLCPP_WARN(
+            node_->get_logger(),
+            "Trajectory collision but odom body free (odom-traj dist=%.3fm, dt=%.3fs), replan.",
+            odom_traj_xy_dist, t_hit - t_cur);
+          changeFSMExecState(REPLAN_TRAJ, "SAFETY");
+        }
+        else if (t_hit - t_cur < emergency_time_)
+        {
+          RCLCPP_WARN(
+            node_->get_logger(), "Suddenly discovered obstacles. emergency stop! time=%f",
+            t_hit - t_cur);
+          enterEmergencyStop("SAFETY");
+        }
         else
         {
-          const bool odom_in_obstacle = isOdomBodyInObstacle();
-          if (!odom_in_obstacle)
-          {
-            RCLCPP_WARN(
-              node_->get_logger(),
-              "Trajectory collision but odom body free (odom-traj dist=%.3fm, dt=%.3fs), replan.",
-              odom_traj_xy_dist, t - t_cur);
-            changeFSMExecState(REPLAN_TRAJ, "SAFETY");
-          }
-          else if (t - t_cur < emergency_time_)
-          {
-            RCLCPP_WARN(node_->get_logger(), "Suddenly discovered obstacles. emergency stop! time=%f", t - t_cur);
-
-            enterEmergencyStop("SAFETY");
-          }
-          else
-          {
-            RCLCPP_WARN(node_->get_logger(), "current traj in collision, replan.");
-            changeFSMExecState(REPLAN_TRAJ, "SAFETY");
-          }
-          return;
+          RCLCPP_WARN(node_->get_logger(), "current traj in collision, replan.");
+          changeFSMExecState(REPLAN_TRAJ, "SAFETY");
         }
-        break;
+        return;
       }
+
+      if (t_next >= t_end - 1e-6)
+        break;
+
+      p_prev = p_next;
+      t_seg = t_next;
     }
   }
 
@@ -746,27 +801,7 @@ namespace ego_planner
 
   double EGOReplanFSM::distToGlobalTrajXY(const Eigen::Vector3d &pos, double *nearest_t_out)
   {
-    if (planner_manager_->global_data_.global_duration_ < 1e-3)
-      return std::numeric_limits<double>::infinity();
-
-    const double t_step = planning_horizen_ / 20 / planner_manager_->pp_.max_vel_;
-    double dist_min = std::numeric_limits<double>::infinity();
-    double nearest_t = 0.0;
-
-    for (double t = 0.0; t <= planner_manager_->global_data_.global_duration_ + 1e-6; t += t_step)
-    {
-      const Eigen::Vector3d pos_t = planner_manager_->global_data_.getPosition(t);
-      const double dist = (pos_t.head<2>() - pos.head<2>()).norm();
-      if (dist < dist_min)
-      {
-        dist_min = dist;
-        nearest_t = t;
-      }
-    }
-
-    if (nearest_t_out)
-      *nearest_t_out = nearest_t;
-    return dist_min;
+    return planner_manager_->global_data_.distToTrajXY(pos, nearest_t_out, nullptr);
   }
 
   bool EGOReplanFSM::maybeReplanGlobalAfterEstop()
@@ -820,59 +855,42 @@ namespace ego_planner
 
   void EGOReplanFSM::getLocalTarget()
   {
-    double t;
+    auto &gd = planner_manager_->global_data_;
 
-    double t_step = planning_horizen_ / 20 / planner_manager_->pp_.max_vel_;
-    double dist_min = 9999, dist_min_t = 0.0;
-    for (t = planner_manager_->global_data_.last_progress_time_; t < planner_manager_->global_data_.global_duration_; t += t_step)
-    {
-      Eigen::Vector3d pos_t = planner_manager_->global_data_.getPosition(t);
-      double dist = (pos_t - start_pt_).norm();
-
-      if (t < planner_manager_->global_data_.last_progress_time_ + 1e-5 && dist > planning_horizen_)
-      {
-        // Important cornor case!
-        for (; t < planner_manager_->global_data_.global_duration_; t += t_step)
-        {
-          Eigen::Vector3d pos_t_temp = planner_manager_->global_data_.getPosition(t);
-          double dist_temp = (pos_t_temp - start_pt_).norm();
-          if (dist_temp < planning_horizen_)
-          {
-            pos_t = pos_t_temp;
-            dist = (pos_t - start_pt_).norm();
-            cout << "Escape cornor case \"getLocalTarget\"" << endl;
-            break;
-          }
-        }
-      }
-
-      if (dist < dist_min)
-      {
-        dist_min = dist;
-        dist_min_t = t;
-      }
-
-      if (dist >= planning_horizen_)
-      {
-        local_target_pt_ = pos_t;
-        planner_manager_->global_data_.last_progress_time_ = dist_min_t;
-        break;
-      }
-    }
-    if (t > planner_manager_->global_data_.global_duration_) // Last global point
+    if (!gd.arcTableValid())
     {
       local_target_pt_ = end_pt_;
-      planner_manager_->global_data_.last_progress_time_ = planner_manager_->global_data_.global_duration_;
+      gd.last_progress_time_ = gd.global_duration_;
+      local_target_vel_ = Eigen::Vector3d::Zero();
+      return;
     }
 
-    if ((end_pt_ - local_target_pt_).norm() < (planner_manager_->pp_.max_vel_ * planner_manager_->pp_.max_vel_) / (2 * planner_manager_->pp_.max_acc_))
+    double nearest_s = 0.0;
+    gd.distToTrajXY(start_pt_, nullptr, &nearest_s);
+
+    const double s_at_last = gd.sAtTime(gd.last_progress_time_);
+    const double s_start = std::max(nearest_s, s_at_last);
+    const double s_target = std::min(s_start + planning_horizen_, gd.totalArcLength());
+
+    double t_target = gd.global_duration_;
+    if (s_target >= gd.totalArcLength() - 1e-3)
     {
-      local_target_vel_ = Eigen::Vector3d::Zero();
+      local_target_pt_ = end_pt_;
+      gd.last_progress_time_ = gd.global_duration_;
     }
     else
     {
-      local_target_vel_ = planner_manager_->global_data_.getVelocity(t);
+      gd.queryAtArcS(s_target, local_target_pt_, t_target);
+      gd.last_progress_time_ = gd.timeAtArcS(s_start);
     }
+
+    const double brake_dist =
+        (planner_manager_->pp_.max_vel_ * planner_manager_->pp_.max_vel_) /
+        (2 * planner_manager_->pp_.max_acc_);
+    if ((end_pt_ - local_target_pt_).norm() < brake_dist)
+      local_target_vel_ = Eigen::Vector3d::Zero();
+    else
+      local_target_vel_ = gd.getVelocity(t_target);
   }
 
   bool EGOReplanFSM::isTagFollowing() const

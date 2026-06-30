@@ -1101,6 +1101,49 @@ void GridMap::getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size)
   ori = mp_.map_origin_, size = mp_.map_size_;
 }
 
+bool GridMap::checkSegmentInflateOccupied(const Eigen::Vector3d &p0, const Eigen::Vector3d &p1)
+{
+  if (!isInMap(p0) || !isInMap(p1))
+    return true;
+
+  // Match getInflateOccupancy: footprint radius around robot_pos_ is not treated as occupied.
+  const auto pos_inflated_occupied = [this](const Eigen::Vector3d &pos) -> bool {
+    const int occ = getInflateOccupancy(pos);
+    if (occ < 0)
+      return true;
+    return occ > 0;
+  };
+
+  if (pos_inflated_occupied(p0))
+    return true;
+
+  Eigen::Vector3i id0, id1;
+  posToIndex(p0, id0);
+  posToIndex(p1, id1);
+
+  if (id0 == id1)
+    return pos_inflated_occupied(p1);
+
+  RayCaster raycaster;
+  if (!raycaster.setInput(id0.cast<double>(), id1.cast<double>()))
+    return pos_inflated_occupied(p1);
+
+  Eigen::Vector3d ray_pt;
+  Eigen::Vector3d pos_w;
+  while (raycaster.step(ray_pt))
+  {
+    const Eigen::Vector3i id(
+      static_cast<int>(ray_pt.x()),
+      static_cast<int>(ray_pt.y()),
+      static_cast<int>(ray_pt.z()));
+    indexToPos(id, pos_w);
+    if (pos_inflated_occupied(pos_w))
+      return true;
+  }
+
+  return pos_inflated_occupied(p1);
+}
+
 void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                 const nav_msgs::msg::Odometry::ConstPtr &odom)
 {

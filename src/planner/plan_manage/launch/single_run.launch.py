@@ -47,6 +47,8 @@ def generate_launch_description():
         'goal_reach_thresh', default=str(_planner['goal_reach_thresh']))
     thresh_replan_time = LaunchConfiguration(
         'thresh_replan_time', default=str(_planner['thresh_replan_time']))
+    collision_check_step = LaunchConfiguration(
+        'collision_check_step', default=str(_planner['collision_check_step']))
     obstacles_inflation = LaunchConfiguration(
         'obstacles_inflation', default=str(_planner['obstacles_inflation']))
     optimization_dist0 = LaunchConfiguration(
@@ -90,6 +92,7 @@ def generate_launch_description():
         ],
         parameters=[
             {'fsm/thresh_replan_time': thresh_replan_time},
+            {'fsm/collision_check_step': collision_check_step},
             {'fsm/thresh_no_replan_meter': 1.0},
             {'fsm/odom_traj_mismatch_thresh': 0.22},
             {'fsm/thresh_goal_reach_meter': goal_reach_thresh},
@@ -228,6 +231,9 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument(
         'thresh_replan_time', default_value=thresh_replan_time,
         description='Min EXEC time before replan (s); default from d1_robot.yaml'))
+    ld.add_action(DeclareLaunchArgument(
+        'collision_check_step', default_value=collision_check_step,
+        description='FSM traj safety arc step (m); default from d1_robot.yaml'))
     ld.add_action(DeclareLaunchArgument(
         'obstacles_inflation', default_value=obstacles_inflation,
         description='Grid obstacle inflation (m); default from d1_robot.yaml'))

@@ -456,7 +456,8 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
 
     auto time_now = node_->now();
 
-    global_data_.setGlobalTraj(gl_traj, time_now);
+    const double arc_t_step = pp_.planning_horizen_ / 20.0 / std::max(pp_.max_vel_, 0.1);
+    global_data_.setGlobalTraj(gl_traj, time_now, arc_t_step);
 
     return true;
   }
@@ -540,7 +541,8 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
 
     auto time_now = node_->now();
 
-    global_data_.setGlobalTraj(gl_traj, time_now);
+    const double arc_t_step = pp_.planning_horizen_ / 20.0 / std::max(pp_.max_vel_, 0.1);
+    global_data_.setGlobalTraj(gl_traj, time_now, arc_t_step);
 
     return true;
   }
