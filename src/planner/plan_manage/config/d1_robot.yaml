@@ -1,5 +1,6 @@
-# D1 实机部署 — 话题、限速与规划调参的唯一配置源
+# D1 实机部署 — 话题、限速、相机内参与规划子集配置
 # 使用者: single_run.launch.py, d1_planner_bridge.launch.py, start_ego_stack.sh
+# 注意: grid_map / fsm 细项 / 优化器权重仍在 single_run.launch.py 硬编码
 
 topics:
   odom: "/ov_msckf/odomimu"

@@ -86,7 +86,11 @@ AprilTag 追踪时，在规划前增加：`ros2 launch apriltag_detect apriltag.
 
 改 `max_vel` / `max_wz` / `max_acc` 或话题名时只改此文件；launch 仍可用 `max_vel:=0.5` 等临时覆盖。
 
-桥接控制调参见 `src/d1_planner_bridge/config/d1_bridge.yaml`。
+**GridMap、FSM 细项、优化器权重**（如 `grid_map/resolution`、`optimization/lambda_*`）仍在 `single_run.launch.py` 硬编码，调参需改 launch 或后续迁入 yaml。
+
+桥接控制调参见 `src/d1_planner_bridge/config/d1_bridge.yaml`（含 `hard_stop_plan_speed`，默认 0.005 m/s）。
+
+后续 PR 与文档进度见 [REMAINING_PRS.md](REMAINING_PRS.md)。
 
 若使用自定义 VIO，通过 launch 参数覆盖：
 
