@@ -1,9 +1,7 @@
 # EGO Planner × D1 实机 Demo 指南
 
-> 本文面向首次接触本项目的开发者与演示人员，介绍 **项目架构**、**运行流程** 与 **关键技术点**，并给出可复现的 Demo 操作步骤。  
-> 数学细节请参阅 [系统总览](00_overview.md)、[规划原理](01_planning_math.md)、[控制原理](02_control_math.md)。
-
-> **配图说明**：图片位于 [`docs/assets/`](assets/)。若 Markdown 预览不显示本地图片，请按 `Ctrl+Shift+V` 打开预览，或在文件树中直接双击 `.jpg` 文件查看。
+> 本文面向首次接触本项目的开发者与演示人员，介绍 **项目架构**、**运行流程** 与 **关键技术点**。  
+> 编译、依赖与参数详见 [Readme.md](../Readme.md)；数学细节见 [系统总览](00_overview.md)、[规划原理](01_planning_math.md)、[控制原理](02_control_math.md)。
 
 ---
 
@@ -27,8 +25,6 @@
 <p align="center">
   <img src="./assets/system_architecture.jpg" alt="系统架构" width="720"/>
 </p>
-
-> 原图文件：[`system_architecture.jpg`](assets/system_architecture.jpg)
 
 ### 2.1 三层结构
 
@@ -142,13 +138,7 @@ sequenceDiagram
 
 ## 4. 规划状态机（FSM）
 
-<p align="center">
-  <img src="./assets/fsm_states.jpg" alt="FSM 状态机" width="720"/>
-</p>
-
-> 原图文件：[`fsm_states.jpg`](assets/fsm_states.jpg)
-
-`EGOReplanFSM` 每 **10 ms** 运行一次，驱动规划生命周期：
+`EGOReplanFSM` 每 **10 ms** 运行一次：
 
 | 状态 | 含义 |
 |------|------|
@@ -165,14 +155,16 @@ stateDiagram-v2
     INIT --> WAIT_TARGET: 收到 odom
     WAIT_TARGET --> GEN_NEW_TRAJ: 有目标
     GEN_NEW_TRAJ --> EXEC_TRAJ: 规划成功
-    EXEC_TRAJ --> REPLAN_TRAJ: 定时(2.5s) / 安全检测
+    GEN_NEW_TRAJ --> WAIT_TARGET: 连续失败
+    EXEC_TRAJ --> REPLAN_TRAJ: 定时 2.5s / 安全检测
     REPLAN_TRAJ --> EXEC_TRAJ: 重规划成功
+    REPLAN_TRAJ --> WAIT_TARGET: 近目标且规划失败
     EXEC_TRAJ --> WAIT_TARGET: XY 距目标 < 0.3m
     EXEC_TRAJ --> EMERGENCY_STOP: 碰撞风险
     EMERGENCY_STOP --> GEN_NEW_TRAJ: 低速 + fail_safe
 ```
 
-**D1 适配要点**（相对原版 EGO 的重要改动）：
+**D1 适配要点**：
 
 - **2.5D 规划**：碰撞检测 z 固定为当前 odom 高度，仅在 XY 平面避障
 - **Odom 锚定**：规划起点始终为当前 odom，重规划时前 3 个 B 样条控制点钉在 odom
@@ -225,104 +217,27 @@ flowchart LR
 
 ---
 
-## 7. Demo 操作流程
+## 7. Demo 操作
 
 <p align="center">
   <img src="./assets/demo_workflow.jpg" alt="Demo 流程" width="720"/>
 </p>
 
-> 原图文件：[`demo_workflow.jpg`](assets/demo_workflow.jpg)
-
-### 7.1 环境准备
-
-**依赖**：ROS 2 Humble、PCL、OpenVINS、RealSense D435i、（Tag 模式）apriltag_ros
-
-**编译**（三个工作区均需 build）：
+一键启动（编译与依赖见 [Readme.md](../Readme.md)）：
 
 ```bash
-# 1. RealSense 驱动
-cd ../realsense && colcon build --symlink-install
-
-# 2. OpenVINS
-cd ../openvins && colcon build --symlink-install
-
-# 3. 本仓
-cd ../ego_control
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install
-source install/setup.bash
+./start_ego_stack.sh                        # RViz 2D Goal 手动导航
+./start_ego_stack.sh enable_tag_tracking=true  # AprilTag 跟随
+./start_ego_stack.sh --no-rviz              # 无 RViz
 ```
 
-**DDS 建议**（FastDDS 易卡顿）：
+| 步骤 | 操作 |
+|------|------|
+| 1 | 启动后等待 VIO 初始化（轻微移动相机） |
+| 2 | RViz Fixed Frame 选 `global`，用 2D Goal 设目标 |
+| 3 | 机器人沿 B 样条避障前进，XY 距目标 < 0.3 m 后停车 |
 
-```bash
-sudo apt install ros-humble-rmw-cyclonedds-cpp
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-```
-
-### 7.2 Demo A：RViz 手动导航（推荐首次演示）
-
-```bash
-cd ego_control
-./start_ego_stack.sh
-```
-
-脚本依次启动：
-
-```
-RealSense → OpenVINS → ego_planner → d1_planner_bridge → RViz
-```
-
-**操作步骤**：
-
-| 步骤 | 操作 | 预期现象 |
-|------|------|----------|
-| 1 | 等待栈启动完成 | 终端显示各节点话题就绪 |
-| 2 | 轻微移动相机/机器人 | OpenVINS 初始化，RViz 出现点云 |
-| 3 | RViz Fixed Frame 选 **`global`** | 地图与机器人位姿对齐 |
-| 4 | 工具栏选 **2D Goal Pose**，在地图上点目标 | FSM 进入 `GEN_NEW_TRAJ` |
-| 5 | 观察机器人运动 | 沿绿色 B 样条避障前进 |
-| 6 | 机器人停稳 | XY 距目标 < 0.3 m，回到 `WAIT_TARGET` |
-
-**日志位置**：`ego_log/stack_YYYYMMDD_HHMMSS/`（各节点独立 `.log`）
-
-### 7.3 Demo B：AprilTag 跟随
-
-```bash
-./start_ego_stack.sh enable_tag_tracking=true
-```
-
-| 步骤 | 操作 | 预期现象 |
-|------|------|----------|
-| 1 | 在相机视野内放置 AprilTag | `/apriltag/target_detected = true` |
-| 2 | 机器人自动规划 | 朝 Tag 中心导航 |
-| 3 | 距 Tag ≤ 0.25 m | 停车，FSM 进入 `TAG_DONE` |
-
-详见 [AprilTag 接入](04_apriltag_integration.md) 与 [Tag 跟随 FSM](../APRILTAG_TRACKING_INTEGRATION.md)。
-
-### 7.4 Demo C：无 RViz 纯实机
-
-```bash
-./start_ego_stack.sh --no-rviz
-```
-
-适合已熟悉系统、仅需实机运行的场景。目标需通过其他方式注入（如预设航点 launch 参数）。
-
-### 7.5 调试常用命令
-
-```bash
-# 查看 odom
-ros2 topic echo /ov_msckf/odomimu --once
-
-# 查看下发的速度
-ros2 topic echo /command/cmd_twist
-
-# 查看规划输出
-ros2 topic hz /drone_0_planning/pos_cmd
-
-# 验证 odom twist 坐标系
-python3 scripts/verify_odom_twist_frame.py
-```
+Tag 模式：Tag 入镜后自动规划跟随，距 Tag ≤ 0.25 m 停车。日志目录 `ego_log/stack_YYYYMMDD_HHMMSS/`。
 
 ---
 
@@ -399,30 +314,3 @@ thresh_replan_time: 2.5  # s
 | [04_apriltag_integration.md](04_apriltag_integration.md) | AprilTag 感知接入 |
 | [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md) | Tag 跟随 FSM |
 | **本文 05_demo.md** | Demo 指南（架构 + 流程 + 操作） |
-
----
-
-## 附录：启动脚本内部流程
-
-```mermaid
-flowchart TD
-  S["./start_ego_stack.sh"] --> L1["1. source ROS + 三工作区"]
-  L1 --> L2["2. 设置 CycloneDDS"]
-  L2 --> L3["3. RealSense rs_launch.py"]
-  L3 --> W1{"深度话题就绪?"}
-  W1 -->|是| L4["4. OpenVINS subscribe.launch.py"]
-  W1 -->|否| W1
-  L4 --> W2{"pose 话题就绪?"}
-  W2 -->|是| L5{"Tag 模式?"}
-  W2 -->|否| W2
-  L5 -->|是| L5a["5. apriltag_detect"]
-  L5 -->|否| L6
-  L5a --> L6["6. ego_planner single_run"]
-  L6 --> L7["7. d1_planner_bridge"]
-  L7 --> L8{"--no-rviz?"}
-  L8 -->|否| L9["8. RViz"]
-  L8 -->|是| Done["就绪，等待 Demo"]
-  L9 --> Done
-```
-
-日志写入 `ego_log/stack_YYYYMMDD_HHMMSS/*.log`，便于事后分析各节点行为。
