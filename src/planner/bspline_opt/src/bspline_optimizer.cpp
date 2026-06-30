@@ -35,12 +35,6 @@ namespace ego_planner
     this->grid_map_ = map;
   }
 
-  void BsplineOptimizer::setEnvironment(const GridMap::Ptr &map, const fast_planner::ObjPredictor::Ptr mov_obj)
-  {
-    this->grid_map_ = map;
-    this->moving_objs_ = mov_obj;
-  }
-
   int BsplineOptimizer::checkOccupancy(const Eigen::Vector3d &pos) const
   {
     Eigen::Vector3d q = pos;
@@ -488,41 +482,6 @@ namespace ego_planner
 
     opt->iter_num_ += 1;
     return cost;
-  }
-
-  void BsplineOptimizer::calcMovingObjCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
-  {
-    cost = 0.0;
-    int end_idx = q.cols() - order_;
-    constexpr double CLEARANCE = 1.5;
-    double t_now = rclcpp::Clock().now().seconds();
-
-    for (int i = order_; i < end_idx; i++)
-    {
-      double time = ((double)(order_ - 1) / 2 + (i - order_ + 1)) * bspline_interval_;
-
-      for (int id = 0; id < moving_objs_->getObjNums(); id++)
-      {
-        Eigen::Vector3d obj_prid = moving_objs_->evaluateConstVel(id, t_now + time);
-        double dist = (cps_.points.col(i) - obj_prid).norm();
-        // cout /*<< "cps_.points.col(i)=" << cps_.points.col(i).transpose()*/ << " moving_objs_=" << obj_prid.transpose() << " dist=" << dist << endl;
-        double dist_err = CLEARANCE - dist;
-        Eigen::Vector3d dist_grad = (cps_.points.col(i) - obj_prid).normalized();
-
-        if (dist_err < 0)
-        {
-          /* do nothing */
-        }
-        else
-        {
-          cost += pow(dist_err, 2);
-          gradient.col(i) += -2.0 * dist_err * dist_grad;
-        }
-      }
-      // cout << "time=" << time << " i=" << i << " order_=" << order_ << " end_idx=" << end_idx << endl;
-      // cout << "--" << endl;
-    }
-    // cout << "---------------" << endl;
   }
 
   void BsplineOptimizer::calcDistanceCostRebound(const Eigen::MatrixXd &q, double &cost,

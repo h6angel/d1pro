@@ -164,10 +164,6 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   depth_sub_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
       node_, "grid_map/depth", rclcpp::QoS(50).get_rmw_qos_profile());
 
-  extrinsic_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
-      "/vins_estimator/extrinsic", 10,
-      std::bind(&GridMap::extrinsicCallback, this, std::placeholders::_1));
-
   if (mp_.pose_type_ == POSE_STAMPED)
   {
     pose_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(
@@ -188,9 +184,6 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
     sync_image_odom_->registerCallback(
         std::bind(&GridMap::depthOdomCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
-
-  indep_odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
-      "grid_map/odom", 10, std::bind(&GridMap::odomCallback, this, std::placeholders::_1));
 
   // 定时器
   occ_timer_ = node_->create_wall_timer(
@@ -982,20 +975,15 @@ void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
   md_.flag_use_depth_fusion = true;
 }
 
-void GridMap::odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
+void GridMap::updateRobotPosition(const Eigen::Vector3d &pos)
 {
-  md_.robot_pos_(0) = odom->pose.pose.position.x;
-  md_.robot_pos_(1) = odom->pose.pose.position.y;
-  md_.robot_pos_(2) = odom->pose.pose.position.z;
+  md_.robot_pos_ = pos;
   md_.has_robot_pos_ = true;
 
-  if (md_.has_first_depth_)
+  if (mp_.pose_type_ != ODOMETRY || md_.has_first_depth_)
     return;
 
-  md_.camera_pos_(0) = odom->pose.pose.position.x;
-  md_.camera_pos_(1) = odom->pose.pose.position.y;
-  md_.camera_pos_(2) = odom->pose.pose.position.z;
-
+  md_.camera_pos_ = pos;
   md_.has_odom_ = true;
 }
 
@@ -1113,23 +1101,57 @@ void GridMap::getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size)
   ori = mp_.map_origin_, size = mp_.map_size_;
 }
 
-void GridMap::extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom)
+bool GridMap::checkSegmentInflateOccupied(const Eigen::Vector3d &p0, const Eigen::Vector3d &p1)
 {
-  Eigen::Quaterniond cam2body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
-                                                     odom->pose.pose.orientation.x,
-                                                     odom->pose.pose.orientation.y,
-                                                     odom->pose.pose.orientation.z);
-  Eigen::Matrix3d cam2body_r_m = cam2body_q.toRotationMatrix();
-  md_.cam2body_.block<3, 3>(0, 0) = cam2body_r_m;
-  md_.cam2body_(0, 3) = odom->pose.pose.position.x;
-  md_.cam2body_(1, 3) = odom->pose.pose.position.y;
-  md_.cam2body_(2, 3) = odom->pose.pose.position.z;
-  md_.cam2body_(3, 3) = 1.0;
+  if (!isInMap(p0) || !isInMap(p1))
+    return true;
+
+  // Match getInflateOccupancy: footprint radius around robot_pos_ is not treated as occupied.
+  const auto pos_inflated_occupied = [this](const Eigen::Vector3d &pos) -> bool {
+    const int occ = getInflateOccupancy(pos);
+    if (occ < 0)
+      return true;
+    return occ > 0;
+  };
+
+  if (pos_inflated_occupied(p0))
+    return true;
+
+  Eigen::Vector3i id0, id1;
+  posToIndex(p0, id0);
+  posToIndex(p1, id1);
+
+  if (id0 == id1)
+    return pos_inflated_occupied(p1);
+
+  RayCaster raycaster;
+  if (!raycaster.setInput(id0.cast<double>(), id1.cast<double>()))
+    return pos_inflated_occupied(p1);
+
+  Eigen::Vector3d ray_pt;
+  Eigen::Vector3d pos_w;
+  while (raycaster.step(ray_pt))
+  {
+    const Eigen::Vector3i id(
+      static_cast<int>(ray_pt.x()),
+      static_cast<int>(ray_pt.y()),
+      static_cast<int>(ray_pt.z()));
+    indexToPos(id, pos_w);
+    if (pos_inflated_occupied(pos_w))
+      return true;
+  }
+
+  return pos_inflated_occupied(p1);
 }
 
 void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                 const nav_msgs::msg::Odometry::ConstPtr &odom)
 {
+  md_.robot_pos_(0) = odom->pose.pose.position.x;
+  md_.robot_pos_(1) = odom->pose.pose.position.y;
+  md_.robot_pos_(2) = odom->pose.pose.position.z;
+  md_.has_robot_pos_ = true;
+
   /* get pose */
   Eigen::Quaterniond body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
                                                  odom->pose.pose.orientation.x,

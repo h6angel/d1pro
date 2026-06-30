@@ -1,14 +1,13 @@
 """
 EGO planner + traj_server for D1 real robot (OpenVINS + RealSense depth mapping).
 
-Prerequisites (separate terminals):
-  ros2 launch ov_msckf d435i_openvins.launch.py
-  ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
+Prerequisites: run ../start_ego_stack.sh (recommended), or launch RealSense + OpenVINS
+  manually before this node — see Readme.md.
 
 Topics / limits / planner tuning: config/d1_robot.yaml
 Depth intrinsics override: ros2 topic echo /camera/camera/depth/camera_info --once
 
-Logs: ./start_ego_stack.sh (ego_log/stack_*/*.log)
+Logs: ./start_ego_stack.sh -> ego_log/stack_*/*.log
 """
 
 import os
@@ -48,6 +47,8 @@ def generate_launch_description():
         'goal_reach_thresh', default=str(_planner['goal_reach_thresh']))
     thresh_replan_time = LaunchConfiguration(
         'thresh_replan_time', default=str(_planner['thresh_replan_time']))
+    collision_check_step = LaunchConfiguration(
+        'collision_check_step', default=str(_planner['collision_check_step']))
     obstacles_inflation = LaunchConfiguration(
         'obstacles_inflation', default=str(_planner['obstacles_inflation']))
     optimization_dist0 = LaunchConfiguration(
@@ -83,6 +84,7 @@ def generate_launch_description():
             ('init_list', 'drone_0_plan_vis/init_list'),
             ('optimal_list', 'drone_0_plan_vis/optimal_list'),
             ('a_star_list', 'drone_0_plan_vis/a_star_list'),
+            # grid_map/odom: only used when grid_map/pose_type=2 (ODOMETRY depth sync)
             ('grid_map/odom', odom_topic),
             ('grid_map/pose', pose_topic),
             ('grid_map/depth', depth_topic),
@@ -90,6 +92,7 @@ def generate_launch_description():
         ],
         parameters=[
             {'fsm/thresh_replan_time': thresh_replan_time},
+            {'fsm/collision_check_step': collision_check_step},
             {'fsm/thresh_no_replan_meter': 1.0},
             {'fsm/odom_traj_mismatch_thresh': 0.22},
             {'fsm/thresh_goal_reach_meter': goal_reach_thresh},
@@ -167,9 +170,6 @@ def generate_launch_description():
             {'bspline/limit_vel': max_vel},
             {'bspline/limit_acc': max_acc},
             {'bspline/limit_ratio': 1.1},
-            {'prediction/obj_num': 0},
-            {'prediction/lambda': 1.0},
-            {'prediction/predict_rate': 1.0},
         ],
     )
 
@@ -231,6 +231,9 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument(
         'thresh_replan_time', default_value=thresh_replan_time,
         description='Min EXEC time before replan (s); default from d1_robot.yaml'))
+    ld.add_action(DeclareLaunchArgument(
+        'collision_check_step', default_value=collision_check_step,
+        description='FSM traj safety arc step (m); default from d1_robot.yaml'))
     ld.add_action(DeclareLaunchArgument(
         'obstacles_inflation', default_value=obstacles_inflation,
         description='Grid obstacle inflation (m); default from d1_robot.yaml'))

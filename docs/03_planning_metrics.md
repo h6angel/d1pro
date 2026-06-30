@@ -40,6 +40,8 @@
 | `[goal_reached]` | `ego_replan_fsm.cpp` | L3 任务成功 |
 | `[goal_timeout]` | `ego_replan_fsm.cpp` | L3 近目标失败 |
 | `EMERGENCY_STOP` / `Suddenly discovered obstacles` | `ego_replan_fsm.cpp` | L3 安全事件 |
+| `[global_replan]` | `ego_replan_fsm.cpp` | 急停恢复时全局路径重建 |
+| `[cmd_vel_pub] hard_stop` | `d1_planner_bridge_node.cpp` | 执行层零速确认 |
 | `current traj in collision, replan` | `ego_replan_fsm.cpp` | 执行中碰撞预警 |
 | bridge `lateral_error` / `heading_error` | `d1_planner_bridge_node.cpp` | 执行层误差 |
 
@@ -355,7 +357,7 @@ $$
 | 速度违反积分 | $\sum_{i,j} [\max(0, |v_{i,j}|-v_{\lim})]^2$ |
 | 加速度违反积分 | $\sum_{i,j} [\max(0, |a_{i,j}|-a_{\lim})]^2$ |
 
-$v_{\lim}, a_{\lim}$ 取 `manager/max_vel`、`manager/max_acc`（D1 默认 1.6 / 2.0）。
+$v_{\lim}, a_{\lim}$ 取 `manager/max_vel`、`manager/max_acc`（D1 默认 **0.6 / 1.0**，见 `d1_robot.yaml`）。
 
 **Refine 触发：** `UniformBspline::checkFeasibility(ratio)` 若超限则计算时间缩放比 `ratio` 并进入 STEP 3。
 
@@ -395,7 +397,7 @@ $\mathbf{p}_g$ 为当次 `local_target_pt`（可从 FSM 日志或内部状态获
 **成功条件（推荐操作定义）：**
 
 1. 日志出现 `[goal_reached]`  
-2. 且 $\|\mathbf{p}_{\text{odom}}^{xy} - \mathbf{p}_{\text{goal}}^{xy}\| \le \texttt{fsm/thresh\_goal\_reach\_meter}$（默认 0.3 m，`single_run.launch.py`）  
+2. 且 $\|\mathbf{p}_{\text{odom}}^{xy} - \mathbf{p}_{\text{goal}}^{xy}\| \le \texttt{fsm/thresh\_goal\_reach\_meter}$（默认 0.3 m，`d1_robot.yaml` → `planner.goal_reach_thresh`）  
 3. 且任务过程中无 `EMERGENCY_STOP`（或碰撞次数 = 0，见下）
 
 **计算：**
@@ -477,6 +479,22 @@ $$
 **计算：** 统计日志中 `changeFSMExecState(REPLAN_TRAJ` 或 `replan` 相关行，除以任务总时长。
 
 **解读：** L2 轨迹差或跟踪差会导致重规划频繁上升。
+
+---
+
+### 6.7 急停链路验收 checklist（P0 已通）
+
+实机或 `ego_log/stack_*` 日志中，单次急停应依次出现：
+
+| 步骤 | 期望 log / 现象 | 来源 |
+|------|-----------------|------|
+| 1 | FSM 转入 `EMERGENCY_STOP`（`[SAFETY]: from EXEC_TRAJ to EMERGENCY_STOP`） | `ego_replan_fsm.cpp` |
+| 2 | 停车 B 样条：`[bspline_rx] ... n=6`，6 个控制点 XY 重合 | `traj_server` |
+| 3 | 采样零速：`[pos_cmd_pub] ... vel=(0.000,0.000,0.000)` | `traj_server` |
+| 4 | 底盘零速：`[cmd_vel_pub] hard_stop ... twist=(0,0)` | `d1_planner_bridge` |
+| 5 | 恢复（可选）：`EMERGENCY_STOP → GEN_NEW_TRAJ`，可能出现 `[global_replan] skip/replan` | `ego_replan_fsm.cpp` |
+
+**hard_stop 阈值：** `hard_stop_plan_speed = 0.005` m/s（`d1_bridge.yaml`）；`plan_vel` 低于此值即强制零速。
 
 ---
 

@@ -257,7 +257,7 @@ start_vel_(2) = start_acc_(2) = local_target_vel_(2) = 0;
 
 `reboundReplan` 入口还对 `start_pt`、`local_target_pt`、`point_set`、`ctrl_pts` 调用 `flatten*Z`。
 
-参数：`manager/use_robot_z_planning`（`single_run.launch.py` / `d1_robot.yaml`，默认 `true`）。
+参数：`manager/use_robot_z_planning`（`single_run.launch.py` 硬编码为 `true`，**不在** `d1_robot.yaml` 中）。
 
 ### 6.2 随机脱困仅在 XY
 
@@ -296,7 +296,7 @@ $$
 |------|------|
 | 主规划循环 | `src/planner/plan_manage/src/planner_manager.cpp` |
 | FSM / 重规划入口 | `src/planner/plan_manage/src/ego_replan_fsm.cpp` |
-| 代价与 L-BFGS | `src/planner/bspline_opt/src/bspline_optimizer.cpp` |
+| 代价与 L-BFGS | `src/planner/bspline_opt/src/bspline_optimizer.cpp`，`include/bspline_opt/lbfgs.hpp` |
 | B 样条求值 | `src/planner/bspline_opt/src/uniform_bspline.cpp` |
 | A* | `src/planner/path_searching/src/dyn_a_star.cpp` |
 | 占据地图 | `src/planner/plan_env/src/grid_map.cpp` |

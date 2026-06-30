@@ -1,5 +1,6 @@
-# D1 实机部署 — 话题、限速与规划调参的唯一配置源
+# D1 实机部署 — 话题、限速、相机内参与规划子集配置
 # 使用者: single_run.launch.py, d1_planner_bridge.launch.py, start_ego_stack.sh
+# 注意: grid_map / fsm 细项 / 优化器权重仍在 single_run.launch.py 硬编码
 
 topics:
   odom: "/ov_msckf/odomimu"
@@ -30,6 +31,7 @@ planner:
   goal_reach_thresh: 0.3
   tag_stop_dist: 0.25   # AprilTag 追踪：距检测点 XY 距离 ≤ 此值则停车 (m)
   thresh_replan_time: 2.5
+  collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)，≈ map_resolution/2
   obstacles_inflation: 0.09
   optimization_dist0: 0.55
   lambda_fitness: 1.5

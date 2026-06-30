@@ -32,4 +32,8 @@ d1_planner_bridge_node:
     # plan_vel below this -> twist=(0,0); was 0.02, lowered to avoid false stops on slow replan
     hard_stop_plan_speed: 0.005
 
+    # 看门狗：超过该时长未收到新的 pos_cmd / odom 则强制 cmd_vel=(0,0)，防止上游崩溃/卡死时按旧指令失控
+    cmd_timeout_sec: 0.3
+    odom_timeout_sec: 0.5
+
     project_velocity_to_body: true

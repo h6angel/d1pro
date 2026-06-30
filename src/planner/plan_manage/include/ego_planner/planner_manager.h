@@ -6,7 +6,6 @@
 #include <bspline_opt/bspline_optimizer.h>
 #include <bspline_opt/uniform_bspline.h>
 #include <plan_env/grid_map.h>
-#include <plan_env/obj_predictor.h>
 #include <traj_utils/plan_container.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <traj_utils/planning_visualization.h>
@@ -38,16 +37,20 @@ namespace ego_planner
     void initPlanModules(rclcpp::Node::SharedPtr &node, PlanningVisualization::Ptr vis = NULL);
 
     void setRobotPlanningZ(double z);
+    void updateRobotPosition(const Eigen::Vector3d &pos);
 
     PlanParameters pp_;
     LocalTrajData local_data_;
     GlobalTrajData global_data_;
     GridMap::Ptr grid_map_;
-    fast_planner::ObjPredictor::Ptr obj_predictor_;
 
   private:
     /* main planning algorithms & modules */
     PlanningVisualization::Ptr visualization_;
+
+    // Node handle: trajectory timing (start_time_) must use the node ROS clock
+    // (node_->now()) so it stays consistent with FSM / traj_server and respects use_sim_time.
+    rclcpp::Node::SharedPtr node_;
 
     // ros::Publisher obj_pub_; //zx-todo 
 

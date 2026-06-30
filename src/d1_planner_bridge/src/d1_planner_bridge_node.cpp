@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <limits>
 
 namespace d1_planner_bridge
 {
@@ -27,7 +28,9 @@ double finiteOrZero(double v)
 D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
 : Node("d1_planner_bridge_node", options)
 {
-  tracker_.setParams(loadTrackerParams());
+  const TrackerParams tracker_params = loadTrackerParams();
+  need_odom_ = tracker_params.project_velocity_to_body;
+  tracker_.setParams(tracker_params);
 
   pos_cmd_topic_ = declare_parameter<std::string>("pos_cmd_topic", "/drone_0_planning/pos_cmd");
   odom_topic_ = declare_parameter<std::string>("odom_topic", "/ov_msckf/odomimu");
@@ -38,13 +41,16 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
   log_cmd_vel_period_ms_ = declare_parameter<int>("log_cmd_vel_period_ms", 500);
   cmd_vel_ema_alpha_ = declare_parameter<double>("cmd_vel_ema_alpha", 0.8);
   hard_stop_plan_speed_ = declare_parameter<double>("hard_stop_plan_speed", 0.005);
+  cmd_timeout_sec_ = declare_parameter<double>("cmd_timeout_sec", 0.3);
+  odom_timeout_sec_ = declare_parameter<double>("odom_timeout_sec", 0.5);
 
   pos_cmd_sub_ = create_subscription<quadrotor_msgs::msg::PositionCommand>(
     pos_cmd_topic_, rclcpp::QoS(10),
     std::bind(&D1PlannerBridgeNode::posCmdCallback, this, std::placeholders::_1));
 
+  // High-rate VIO odom: best_effort + keep_last(1) (latest-sample-wins, no backlog).
   odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
-    odom_topic_, rclcpp::QoS(10),
+    odom_topic_, rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(),
     std::bind(&D1PlannerBridgeNode::odomCallback, this, std::placeholders::_1));
 
   cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 10);
@@ -97,23 +103,33 @@ void D1PlannerBridgeNode::posCmdCallback(
 {
   std::lock_guard<std::mutex> lock(mutex_);
   last_pos_cmd_ = msg;
+  last_pos_cmd_recv_ = now();
+  have_pos_cmd_recv_ = true;
 }
 
 void D1PlannerBridgeNode::odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
   std::lock_guard<std::mutex> lock(mutex_);
   last_odom_ = msg;
+  last_odom_recv_ = now();
+  have_odom_recv_ = true;
 }
 
 void D1PlannerBridgeNode::controlTimerCallback()
 {
   quadrotor_msgs::msg::PositionCommand::SharedPtr cmd;
   nav_msgs::msg::Odometry::SharedPtr odom;
+  rclcpp::Time cmd_recv, odom_recv;
+  bool have_cmd_recv = false, have_odom_recv = false;
 
   {
     std::lock_guard<std::mutex> lock(mutex_);
     cmd = last_pos_cmd_;
     odom = last_odom_;
+    cmd_recv = last_pos_cmd_recv_;
+    odom_recv = last_odom_recv_;
+    have_cmd_recv = have_pos_cmd_recv_;
+    have_odom_recv = have_odom_recv_;
   }
 
   geometry_msgs::msg::Twist twist;
@@ -128,13 +144,31 @@ void D1PlannerBridgeNode::controlTimerCallback()
     return;
   }
 
+  // ---- Watchdog: stop if pos_cmd or (needed) odom went stale ----
+  const rclcpp::Time t_now = now();
+  const double inf = std::numeric_limits<double>::infinity();
+  const double cmd_age = have_cmd_recv ? (t_now - cmd_recv).seconds() : inf;
+  const double odom_age = have_odom_recv ? (t_now - odom_recv).seconds() : inf;
+  const bool cmd_stale = cmd_age > cmd_timeout_sec_;
+  const bool odom_stale = need_odom_ && (odom_age > odom_timeout_sec_);
+
+  if (cmd_stale || odom_stale) {
+    resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
+    twist.linear.x = 0.0;
+    twist.angular.z = 0.0;
+    cmd_vel_pub_->publish(twist);
+    RCLCPP_WARN_THROTTLE(
+      get_logger(), *get_clock(), 1000,
+      "[watchdog] stale input -> stop. cmd_age=%.3fs (timeout=%.2f) "
+      "odom_age=%.3fs (timeout=%.2f need_odom=%d)",
+      cmd_age, cmd_timeout_sec_, odom_age, odom_timeout_sec_, need_odom_ ? 1 : 0);
+    return;
+  }
+
   const double v_plan_cmd = std::hypot(cmd->velocity.x, cmd->velocity.y);
 
-  if (have_last_traj_id_ && cmd->trajectory_id != last_traj_id_) {
-    resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);
-  }
-  last_traj_id_ = cmd->trajectory_id;
-  have_last_traj_id_ = true;
+  // Replan bumps traj_id; keep EMA state so vx/wz blend across trajectory switches
+  // (reset only on watchdog / hard_stop / invalid — not on every replan).
 
   if (v_plan_cmd < hard_stop_plan_speed_) {
     resetCmdVelFilter(cmd_vel_filter_init_, filt_vx_, filt_wz_);

@@ -36,6 +36,8 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
 
   void EGOPlannerManager::initPlanModules(rclcpp::Node::SharedPtr &node, PlanningVisualization::Ptr vis)
   {
+    node_ = node;
+
     node->declare_parameter("manager/max_vel", -1.0);
     node->declare_parameter("manager/max_acc", -1.0);
     node->declare_parameter("manager/max_jerk", -1.0);
@@ -60,7 +62,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     bspline_optimizer_.reset(new BsplineOptimizer);
     // bspline_optimizer_->setParam(nh);
     bspline_optimizer_->setParam(node);
-    bspline_optimizer_->setEnvironment(grid_map_, obj_predictor_);
+    bspline_optimizer_->setEnvironment(grid_map_);
     bspline_optimizer_->a_star_.reset(new AStar);
     bspline_optimizer_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
 
@@ -75,6 +77,12 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
       return;
     }
     bspline_optimizer_->setPlanningZ(z);
+  }
+
+  void EGOPlannerManager::updateRobotPosition(const Eigen::Vector3d &pos)
+  {
+    if (grid_map_)
+      grid_map_->updateRobotPosition(pos);
   }
 
   bool EGOPlannerManager::reboundReplan(Eigen::Vector3d start_pt, Eigen::Vector3d start_vel,
@@ -189,7 +197,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
       {
 
         double t;
-        double t_cur = (rclcpp::Clock().now() - local_data_.start_time_).seconds();
+        double t_cur = (node_->now() - local_data_.start_time_).seconds();
         t_cur = std::max(0.0, std::min(t_cur, local_data_.duration_));
 
         vector<double> pseudo_arc_length;
@@ -348,7 +356,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     t_refine = rclcpp::Clock().now() - t_start;
 
     // save planned results
-    updateTrajInfo(pos, rclcpp::Clock().now());
+    updateTrajInfo(pos, node_->now());
 
     static double sum_time = 0;
     static int count_success = 0;
@@ -373,7 +381,7 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
       control_points.col(i) = stop_pos;
     }
 
-    updateTrajInfo(UniformBspline(control_points, 3, 1.0), rclcpp::Clock().now());
+    updateTrajInfo(UniformBspline(control_points, 3, 1.0), node_->now());
 
     return true;
   }
@@ -446,9 +454,10 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     else
       return false;
 
-    auto time_now = rclcpp::Clock().now();
+    auto time_now = node_->now();
 
-    global_data_.setGlobalTraj(gl_traj, time_now);
+    const double arc_t_step = pp_.planning_horizen_ / 20.0 / std::max(pp_.max_vel_, 0.1);
+    global_data_.setGlobalTraj(gl_traj, time_now, arc_t_step);
 
     return true;
   }
@@ -530,9 +539,10 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     else
       return false;
 
-    auto time_now = rclcpp::Clock().now();
+    auto time_now = node_->now();
 
-    global_data_.setGlobalTraj(gl_traj, time_now);
+    const double arc_t_step = pp_.planning_horizen_ / 20.0 / std::max(pp_.max_vel_, 0.1);
+    global_data_.setGlobalTraj(gl_traj, time_now, arc_t_step);
 
     return true;
   }

@@ -106,6 +106,9 @@ namespace ego_planner
 
     double odom_traj_mismatch_thresh_{0.22};
 
+    /// Trajectory safety check: arc-length step between segment raycasts (m).
+    double collision_check_step_{0.05};
+
     bool enable_fail_safe_;
 
 

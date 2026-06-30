@@ -22,7 +22,7 @@ FSM 局部目标
 | 动态 A* | `src/planner/path_searching/src/dyn_a_star.cpp` | 碰撞段绕行折线，构造 rebound 法向 |
 | 弹性初值 | `src/planner/bspline_opt/src/bspline_optimizer.cpp` → `initControlPoints` | 控制点 + A* 引导 |
 | 代价与梯度 | `bspline_optimizer.cpp` → `combineCostRebound` / `combineCostRefine` | 平滑、避障、可行性、终端 |
-| 求解器 | `src/planner/bspline_opt/src/gradient_descent_optimizer.cpp` | L-BFGS / 梯度下降 |
+| 求解器 | `src/planner/bspline_opt/include/bspline_opt/lbfgs.hpp`（L-BFGS）；调用入口 `bspline_optimizer.cpp` → `BsplineOptimizeTrajRebound` / `Refine` | L-BFGS 无约束优化 |
 | 执行层 | `src/d1_planner_bridge/` | 差速跟踪，非完整约束主要在此体现 |
 
 **改进方向概览：** 更好的初值 → 更好的障碍表示 → 更好的优化器 → 更好的机器人运动学模型。
@@ -59,7 +59,7 @@ flowchart LR
   - **学什么：** 动力学递推、代价二次近似、滚动时域、约束处理（软/硬惩罚、QP 子问题）。
   - **为何重要：** 理解 EGO 惩罚项优化的理论上限；为替换 L-BFGS 或改进 `d1_planner_bridge` 跟踪打基础。
   - **可落地位置：**
-    - 优化层：替代 `gradient_descent_optimizer` + `combineCostRebound` 的求解方式；
+    - 优化层：替代 `lbfgs.hpp` + `combineCostRebound` 的求解方式；
     - 执行层：在 bridge 做短 horizon MPC，减轻 B 样条与底盘模型不一致。
   - **参考资料：** Bertsekas《Dynamic Programming and Optimal Control》；MIT Underactuated Robotics（iLQR）；acados / OSQP 示例。
   - **验收：** 能用 iLQR 在简单 2D 点质量或差速模型上复现一段避障轨迹，并与当前 EGO 单步耗时对比。
@@ -148,7 +148,7 @@ flowchart LR
 |--------------|----------|--------------|
 | 初值路径不可执行、转弯怪 | Hybrid A* / Lattice | `dyn_a_star.cpp`，`initControlPoints` |
 | 贴障抖动、优化不收敛 | ESDF + 平滑距离代价 | `GridMap`，`calcDistanceCostRebound` |
-| 惩罚项调参困难、实时性差 | iLQR / MPC | `gradient_descent_optimizer.cpp`，`combineCostRebound` |
+| 惩罚项调参困难、实时性差 | iLQR / MPC | `lbfgs.hpp`，`bspline_optimizer.cpp`（`combineCostRebound`） |
 | 轨迹表示不够灵活 | MINCO / GCOPTER | `UniformBspline`，`planner_manager.cpp` |
 | 全局断线 | RRT* / BIT* | `ego_replan_fsm.cpp`，全局航点逻辑 |
 | 跟踪与规划模型脱节 | MPC @ bridge | `d1_planner_bridge_node.cpp` |

@@ -86,7 +86,7 @@ $$
 \mathbf{v} = \frac{\mathbf{p}_{\mathrm{end}}^{xy} - \mathbf{p}_{\mathrm{odom}}^{xy}}{\|\cdot\|} \cdot \min(v_{\max}^{\mathrm{end}},\; k_{\mathrm{end}} \cdot d_{xy})
 $$
 
-默认 $k_{\mathrm{end}}=0.8$，$v_{\max}^{\mathrm{end}}=1.6$。
+默认 $k_{\mathrm{end}}=0.8$，$v_{\max}^{\mathrm{end}}=$ `endpoint_max_vel`（与 `d1_robot.yaml` 的 `limits.max_vel` 一致，当前默认 **0.6** m/s）。
 
 这样慢车不会在“轨迹时间走完”后仍离终点较远时得到错误的高速采样。
 
@@ -251,7 +251,7 @@ v_x \leftarrow \mathrm{clamp}(v_x,\, -v_{\max},\, v_{\max}), \quad
 \omega_z \leftarrow \mathrm{clamp}(\omega_z,\, -\omega_{\max},\, \omega_{\max})
 $$
 
-D1 默认 $v_{\max}=1.6\,\text{m/s}$，$\omega_{\max}=1.0\,\text{rad/s}$（与规划 `max_vel` 对齐）。
+D1 默认 $v_{\max}=0.6\,\text{m/s}$，$\omega_{\max}=0.5\,\text{rad/s}$（来自 `d1_robot.yaml` 的 `limits.max_vel` / `limits.max_wz`，由 launch 注入 traj_server 与 bridge）。
 
 ### 3.7 输出 EMA 平滑
 
@@ -266,6 +266,14 @@ $$
 $$
 
 $\alpha =$ `cmd_vel_ema_alpha`（默认 0.8），抑制重规划导致的 `cmd_vel` 跳变。
+
+### 3.9 急停硬停（`hard_stop`）
+
+当 `PositionCommand` 中规划速度 $\|\mathbf{v}^{xy}\| < \texttt{hard\_stop\_plan\_speed}$ 时，bridge **强制**发布 `twist = (0, 0)` 并重置 EMA 状态：
+
+- 参数：`d1_bridge.yaml` → `hard_stop_plan_speed`（默认 **0.005** m/s；早期为 0.02，因慢速重规划误触发而降低）
+- 典型场景：`enterEmergencyStop()` 发布的停车 B 样条经 `traj_server` 采样后 `plan_vel ≈ 0`
+- log：`[cmd_vel_pub] hard_stop traj_id=... plan_vel=... twist=(0,0)`
 
 ### 3.8 ROS 消息映射
 
@@ -288,7 +296,7 @@ $$
 
 ## 5. 参数表
 
-### 5.1 `traj_server`（`single_run.launch.py`）
+### 5.1 `traj_server`（`single_run.launch.py`，限速来自 `d1_robot.yaml`）
 
 | 参数 | 默认 | 含义 |
 |------|------|------|
@@ -298,20 +306,21 @@ $$
 | `endpoint_approach_dist` | 0.35 | 过末端仍“未到位”判定距离 |
 | `endpoint_stop_dist` | 0.08 | 认为到达终点的 XY 距离 |
 | `endpoint_vel_gain` | 0.8 | 终点引导 $k_{\mathrm{end}}$ |
-| `endpoint_max_vel` | 1.6 | 终点引导速度上限 |
+| `endpoint_max_vel` | 0.6 | 终点引导速度上限（= `limits.max_vel`） |
+| `max_yaw_dot` | 0.5 | yaw 角速度上限（= `limits.max_wz`） |
 
-### 5.2 `d1_bridge.yaml`
+### 5.2 `d1_bridge.yaml`（话题/限速默认仍来自 `d1_robot.yaml`）
 
 | 参数 | 默认 | 含义 |
 |------|------|------|
-| `max_vx` | 1.6 | 前进速度上限 |
-| `max_wz` | 1.0 | 角速度上限 |
+| `max_vx` | 0.6 | 前进速度上限（launch 注入，= `limits.max_vel`） |
+| `max_wz` | 0.5 | 角速度上限（launch 注入，= `limits.max_wz`） |
 | `yaw_kp` | 1.2 | 航向 P 增益 $k_\psi$ |
 | `yaw_rate_ff` | 1.0 | $\dot\psi$ 前馈增益 $k_{\mathrm{ff}}$ |
-| `max_yaw_dot_ff` | 0.5 | 前馈 $\dot\psi$ 限幅 |
-| `max_wz_yaw_p` | 0.5 | 行驶中航向 P 项上限 |
-| `align_heading_thresh_rad` | 0.6 | 原地转阈值 $\theta_{\mathrm{align}}$ |
-| `min_turn_wz` | 0.5 | 原地转最小 $\omega$ |
+| `max_yaw_dot_ff` | 0.5 | 前馈 $\dot\psi$ 限幅（launch 设为 `max_wz`） |
+| `max_wz_yaw_p` | 0.5 | 行驶中航向 P 项上限（launch 设为 `max_wz`） |
+| `align_heading_thresh_rad` | 0.4 | 原地转阈值 $\theta_{\mathrm{align}}$ |
+| `min_turn_wz` | 0.5 | 原地转最小 $\omega$（launch 设为 `max_wz`） |
 | `lateral_kp` | 0.3 | 横向增益 $k_{\mathrm{lat}}$ |
 | `lateral_error_deadband` | 0.05 | 横向死区 |
 | `max_wz_lateral_p` | 0.35 | 横向 P 项上限 |
@@ -319,8 +328,9 @@ $$
 | `max_lateral_error_m` | 2.0 | 横向失效距离 |
 | `vx_lat_damp_gain` | 0.25 | 横向减速 $g_{\mathrm{lat}}$ |
 | `lateral_slowdown_dist` | 0.4 | 减速归一化距离 |
-| `min_vx` | 0.08 | 最小前进速度 |
+| `min_vx` | 0.05 | 最小前进速度 |
 | `cmd_vel_ema_alpha` | 0.8 | 输出 EMA 系数 $\alpha$ |
+| `hard_stop_plan_speed` | 0.005 | 规划速度低于此值强制零速 |
 | `allow_reverse` | false | 禁止倒车 |
 | `project_velocity_to_body` | true | 世界→车体速度投影 |
 

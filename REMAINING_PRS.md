@@ -6,7 +6,7 @@
 **P0 已合并行为（简要）：**
 
 - `enterEmergencyStop()`：进入 `EMERGENCY_STOP` 时同步发布停车 B-spline
-- `d1_planner_bridge`：`plan_vel < 0.02` 时 `hard_stop`，`cmd_vel = (0, 0)`
+- `d1_planner_bridge`：`plan_vel < hard_stop_plan_speed`（默认 **0.005** m/s）时 `hard_stop`，`cmd_vel = (0, 0)`
 
 **P0 实机 log 验证（`ego_log/stack_20260617_114536/`）：** 4 次急停均在 ~1ms 内发出 `n=6` 重合控制点样条，`traj_server` 速度归零，bridge 出现 `hard_stop twist=(0,0)`。指令链路已通。
 
@@ -14,34 +14,36 @@
 
 ## PR 优先级总览
 
-| PR | 主题 | 优先级 | 主要文件 |
-|----|------|--------|----------|
-| PR-1 | 急停后从当前位姿重算全局参考 | **P1** | `ego_replan_fsm.cpp`, `planner_manager.cpp` |
-| PR-2 | 占据判定分层，减少误急停 | **P1** | `ego_replan_fsm.cpp`, `grid_map` 参数 |
-| PR-3 | 非 EXEC 状态下安全检测收敛 | **P2** | `ego_replan_fsm.cpp` |
-| PR-4 | 执行层急停体验与惯性 | **P2** | `d1_planner_bridge`, `traj_server.cpp` |
-| PR-5 | 文档与指标对齐 | **P3** | `docs/00_overview.md`, `docs/03_planning_metrics.md` |
+| PR | 主题 | 优先级 | 状态 | 主要文件 |
+|----|------|--------|------|----------|
+| PR-1 | 急停后从当前位姿重算全局参考 | **P1** | **部分完成** | `ego_replan_fsm.cpp`, `planner_manager.cpp` |
+| PR-2 | 占据判定分层，减少误急停 | **P1** | 待做 | `ego_replan_fsm.cpp`, `grid_map` 参数 |
+| PR-3 | 非 EXEC 状态下安全检测收敛 | **P2** | 待做 | `ego_replan_fsm.cpp` |
+| PR-4 | 执行层急停体验与惯性 | **P2** | 待做 | `d1_planner_bridge`, `traj_server.cpp` |
+| PR-5 | 文档与指标对齐 | **P3** | **进行中** | `docs/00_overview.md`, `docs/03_planning_metrics.md` |
 
 建议合并顺序：**PR-1 → PR-2 → PR-3 → PR-4 → PR-5**。
 
 ---
 
-## PR-1：急停恢复时重算全局路径（P1）
+## PR-1：急停恢复时重算全局路径（P1，部分完成）
 
-### 要做什么
+### 已实现（当前代码）
 
-在 `GEN_NEW_TRAJ`（或专用 `RECOVER_TRAJ`）中，局部 `planFromGlobalTraj` **之前**：
+`EMERGENCY_STOP` → `GEN_NEW_TRAJ` 时置 `pending_estop_global_replan_=true`；`GEN_NEW_TRAJ` 入口调用 `maybeReplanGlobalAfterEstop()`（`ego_replan_fsm.cpp`）：
 
-1. 以当前 `odom_pos_` / `odom_vel_` 为起点，对 `end_pt_` 调用 `planGlobalTraj()`，重建 `global_data_`
-2. 重置 `global_data_.last_progress_time_ = 0`（或按 odom 在 new global 上的最近点初始化）
-3. 再执行现有 `planFromGlobalTraj` → `reboundReplan`
+- 若 odom 相对全局路径 XY 漂移 **≤** `fsm/global_replan_drift_thresh`（默认 0.25 m）：跳过重建，仅对齐 `last_progress_time_`（log：`[global_replan] skip`）
+- 若漂移 **>** 阈值：以当前 `odom_pos_` / `odom_vel_` 对 `end_pt_` 调用 `planGlobalTraj()` 重建 `global_data_`（log：`[global_replan] replan`）
+- 随后仍执行现有 `planFromGlobalTraj(10)` → `reboundReplan`
 
-**进阶（可拆子 PR）：** 全局层不用直线 minSnap，改为 **当前 odom → goal 的 A\* / Hybrid A\*** 折线再多项式平滑（`dyn_a_star` 或新模块）。
+### 仍待做
 
-### 原因
+- **进阶（可拆子 PR）：** 全局层不用直线 minSnap，改为 **当前 odom → goal 的 A\* / Hybrid A\*** 折线再多项式平滑（`dyn_a_star` 或新模块）
+- 漂移 ≤ 阈值时仍可能因旧 global 形状导致 `planFromGlobalTraj` 连续失败（log 中急停 #2 现象）；需配合 PR-2 或降低 `global_replan_drift_thresh`
 
-- 文档写「从全局路径重新生成」，但当前 `GEN_NEW_TRAJ` 只在**已有** `global_data_` 上 `getLocalTarget()` 切片，**不会**重算 start→goal
-- `planGlobalTraj()` 仅在 `planNextWaypoint()`（新目标）时调用一次
+### 原因（历史问题）
+
+- 早期 `GEN_NEW_TRAJ` 只在**已有** `global_data_` 上 `getLocalTarget()` 切片，**不会**重算 start→goal；`planGlobalTraj()` 仅在 `planNextWaypoint()` 时调用一次
 - log 中急停 #2：`GEN_NEW_TRAJ` 连续 replan 5~9 失败 ~2.5s 才出 `traj_id=6`；恢复后 0.9s 内再次急停 — 典型「车已偏离原 global 多项式，局部 rebound 无解」
 
 ### 验收
@@ -138,17 +140,24 @@ P0 已做：`hard_stop` 零速 + EMA 重置。可选增强：
 
 ---
 
-## PR-5：文档与指标对齐（P3）
+## PR-5：文档与指标对齐（P3，进行中）
 
-### 要做什么
+### 已完成（2026-06）
 
-- 更新 [docs/00_overview.md](docs/00_overview.md) §3.2 状态图：补充 `enterEmergencyStop()`、bridge `hard_stop`
-- 更新 [docs/03_planning_metrics.md](docs/03_planning_metrics.md)：急停验收 checklist（`bspline_rx` 停车样条、`hard_stop` log）
-- 在 [Readme.md](Readme.md) 或本文档链接 PR 进度
+- [x] 更新 [docs/00_overview.md](docs/00_overview.md) §3：移除已删除的 `SEQUENTIAL_START`；补充 `enterEmergencyStop()`、`maybeReplanGlobalAfterEstop()`、bridge `hard_stop`
+- [x] 更新 [docs/todo.md](docs/todo.md)：求解器路径改为 `lbfgs.hpp`
+- [x] 更新 [docs/02_control_math.md](docs/02_control_math.md)、[docs/03_planning_metrics.md](docs/03_planning_metrics.md)：D1 默认限速与 `d1_robot.yaml` 对齐
+- [x] 更新 [Readme.md](Readme.md)：说明 yaml 与 launch 的配置分工
+- [x] 更新 [docs/04_apriltag_integration.md](docs/04_apriltag_integration.md)：AprilTag 包已迁入 `src/perception/`
+
+### 仍待做
+
+- [ ] [docs/03_planning_metrics.md](docs/03_planning_metrics.md)：急停验收 checklist 自动化脚本
+- [ ] 将 `single_run.launch.py` 硬编码参数迁入 `d1_robot.yaml` 后，同步更新文档「单一配置源」表述
 
 ### 原因
 
-- 原文档写 `EMERGENCY_STOP → GEN_NEW_TRAJ` 会「从全局路径重新生成」，与实现不符，易误导后续开发
+- 早期文档写 `EMERGENCY_STOP → GEN_NEW_TRAJ` 会「从全局路径重新生成」，与当时实现不符；现已部分对齐（见 PR-1），文档已同步
 
 ---
 

@@ -1,8 +1,10 @@
 # AprilTag 感知接入 ego_control
 
-本文说明如何把 **AprilTag 检测 + 世界系目标位姿** 并入 `ego_control` 工程，与现有的 **规划（ego_planner）**、**控制（d1_planner_bridge）** 形成统一工作区，而不再依赖独立的 `apriltagdetect` 工作区。
+本文说明 **AprilTag 检测 + 世界系目标位姿** 在 `ego_control` 工程中的位置，与 **规划（ego_planner）**、**控制（d1_planner_bridge）** 的对接方式。
 
-规划侧如何消费目标话题，见 [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md)（FSM 状态机、停车判定、重规划节流等）。本文侧重 **感知层怎么迁、怎么接、怎么一键启动**。
+规划侧如何消费目标话题，见 [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md)（FSM 状态机、停车判定、重规划节流等）。本文侧重 **感知包结构、话题契约、一键启动**。
+
+> **状态：** `apriltag_detect` 已迁入 `src/perception/apriltag_detect/`，由 `start_ego_stack.sh enable_tag_tracking=true` 拉起。§5 保留为历史迁移记录。
 
 ---
 
@@ -27,6 +29,7 @@ ego_control/
     │   ├── path_searching/
     │   └── traj_utils/
     ├── d1_planner_bridge/          # 控制栈：pos_cmd → cmd_vel
+    ├── perception/apriltag_detect/ # AprilTag 检测（已迁入）
     └── quadrotor_msgs/
 ```
 
@@ -34,24 +37,24 @@ ego_control/
 
 | 层级 | 所在位置 | 职责 | 默认由谁启动 |
 |------|----------|------|--------------|
-| **感知** | `../realsense`、`../openvins`；**待迁入** AprilTag | 图像、IMU、VIO 位姿、Tag 世界坐标 | `start_ego_stack.sh` 前两步 |
-| **规划** | `src/planner/` | 避障、B 样条、Tag 跟随 FSM | `start_ego_stack.sh` 第三步 |
-| **控制** | `src/d1_planner_bridge/` | 差速跟踪、发 `cmd_vel` | `start_ego_stack.sh` 第四步 |
+| **感知** | `../realsense`、`../openvins`；`src/perception/apriltag_detect/` | 图像、IMU、VIO 位姿、Tag 世界坐标 | `start_ego_stack.sh` |
+| **规划** | `src/planner/` | 避障、B 样条、Tag 跟随 FSM | `start_ego_stack.sh` |
+| **控制** | `src/d1_planner_bridge/` | 差速跟踪、发 `cmd_vel` | `start_ego_stack.sh` |
 
-当前缺口：**感知层里的 AprilTag 仍在独立仓库 `../apriltagdetect`**，需要手动第二个终端 `apriltag_only.launch.py`。目标是把这一块收进 `ego_control/src/`。
+AprilTag 检测包位于 `src/perception/apriltag_detect/`，`start_ego_stack.sh enable_tag_tracking=true` 时自动拉起 `apriltag.launch.py`。
 
 ---
 
-## 2. 独立 apriltagdetect 里有什么
+## 2. apriltag_detect 包内容
 
-`../apriltagdetect` 工作区只有一个 Python 包 `apriltag_detect`，逻辑很轻，适合原样迁入：
+`src/perception/apriltag_detect/` 包含：
 
 | 文件 | 作用 |
 |------|------|
 | `apriltag_detect/target_pose_node.py` | 查 TF，计算 Tag 在 `global` 系位姿 |
 | `config/tags.yaml` | `apriltag_ros` 参数（族、ID、物理尺寸） |
 | `config/target_pose.yaml` | `target_pose_node` 坐标系与话题名 |
-| `launch/apriltag_only.launch.py` | 只起 `apriltag_ros` + `target_pose_node` |
+| `launch/apriltag.launch.py` | 起 `apriltag_ros` + `target_pose_node` |
 
 **不需要迁入** `launch/d435i_apriltag.launch.py`：它会重复启动 RealSense + OpenVINS，且 infra 帧率（90Hz）与 ego 脚本（30Hz）不一致，容易导致 VIO 抖动。实机统一用 `start_ego_stack.sh` 起底座 + 本仓内的 `apriltag_only` 起检测即可。
 
@@ -63,33 +66,25 @@ sudo apt install ros-humble-apriltag-ros ros-humble-apriltag-msgs
 
 ---
 
-## 3. 迁入后的目标目录
-
-建议在 `ego_control/src/` 下新增 **感知** 子目录，与 `planner/`、`d1_planner_bridge/` 并列：
+## 3. 包目录结构（当前）
 
 ```
-ego_control/src/
-├── perception/
-│   └── apriltag_detect/          # 从 apriltagdetect 迁入
-│       ├── package.xml
-│       ├── setup.py
-│       ├── resource/
-│       ├── apriltag_detect/
-│       │   └── target_pose_node.py
-│       ├── config/
-│       │   ├── tags.yaml
-│       │   └── target_pose.yaml
-│       └── launch/
-│           └── apriltag.launch.py   # 由原 apriltag_only.launch.py 改名
-├── planner/
-└── d1_planner_bridge/
+ego_control/src/perception/apriltag_detect/
+├── package.xml
+├── setup.py
+├── resource/
+├── apriltag_detect/
+│   └── target_pose_node.py
+├── config/
+│   ├── tags.yaml
+│   └── target_pose.yaml
+└── launch/
+    └── apriltag.launch.py
 ```
-
-包名保持 `apriltag_detect` 不变，这样 `ego_replan_fsm` 里写死的话题名、`start_ego_stack.sh` 参数都无需修改。
 
 ---
 
-## 4. 端到端数据流（接入后）
+## 4. 端到端数据流
 
 ```mermaid
 flowchart TB
@@ -98,8 +93,8 @@ flowchart TB
     OV["ov_msckf OpenVINS"]
   end
 
-  subgraph ego_perception["ego_control / 感知（迁入后）"]
-    AT["apriltag_ros"]
+  subgraph ego_perception["ego_control / 感知"]
+    AT["apriltag_ros + target_pose_node"]
   end
 
   subgraph ego_plan["ego_control / 规划"]
@@ -154,7 +149,9 @@ T_global_tag = T_global_cam0 × T_cam0_optical × T_optical_tag
 
 ---
 
-## 5. 迁移步骤（操作清单）
+## 5. 历史：从独立工作区迁入（已完成）
+
+> 以下步骤已于 2026 年初完成；保留供参考。日常开发无需重复执行。
 
 ### 5.1 拷贝源码
 

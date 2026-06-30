@@ -44,23 +44,60 @@ double max_yaw_dot_ = 0.5;
 rclcpp::Node::SharedPtr g_node;
 int g_log_trace_period_ms_ = 500;
 
-double closestTimeOnTrajXY(const Eigen::Vector2d & query_xy)
+namespace
 {
+constexpr double kClosestSearchDt = 0.05;
+constexpr double kClosestSearchWindowSec = 1.0;
+
+/// Closest trajectory parameter t (XY) to query. t_hint < 0 => full scan (new traj).
+/// Otherwise search [t_hint ± window]; if the minimum lies on a window edge, fall back to full scan.
+double closestTimeOnTrajXY(const Eigen::Vector2d & query_xy, double t_hint)
+{
+  if (!receive_traj_ || traj_duration_ < 1e-6)
+    return 0.0;
+
   double best_t = 0.0;
   double best_d2 = 1e18;
-  constexpr double dt = 0.05;
-  for (double t = 0.0; t <= traj_duration_ + 1e-6; t += dt)
-  {
-    const Eigen::Vector3d p = traj_[0].evaluateDeBoorT(t);
-    const double d2 = (p.head<2>() - query_xy).squaredNorm();
-    if (d2 < best_d2)
+
+  const auto scan_range = [&](const double t0, const double t1) {
+    const double lo = std::max(0.0, t0);
+    const double hi = std::min(traj_duration_, t1);
+    for (double t = lo; t <= hi + 1e-6; t += kClosestSearchDt)
     {
-      best_d2 = d2;
-      best_t = t;
+      const Eigen::Vector3d p = traj_[0].evaluateDeBoorT(t);
+      const double d2 = (p.head<2>() - query_xy).squaredNorm();
+      if (d2 < best_d2)
+      {
+        best_d2 = d2;
+        best_t = t;
+      }
     }
+  };
+
+  if (!std::isfinite(t_hint) || t_hint < 0.0)
+  {
+    scan_range(0.0, traj_duration_);
+    return best_t;
   }
+
+  const double t_hint_clamped = std::max(0.0, std::min(t_hint, traj_duration_));
+  const double t_lo = t_hint_clamped - kClosestSearchWindowSec;
+  const double t_hi = t_hint_clamped + kClosestSearchWindowSec;
+  scan_range(t_lo, t_hi);
+
+  const double lo = std::max(0.0, t_lo);
+  const double hi = std::min(traj_duration_, t_hi);
+  const bool at_left_edge = lo > 1e-6 && best_t <= lo + kClosestSearchDt + 1e-6;
+  const bool at_right_edge = hi < traj_duration_ - 1e-6 && best_t >= hi - kClosestSearchDt - 1e-6;
+  if (at_left_edge || at_right_edge)
+  {
+    best_d2 = 1e18;
+    scan_range(0.0, traj_duration_);
+  }
+
   return best_t;
 }
+}  // namespace
 
 double tangentYawAtTrajTime(double t)
 {
@@ -134,7 +171,7 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
   traj_duration_ = traj_[0].getTimeSum();
   t_progress_ = 0.0;
   if (use_odom_progress_ && have_odom_) {
-    t_progress_ = closestTimeOnTrajXY(odom_pos_.head<2>());
+    t_progress_ = closestTimeOnTrajXY(odom_pos_.head<2>(), -1.0);
     t_progress_ = std::max(0.0, std::min(t_progress_, traj_duration_));
   }
 
@@ -284,16 +321,19 @@ void cmdCallback()
   if (!receive_traj_)
     return;
 
-  rclcpp::Clock clock(RCL_ROS_TIME);
-  rclcpp::Time time_now = clock.now();
+  // Use the node ROS clock so wall-clock playback matches start_time_ (set with the
+  // planner node clock) and respects use_sim_time. A standalone rclcpp::Clock is not
+  // driven by /clock and would diverge under simulation.
+  rclcpp::Time time_now = g_node->now();
 
   const Eigen::Vector3d traj_end = traj_[0].evaluateDeBoorT(traj_duration_);
 
   double t_cur = 0.0;
   bool endpoint_hold = false;
+  double t_closest = 0.0;
   if (use_odom_progress_ && have_odom_)
   {
-    const double t_closest = closestTimeOnTrajXY(odom_pos_.head<2>());
+    t_closest = closestTimeOnTrajXY(odom_pos_.head<2>(), t_progress_);
     const double dist_odom_end_xy =
       (odom_pos_.head<2>() - traj_end.head<2>()).norm();
 
@@ -323,7 +363,7 @@ void cmdCallback()
   Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
   std::pair<double, double> yaw_yawdot(0, 0);
 
-  static rclcpp::Time time_last = clock.now();
+  static rclcpp::Time time_last = time_now;
   if (endpoint_hold)
   {
     pos = traj_end;
@@ -418,7 +458,7 @@ void cmdCallback()
 
   double t_track = std::max(0.0, std::min(t_cur, traj_duration_));
   if (use_odom_progress_ && have_odom_) {
-    t_track = closestTimeOnTrajXY(odom_pos_.head<2>());
+    t_track = t_closest;
   }
   const Eigen::Vector3d track_pos = traj_[0].evaluateDeBoorT(t_track);
   cmd.track_point.x = track_pos(0);
@@ -477,8 +517,9 @@ int main(int argc, char **argv)
       10,
       bsplineCallback);
 
+  // High-rate VIO odom: best_effort + keep_last(1) (latest-sample-wins, no backlog).
   auto odom_sub = node->create_subscription<nav_msgs::msg::Odometry>(
-      "odom", 10, odomCallback);
+      "odom", rclcpp::QoS(rclcpp::KeepLast(1)).best_effort(), odomCallback);
 
   // Relative name so launch remapping (position_cmd -> /drone_0_planning/pos_cmd) applies.
   pos_cmd_pub = node->create_publisher<quadrotor_msgs::msg::PositionCommand>(

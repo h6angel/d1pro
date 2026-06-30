@@ -5,7 +5,6 @@
 #include <path_searching/dyn_a_star.h>
 #include <bspline_opt/uniform_bspline.h>
 #include <plan_env/grid_map.h>
-#include <plan_env/obj_predictor.h>
 #include <rclcpp/rclcpp.hpp>
 #include "bspline_opt/lbfgs.hpp"
 #include <traj_utils/plan_container.hpp>
@@ -91,7 +90,6 @@ namespace ego_planner
 
     /* main API */
     void setEnvironment(const GridMap::Ptr &map);
-    void setEnvironment(const GridMap::Ptr &map, const fast_planner::ObjPredictor::Ptr mov_obj);
     void setParam(rclcpp::Node::SharedPtr node);
     Eigen::MatrixXd BsplineOptimizeTraj(const Eigen::MatrixXd &points, const double &ts,
                                         const int &cost_function, int max_num_id, int max_time_id);
@@ -134,7 +132,6 @@ namespace ego_planner
 
   private:
     GridMap::Ptr grid_map_;
-    fast_planner::ObjPredictor::Ptr moving_objs_;
 
     enum FORCE_STOP_OPTIMIZE_TYPE
     {
@@ -155,7 +152,6 @@ namespace ego_planner
                                         //
     int max_num_id_, max_time_id_;      // stopping criteria
     int cost_function_;                 // used to determine objective function
-    double start_time_;                 // global time for moving obstacles
 
     /* optimization parameters */
     int order_;                    // bspline degree
@@ -198,7 +194,6 @@ namespace ego_planner
     void calcFeasibilityCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcTerminalCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcDistanceCostRebound(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient, int iter_num, double smoothness_cost);
-    void calcMovingObjCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     void calcFitnessCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient);
     bool check_collision_and_rebound(void);
 

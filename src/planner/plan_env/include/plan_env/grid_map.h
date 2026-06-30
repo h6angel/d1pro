@@ -193,6 +193,9 @@ public:
   /// Inflated occupancy without robot footprint exemption (for body-in-obstacle checks).
   inline int getInflateOccupancyNoFootprint(Eigen::Vector3d pos);
 
+  /// True if segment p0→p1 crosses an inflated occupied voxel (read-only raycast).
+  bool checkSegmentInflateOccupied(const Eigen::Vector3d &p0, const Eigen::Vector3d &p1);
+
   inline void boundIndex(Eigen::Vector3i &id);
   inline bool isUnknown(const Eigen::Vector3i &id);
   inline bool isUnknown(const Eigen::Vector3d &pos);
@@ -208,6 +211,8 @@ public:
 
   bool hasDepthObservation();
   bool odomValid();
+  /// Robot pose from the single odom subscription in ego_planner_node (FSM forwards here).
+  void updateRobotPosition(const Eigen::Vector3d &pos);
   void getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size);
   inline double getResolution();
   Eigen::Vector3d getOrigin();
@@ -225,9 +230,7 @@ private:
   // get depth image and camera pose
   void depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                          const geometry_msgs::msg::PoseStamped::ConstPtr &pose);
-  void extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom);
   void depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img, const nav_msgs::msg::Odometry::ConstPtr &odom);
-  void odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom);
 
   // update occupancy by raycasting
   void updateOccupancyCallback();
@@ -265,9 +268,6 @@ private:
   std::shared_ptr<message_filters::Subscriber<nav_msgs::msg::Odometry>> odom_sub_;
   SynchronizerImagePose sync_image_pose_;
   SynchronizerImageOdom sync_image_odom_;
-
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr indep_odom_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr extrinsic_sub_;
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_inf_pub_;
