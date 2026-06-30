@@ -23,44 +23,14 @@
 ## 2. 系统架构
 
 <p align="center">
-  <img src="./assets/system_architecture.jpg" alt="系统架构" width="720"/>
+  <img src="./assets/system_architecture.png" alt="系统架构" width="800"/>
 </p>
 
 ### 2.1 三层结构
 
-```mermaid
-flowchart TB
-  subgraph L1["感知层（外部 + 可选本仓）"]
-    RS["RealSense D435i"]
-    OV["OpenVINS ov_msckf"]
-    AT["AprilTag（可选）"]
-  end
-
-  subgraph L2["规划层（本仓 src/planner/）"]
-    GM["GridMap 在线建图"]
-    FSM["EGOReplanFSM 状态机"]
-    PM["B 样条 + A* 优化"]
-    TS["traj_server 轨迹采样"]
-  end
-
-  subgraph L3["控制层（本仓 d1_planner_bridge）"]
-    BR["TrajectoryTracker"]
-    D1["D1 底盘 /command/cmd_twist"]
-  end
-
-  RS --> OV
-  RS --> GM
-  OV --> GM
-  OV --> FSM
-  AT --> FSM
-  GM --> PM
-  FSM --> PM
-  PM --> TS
-  TS --> BR
-  OV --> TS
-  OV --> BR
-  BR --> D1
-```
+<p align="center">
+  <img src="./assets/three_layer_architecture.png" alt="系统三层架构" width="800"/>
+</p>
 
 ### 2.2 仓库目录结构
 
@@ -98,28 +68,9 @@ d1robot/
 
 ### 3.1 端到端数据流
 
-```mermaid
-sequenceDiagram
-  participant Cam as RealSense
-  participant VIO as OpenVINS
-  participant Map as GridMap
-  participant Plan as ego_planner
-  participant TS as traj_server
-  participant BR as d1_bridge
-  participant Bot as D1 底盘
-
-  Cam->>VIO: IMU + 图像
-  Cam->>Map: 深度图
-  VIO->>Map: pose_stamped
-  VIO->>Plan: odomimu
-  Note over Plan: RViz 2D Goal 或 AprilTag
-  Map->>Plan: 占据查询
-  Plan->>TS: B-spline 轨迹
-  VIO->>TS: odom
-  TS->>BR: pos_cmd
-  VIO->>BR: odom
-  BR->>Bot: cmd_twist
-```
+<p align="center">
+  <img src="./assets/data_flow_sequence.png" alt="端到端数据流" width="900"/>
+</p>
 
 ### 3.2 关键 ROS 话题
 
@@ -149,20 +100,9 @@ sequenceDiagram
 | `EXEC_TRAJ` | 执行已发布 B 样条 |
 | `EMERGENCY_STOP` | 碰撞风险，发布停车轨迹 |
 
-```mermaid
-stateDiagram-v2
-    [*] --> INIT
-    INIT --> WAIT_TARGET: 收到 odom
-    WAIT_TARGET --> GEN_NEW_TRAJ: 有目标
-    GEN_NEW_TRAJ --> EXEC_TRAJ: 规划成功
-    GEN_NEW_TRAJ --> WAIT_TARGET: 连续失败
-    EXEC_TRAJ --> REPLAN_TRAJ: 定时 2.5s / 安全检测
-    REPLAN_TRAJ --> EXEC_TRAJ: 重规划成功
-    REPLAN_TRAJ --> WAIT_TARGET: 近目标且规划失败
-    EXEC_TRAJ --> WAIT_TARGET: XY 距目标 < 0.3m
-    EXEC_TRAJ --> EMERGENCY_STOP: 碰撞风险
-    EMERGENCY_STOP --> GEN_NEW_TRAJ: 低速 + fail_safe
-```
+<p align="center">
+  <img src="./assets/fsm_state_diagram.png" alt="EGOReplanFSM 状态机" width="850"/>
+</p>
 
 **D1 适配要点**：
 
@@ -177,14 +117,9 @@ stateDiagram-v2
 
 一次 `reboundReplan()` 分三步：
 
-```mermaid
-flowchart LR
-  A["STEP 1<br/>INIT"] --> B["STEP 2<br/>OPT"]
-  B --> C["STEP 3<br/>REFINE"]
-  A -.- A1["多项式初值 + A* 弹性方向"]
-  B -.- B1["L-BFGS 优化 B 样条控制点"]
-  C -.- C1["精修轨迹"]
-```
+<p align="center">
+  <img src="./assets/planning_algorithm_flow.png" alt="规划算法三步流程" width="750"/>
+</p>
 
 | 模块 | 包 | 职责 |
 |------|-----|------|
@@ -197,15 +132,9 @@ flowchart LR
 
 ## 6. 控制链路
 
-```mermaid
-flowchart LR
-  BS["B-spline"] --> TS["traj_server<br/>De Boor 采样"]
-  TS --> PC["PositionCommand<br/>p, v, yaw"]
-  PC --> BR["d1_planner_bridge<br/>TrajectoryTracker"]
-  ODOM["odom"] --> TS
-  ODOM --> BR
-  BR --> CV["cmd_vel<br/>linear.x + angular.z"]
-```
+<p align="center">
+  <img src="./assets/control_chain.png" alt="控制链路" width="850"/>
+</p>
 
 **TrajectoryTracker 控制律**（`d1_planner_bridge`）：
 
@@ -220,7 +149,7 @@ flowchart LR
 ## 7. Demo 操作
 
 <p align="center">
-  <img src="./assets/demo_workflow.jpg" alt="Demo 流程" width="720"/>
+  <img src="./assets/demo_workflow.png" alt="Demo 流程" width="800"/>
 </p>
 
 一键启动（编译与依赖见 [Readme.md](../Readme.md)）：
