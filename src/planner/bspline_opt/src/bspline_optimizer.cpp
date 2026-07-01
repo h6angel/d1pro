@@ -1135,15 +1135,26 @@ namespace ego_planner
           {
             // cout << "hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
 
-            // 如果在前三个控制点范围内检测到了碰撞则视为不可行
-            if (t <= bspline_interval_) // First 3 control points in obstacles!
+            // Near-start collision: abort only if robot body is actually occupied.
+            if (t <= bspline_interval_)
             {
-              // cout << cps_.points.col(1).transpose() << "\n"
-              //      << cps_.points.col(2).transpose() << "\n"
-              //      << cps_.points.col(3).transpose() << "\n"
-              //      << cps_.points.col(4).transpose() << endl;
-              RCLCPP_WARN(rclcpp::get_logger("rebound_optimize"), "First 3 control points in obstacles! return false, t=%f", t);
-              return false;
+              Eigen::Vector3d start_pt = traj.evaluateDeBoorT(0.0);
+              if (use_planning_z_)
+                start_pt(2) = planning_z_;
+              const bool body_in_obs =
+                  grid_map_->getInflateOccupancyNoFootprint(start_pt) > 0;
+              if (body_in_obs)
+              {
+                RCLCPP_WARN(
+                  rclcpp::get_logger("rebound_optimize"),
+                  "Start in obstacles (body occupied), abort. t=%f", t);
+                return false;
+              }
+              RCLCPP_WARN(
+                rclcpp::get_logger("rebound_optimize"),
+                "First 3 cps near obstacle but body free, restart. t=%f", t);
+              flag_occ = true;
+              break;
             }
 
             break;

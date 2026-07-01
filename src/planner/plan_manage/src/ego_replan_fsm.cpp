@@ -505,26 +505,43 @@ double advanceTForArcStep(
     }
   }
 
-  bool EGOReplanFSM::planFromGlobalTraj(const int trial_times /*=1*/) // zx-todo
+  bool EGOReplanFSM::callReboundReplanWithEscape(const int trial_times, const bool try_warm_start)
+  {
+    if (try_warm_start)
+    {
+      const bool flag_random = timesOfConsecutiveStateCalls().first > 1;
+      for (int i = 0; i < trial_times; ++i)
+      {
+        if (callReboundReplan(false, flag_random))
+          return true;
+      }
+    }
+
+    for (int i = 0; i < trial_times; ++i)
+    {
+      if (callReboundReplan(true, false))
+        return true;
+    }
+
+    if (!isOdomBodyInObstacle())
+    {
+      for (int i = 0; i < trial_times; ++i)
+      {
+        if (callReboundReplan(true, true))
+          return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool EGOReplanFSM::planFromGlobalTraj(const int trial_times /*=1*/)
   {
     start_pt_ = odom_pos_;
     start_vel_ = odom_vel_;
     start_acc_.setZero();
 
-    bool flag_random_poly_init;
-    if (timesOfConsecutiveStateCalls().first == 1)
-      flag_random_poly_init = false;
-    else
-      flag_random_poly_init = true;
-
-    for (int i = 0; i < trial_times; i++)
-    {
-      if (callReboundReplan(true, flag_random_poly_init))
-      {
-        return true;
-      }
-    }
-    return false;
+    return callReboundReplanWithEscape(trial_times, false);
   }
 
   bool EGOReplanFSM::isOdomBodyInObstacle() const
@@ -550,28 +567,7 @@ double advanceTForArcStep(
     start_vel_ = odom_vel_;
     start_acc_.setZero();
 
-    bool flag_random_poly_init;
-    if (timesOfConsecutiveStateCalls().first == 1)
-      flag_random_poly_init = false;
-    else
-      flag_random_poly_init = true;
-
-    for (int i = 0; i < trial_times; i++)
-    {
-      if (callReboundReplan(false, flag_random_poly_init))
-        return true;
-    }
-
-    // Odom jump / stale warm-start ctrl pts: retry from polynomial init when body is free.
-    if (!isOdomBodyInObstacle())
-    {
-      for (int i = 0; i < trial_times; i++)
-      {
-        if (callReboundReplan(true, flag_random_poly_init))
-          return true;
-      }
-    }
-    return false;
+    return callReboundReplanWithEscape(trial_times, true);
   }
 
   void EGOReplanFSM::checkCollisionCallback()
@@ -592,12 +588,27 @@ double advanceTForArcStep(
         RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
         enterEmergencyStop("SAFETY");
       }
-      else if (exec_state_ == GEN_NEW_TRAJ)
+      else if (exec_state_ == GEN_NEW_TRAJ || exec_state_ == EMERGENCY_STOP)
       {
         RCLCPP_WARN_THROTTLE(
           node_->get_logger(), *node_->get_clock(),
           std::max(log_trace_period_ms_, 500),
-          "Depth stale during GEN_NEW_TRAJ recovery (no re-estop)");
+          "Depth stale during %s (no re-estop, no traj scan)",
+          exec_state_ == EMERGENCY_STOP ? "EMERGENCY_STOP" : "GEN_NEW_TRAJ");
+      }
+      return;
+    }
+
+    /* EMERGENCY_STOP / GEN_NEW_TRAJ: odom body only — never forward-scan stale local traj. */
+    if (exec_state_ == EMERGENCY_STOP || exec_state_ == GEN_NEW_TRAJ)
+    {
+      if (have_odom_ && isOdomBodyInObstacle())
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(),
+          std::max(log_trace_period_ms_, 500),
+          "[SAFETY] odom body occupied during %s (odom-only check, no traj scan)",
+          exec_state_ == EMERGENCY_STOP ? "EMERGENCY_STOP" : "GEN_NEW_TRAJ");
       }
       return;
     }

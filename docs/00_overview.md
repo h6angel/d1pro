@@ -227,7 +227,7 @@ flowchart LR
 | `src/planner/plan_manage/launch/single_run.launch.py` | 规划节点 + traj_server；从 yaml 读入上述项，**grid_map / fsm 细项 / 优化器权重仍在此硬编码** |
 | `src/d1_planner_bridge/config/d1_bridge.yaml` | 底盘跟踪增益、`hard_stop_plan_speed` 等（话题/限速默认仍来自 `d1_robot.yaml`） |
 
-改 `max_vel` / `max_wz` / `max_acc` 或话题名时优先改 `d1_robot.yaml`；调 GridMap 分辨率、占据概率、优化器 `lambda_*` 等需改 `single_run.launch.py`（或后续迁入 yaml）。
+改 `max_vel` / `max_wz` / `max_acc`、话题名、FSM、GridMap、优化器、traj_server 等默认参数时改 `d1_robot.yaml`；`single_run.launch.py` 仅保留 launch 覆盖项（如 `enable_tag_tracking`）。
 
 ### 5.3 常见“一冲一停”
 
