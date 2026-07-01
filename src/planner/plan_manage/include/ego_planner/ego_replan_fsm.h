@@ -100,6 +100,15 @@ namespace ego_planner
 
     double emergency_time_;
 
+    /// Traj hit within this horizon (s) + body in inflate + moving toward hit => EMERGENCY_STOP.
+    double estop_imminent_time_{0.3};
+
+    /// Below this XY speed (m/s), inflation-only contact prefers REPLAN over estop.
+    double estop_min_approach_speed_{0.05};
+
+    /// Safety callback: planFromCurrentTraj trial count before tiered estop/replan.
+    int safety_replan_trials_{5};
+
     double global_replan_drift_thresh_;
 
     /// Odom farther than this from the time-sampled traj point => stale traj / jump, force replan.
@@ -235,7 +244,7 @@ namespace ego_planner
 
     bool callReboundReplan(bool flag_use_poly_init, bool flag_randomPolyTraj); // front-end and back-end method
 
-    /// warm-start (optional) → poly init → random poly escape when body is free.
+    /// warm-start (optional) → poly init → random poly escape (always try last stage).
     bool callReboundReplanWithEscape(int trial_times, bool try_warm_start);
 
     bool callEmergencyStop(Eigen::Vector3d stop_pos);                          // front-end and back-end method
@@ -252,7 +261,8 @@ namespace ego_planner
 
     bool isOdomBodyInObstacle() const;
 
-
+    /// Tier-2: after replan escape fails, decide EMERGENCY_STOP vs REPLAN_TRAJ.
+    bool shouldEmergencyStopOnTrajHit(double dt_to_hit, const Eigen::Vector3d &hit_pos) const;
 
     /* return value: std::pair< Times of the same state be continuously called, current continuously called state > */
 
