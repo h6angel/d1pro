@@ -228,7 +228,8 @@ fi
 # 4. EGO 规划（速度/话题默认来自 d1_robot.yaml）
 launch_bg ego_planner \
   ros2 launch ego_planner single_run.launch.py \
-  enable_tag_tracking:=${ENABLE_TAG_TRACKING}
+  enable_tag_tracking:=${ENABLE_TAG_TRACKING} \
+  tracking_trace_csv:=${LOG_DIR}/tracking_trace.csv
 
 sleep 2 || exit 130
 
@@ -238,8 +239,10 @@ launch_bg d1_bridge \
 
 # 6. 可选 RViz（Fixed Frame 选 global）
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
-  launch_bg rviz \
-    ros2 launch ego_planner rviz.launch.py
+  log "启动 rviz ..."
+  ros2 launch ego_planner rviz.launch.py >/dev/null 2>&1 &
+  PIDS+=("$!")
+  log "rviz PID=$!  (不写入日志文件)"
 fi
 
 log "=========================================="
@@ -250,9 +253,11 @@ if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
   log "  AprilTag   -> ${LOG_DIR}/apriltag.log"
 fi
 log "  EGO 规划   -> ${LOG_DIR}/ego_planner.log"
+log "  跟踪 CSV   -> ${LOG_DIR}/tracking_trace.csv"
+log "               关键列: dist_closest_xy(跟踪误差) e_lat h_err dist_end_xy endpoint_hold"
 log "  D1 桥接    -> ${LOG_DIR}/d1_bridge.log"
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
-  log "  RViz       -> ${LOG_DIR}/rviz.log"
+  log "  RViz       -> (无日志文件)"
 fi
 log "=========================================="
 

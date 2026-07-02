@@ -109,6 +109,7 @@ traj_server:
   use_odom_progress: true
   odom_lookahead_time: 0.5
   log_trace_period_ms: 500
+  tracking_trace_period_ms: 50   # CSV row interval; see tracking_trace.csv column guide in start_ego_stack.sh
   endpoint_approach_dist: 0.35
   endpoint_stop_dist: 0.08
   endpoint_vel_gain: 0.8
