@@ -64,6 +64,9 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/planning_horizon", -1.0);
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
+    node_->declare_parameter("fsm/estop_imminent_time", 0.3);
+    node_->declare_parameter("fsm/estop_min_approach_speed", 0.05);
+    node_->declare_parameter("fsm/safety_replan_trials", 5);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
     node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.22);
     node_->declare_parameter("fsm/collision_check_step", 0.05);
@@ -81,6 +84,12 @@ double advanceTForArcStep(
     node_->get_parameter("fsm/planning_horizon", planning_horizen_);
     node_->get_parameter("fsm/planning_horizen_time", planning_horizen_time_);
     node_->get_parameter("fsm/emergency_time", emergency_time_);
+    node_->get_parameter("fsm/estop_imminent_time", estop_imminent_time_);
+    node_->get_parameter("fsm/estop_min_approach_speed", estop_min_approach_speed_);
+    node_->get_parameter("fsm/safety_replan_trials", safety_replan_trials_);
+    estop_imminent_time_ = std::max(estop_imminent_time_, 0.01);
+    estop_min_approach_speed_ = std::max(estop_min_approach_speed_, 0.0);
+    safety_replan_trials_ = std::max(safety_replan_trials_, 1);
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
     node_->get_parameter("fsm/odom_traj_mismatch_thresh", odom_traj_mismatch_thresh_);
     odom_traj_mismatch_thresh_ = std::max(odom_traj_mismatch_thresh_, 0.01);
@@ -523,13 +532,11 @@ double advanceTForArcStep(
         return true;
     }
 
-    if (!isOdomBodyInObstacle())
+    // Random poly escape: always try, even when odom is in inflation margin.
+    for (int i = 0; i < trial_times; ++i)
     {
-      for (int i = 0; i < trial_times; ++i)
-      {
-        if (callReboundReplan(true, true))
-          return true;
-      }
+      if (callReboundReplan(true, true))
+        return true;
     }
 
     return false;
@@ -552,6 +559,30 @@ double advanceTForArcStep(
     const auto map = planner_manager_->grid_map_;
     Eigen::Vector3d p = odom_pos_;
     return map->getInflateOccupancyNoFootprint(p) > 0;
+  }
+
+  bool EGOReplanFSM::shouldEmergencyStopOnTrajHit(
+    const double dt_to_hit, const Eigen::Vector3d &hit_pos) const
+  {
+    // Body check uses inflated occupancy (same margin as traj scan), no footprint exemption.
+    if (!isOdomBodyInObstacle())
+      return false;
+
+    if (dt_to_hit >= estop_imminent_time_)
+      return false;
+
+    const double speed_xy = odom_vel_.head<2>().norm();
+    if (speed_xy < estop_min_approach_speed_)
+      return false;
+
+    Eigen::Vector2d to_hit = (hit_pos - odom_pos_).head<2>();
+    const double dist_xy = to_hit.norm();
+    if (dist_xy < 1e-3)
+      return false;
+
+    to_hit /= dist_xy;
+    const double vel_toward = odom_vel_.head<2>().dot(to_hit);
+    return vel_toward >= estop_min_approach_speed_;
   }
 
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
@@ -653,32 +684,36 @@ double advanceTForArcStep(
 
       if (map->checkSegmentInflateOccupied(p_prev, p_next))
       {
-        const double t_hit = t_next;
-        if (planFromCurrentTraj())
+        const double dt_hit = t_next - t_cur;
+        if (planFromCurrentTraj(safety_replan_trials_))
         {
           changeFSMExecState(EXEC_TRAJ, "SAFETY");
           return;
         }
 
-        const bool odom_in_obstacle = isOdomBodyInObstacle();
-        if (!odom_in_obstacle)
+        const bool odom_inflate = isOdomBodyInObstacle();
+        if (!odom_inflate)
         {
           RCLCPP_WARN(
             node_->get_logger(),
-            "Trajectory collision but odom body free (odom-traj dist=%.3fm, dt=%.3fs), replan.",
-            odom_traj_xy_dist, t_hit - t_cur);
+            "[SAFETY_TIER] traj_hit dt=%.3f odom_inflate=0 -> REPLAN (body free)",
+            dt_hit);
           changeFSMExecState(REPLAN_TRAJ, "SAFETY");
         }
-        else if (t_hit - t_cur < emergency_time_)
+        else if (shouldEmergencyStopOnTrajHit(dt_hit, p_next))
         {
           RCLCPP_WARN(
-            node_->get_logger(), "Suddenly discovered obstacles. emergency stop! time=%f",
-            t_hit - t_cur);
+            node_->get_logger(),
+            "[SAFETY_TIER] imminent dt=%.3f odom_inflate=1 -> EMERGENCY_STOP",
+            dt_hit);
           enterEmergencyStop("SAFETY");
         }
         else
         {
-          RCLCPP_WARN(node_->get_logger(), "current traj in collision, replan.");
+          RCLCPP_WARN(
+            node_->get_logger(),
+            "[SAFETY_TIER] not imminent dt=%.3f odom_inflate=1 -> REPLAN",
+            dt_hit);
           changeFSMExecState(REPLAN_TRAJ, "SAFETY");
         }
         return;

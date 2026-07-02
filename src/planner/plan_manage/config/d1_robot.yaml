@@ -41,6 +41,9 @@ fsm:
   odom_traj_mismatch_thresh: 0.22
   planning_horizen_time: 3.0
   emergency_time: 1.0
+  estop_imminent_time: 0.3       # PR-2: inflate-only estop if hit within this (s) and moving toward hit
+  estop_min_approach_speed: 0.05 # PR-2: below this XY speed, prefer REPLAN over estop when only in inflate
+  safety_replan_trials: 5        # PR-2: escape attempts in safety callback before tier decision
   global_replan_drift_thresh: 0.25
   fail_safe: true
   log_trace_period_ms: 500
