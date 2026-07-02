@@ -108,10 +108,11 @@ def build_ego_planner_params(cfg, overrides=None):
 def build_traj_server_params(cfg, overrides=None):
     """Build traj_server parameters from d1_robot.yaml."""
     overrides = overrides or {}
+    planner = cfg.get('planner', {})
     limits = cfg.get('limits', {})
 
     params = flatten_ros_params(cfg.get('traj_server', {}), 'traj_server')
-    params['traj_server/endpoint_max_vel'] = limits['max_vel']
+    params['traj_server/endpoint_stop_dist'] = planner['goal_reach_thresh']
     params['traj_server/max_yaw_dot'] = limits['max_wz']
 
     for key, value in overrides.items():

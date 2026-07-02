@@ -82,6 +82,26 @@ INTERRUPTED=false
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# 上次 Ctrl+C 后子进程常残留并占用 D435i USB，导致 RealSense busy / OpenVINS SIGABRT / 无点云。
+kill_stale_stack_nodes() {
+  local sig="$1"
+  pkill "-${sig}" -f 'realsense2_camera_node' 2>/dev/null || true
+  pkill "-${sig}" -f 'run_subscribe_msckf' 2>/dev/null || true
+  pkill "-${sig}" -f 'ego_planner_node' 2>/dev/null || true
+  pkill "-${sig}" -f '/traj_server' 2>/dev/null || true
+  pkill "-${sig}" -f 'd1_planner_bridge_node' 2>/dev/null || true
+  pkill "-${sig}" -f 'rviz2' 2>/dev/null || true
+  pkill "-${sig}" -f 'apriltag_detect' 2>/dev/null || true
+}
+
+preflight_cleanup() {
+  log "清理残留节点（避免相机 USB busy、VIO 崩溃、RViz 无点云）..."
+  kill_stale_stack_nodes TERM
+  sleep 2
+  kill_stale_stack_nodes KILL
+  sleep 1
+}
+
 launch_bg() {
   local name="$1"
   shift
@@ -102,10 +122,12 @@ cleanup() {
   for pid in "${PIDS[@]}"; do
     kill -TERM "${pid}" 2>/dev/null || true
   done
+  kill_stale_stack_nodes TERM
   sleep 1
   for pid in "${PIDS[@]}"; do
     kill -KILL "${pid}" 2>/dev/null || true
   done
+  kill_stale_stack_nodes KILL
   log "已退出。日志保留在: ${LOG_DIR}"
 }
 
@@ -189,6 +211,8 @@ log "enable_tag_tracking=${ENABLE_TAG_TRACKING}"
 log "D1 config: ${D1_CONFIG}"
 log "D1 limits: max_vx=${D1_MAX_VX} m/s max_wz=${D1_MAX_WZ} rad/s max_acc=${D1_MAX_ACC} m/s^2"
 
+preflight_cleanup
+
 # 1. RealSense D435i
 launch_bg realsense \
   ros2 launch realsense2_camera rs_launch.py
@@ -207,6 +231,7 @@ launch_bg openvins \
 if [[ "${SKIP_WAIT}" == "false" ]]; then
   wait_for_topic /ov_msckf/pose_stamped 30 || exit $?
   wait_for_message /ov_msckf/pose_stamped 90 || exit $?
+  wait_for_message /ov_msckf/odomimu 30 || exit $?
 fi
 
 # 3. AprilTag 感知（仅追踪模式）
@@ -233,6 +258,12 @@ launch_bg ego_planner \
 
 sleep 2 || exit 130
 
+if [[ "${SKIP_WAIT}" == "false" ]]; then
+  wait_for_topic /drone_0_grid/grid_map/occupancy_inflate 30 || {
+    log "[警告] 点云话题未出现，检查 openvins/realsense 日志" >&2
+  }
+fi
+
 # 5. D1 底盘桥接
 launch_bg d1_bridge \
   ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
@@ -254,7 +285,7 @@ if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
 fi
 log "  EGO 规划   -> ${LOG_DIR}/ego_planner.log"
 log "  跟踪 CSV   -> ${LOG_DIR}/tracking_trace.csv"
-log "               关键列: dist_closest_xy(跟踪误差) e_lat h_err dist_end_xy endpoint_hold"
+log "               关键列: dist_closest_xy(跟踪误差) e_lat h_err dist_end_xy"
 log "  D1 桥接    -> ${LOG_DIR}/d1_bridge.log"
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
   log "  RViz       -> (无日志文件)"

@@ -13,7 +13,7 @@
 namespace d1_planner_bridge
 {
 
-/// EGO pos_cmd -> D1 cmd_twist: velocity feedforward + yaw/lateral error feedback.
+/// EGO pos_cmd -> D1 cmd_twist: body-frame velocity projection + yaw_dot passthrough.
 class D1PlannerBridgeNode : public rclcpp::Node
 {
 public:
@@ -30,9 +30,7 @@ private:
   quadrotor_msgs::msg::PositionCommand::SharedPtr last_pos_cmd_;
   nav_msgs::msg::Odometry::SharedPtr last_odom_;
 
-  // Watchdog: arrival time (node clock) of the latest pos_cmd / odom. If upstream
-  // (traj_server / planner / VIO) crashes or hangs, no new messages arrive and the
-  // age grows past the timeout -> force cmd_vel=(0,0) instead of replaying stale data.
+  // Watchdog: if upstream stops publishing, force cmd_vel=(0,0).
   rclcpp::Time last_pos_cmd_recv_{0, 0, RCL_ROS_TIME};
   rclcpp::Time last_odom_recv_{0, 0, RCL_ROS_TIME};
   bool have_pos_cmd_recv_{false};
@@ -52,18 +50,9 @@ private:
   bool log_cmd_vel_{true};
   int log_cmd_vel_period_ms_{0};
 
-  double cmd_vel_ema_alpha_{0.35};
-  /// plan_vel below this forces twist=(0,0); true stop is plan_vel==0.
-  double hard_stop_plan_speed_{0.005};
-
-  /// Watchdog timeouts (s): stop if no fresh pos_cmd / odom within this window.
   double cmd_timeout_sec_{0.3};
   double odom_timeout_sec_{0.5};
-  /// Only watchdog odom when the tracker actually needs it (body-frame projection).
   bool need_odom_{true};
-  bool cmd_vel_filter_init_{false};
-  double filt_vx_{0.0};
-  double filt_wz_{0.0};
 };
 
 }  // namespace d1_planner_bridge

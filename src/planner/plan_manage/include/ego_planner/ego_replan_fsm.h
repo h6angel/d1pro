@@ -111,10 +111,6 @@ namespace ego_planner
 
     double global_replan_drift_thresh_;
 
-    /// Odom farther than this from the time-sampled traj point => stale traj / jump, force replan.
-
-    double odom_traj_mismatch_thresh_{0.22};
-
     /// Trajectory safety check: arc-length step between segment raycasts (m).
     double collision_check_step_{0.05};
 

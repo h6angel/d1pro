@@ -109,8 +109,6 @@ def _launch_setup(context, *args, **kwargs):
     }
 
     traj_overrides = {
-        'traj_server/endpoint_max_vel': max_vel,
-        'traj_server/max_yaw_dot': max_wz,
         'traj_server/tracking_trace_csv': tracking_trace_csv,
     }
 
