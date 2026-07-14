@@ -1,5 +1,6 @@
 
 #include <algorithm>
+#include <cstring>
 #include <limits>
 
 #include <ego_planner/ego_replan_fsm.h>
@@ -74,6 +75,11 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
     node_->declare_parameter("fsm/gen_new_traj_backoff_base_sec", 0.25);
     node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
+    node_->declare_parameter("fsm/odom_diag_enable", true);
+    node_->declare_parameter("fsm/odom_diag_period_ms", 500);
+    node_->declare_parameter("fsm/odom_diag_implausible_speed", 0.5);
+    node_->declare_parameter("fsm/odom_diag_stamp_dt_lag_sec", 0.15);
+    node_->declare_parameter("fsm/odom_diag_stamp_age_warn_sec", 0.10);
 
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
     node_->get_parameter("fsm/thresh_no_replan_meter", no_replan_thresh_);
@@ -101,6 +107,26 @@ double advanceTForArcStep(
     gen_new_traj_backoff_base_sec_ = std::max(gen_new_traj_backoff_base_sec_, 0.05);
     gen_new_traj_backoff_max_sec_ = std::max(
       gen_new_traj_backoff_max_sec_, gen_new_traj_backoff_base_sec_);
+
+    {
+      traj_utils::OdomDiagParams od;
+      node_->get_parameter("fsm/odom_diag_enable", od.enable);
+      node_->get_parameter("fsm/odom_diag_period_ms", od.period_ms);
+      node_->get_parameter("fsm/odom_diag_implausible_speed", od.implausible_speed);
+      node_->get_parameter("fsm/odom_diag_stamp_dt_lag_sec", od.stamp_dt_lag_sec);
+      node_->get_parameter("fsm/odom_diag_stamp_age_warn_sec", od.stamp_age_warn_sec);
+      od.period_ms = std::max(od.period_ms, 100);
+      od.implausible_speed = std::max(od.implausible_speed, 0.05);
+      od.stamp_dt_lag_sec = std::max(od.stamp_dt_lag_sec, 0.02);
+      od.stamp_age_warn_sec = std::max(od.stamp_age_warn_sec, 0.02);
+      odom_diag_.setParams(od);
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[odom_diag] enable=%d period_ms=%d implausible_speed=%.2f "
+        "stamp_dt_lag=%.2f stamp_age_warn=%.2f (log-only)",
+        od.enable ? 1 : 0, od.period_ms, od.implausible_speed,
+        od.stamp_dt_lag_sec, od.stamp_age_warn_sec);
+    }
 
     node_->declare_parameter("fsm/enable_tag_tracking", false);
     node_->declare_parameter("fsm/tag_pose_topic", "/apriltag/target_pose_global");
@@ -291,6 +317,41 @@ double advanceTForArcStep(
     odom_vel_ = odom_orient_ * v_body;
 
     // odom_acc_ = estimateAcc( msg );
+
+    if (odom_diag_.params().enable)
+    {
+      const rclcpp::Time stamp(msg->header.stamp);
+      const rclcpp::Time now = node_->now();
+      const auto sample = odom_diag_.update(stamp, now, odom_pos_(0), odom_pos_(1));
+      if (sample.valid &&
+          (strcmp(sample.kind, "SUSPECT_JUMP") == 0 ||
+           strcmp(sample.kind, "LIKELY_LAG") == 0 ||
+           strcmp(sample.kind, "STAMP_BACK") == 0))
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(), 200,
+          "[odom_diag/planner] %s pose=(%.3f,%.3f) step_xy=%.3f "
+          "stamp_dt=%.3f wall_dt=%.3f implied_v=%.2f age=%.3f",
+          sample.kind, odom_pos_(0), odom_pos_(1), sample.pose_step_xy,
+          sample.stamp_dt, sample.wall_dt, sample.implied_speed, sample.stamp_age);
+      }
+      uint64_t n_tot = 0, n_lag = 0, n_jump = 0, n_back = 0;
+      if (odom_diag_.takeSummary(now, n_tot, n_lag, n_jump, n_back))
+      {
+        RCLCPP_INFO(
+          node_->get_logger(),
+          "[odom_diag/planner] summary Hz~%.1f lag=%lu jump=%lu stamp_back=%lu "
+          "last=%s step=%.3f implied_v=%.2f age=%.3f",
+          n_tot * 1000.0 / std::max(odom_diag_.params().period_ms, 1),
+          static_cast<unsigned long>(n_lag),
+          static_cast<unsigned long>(n_jump),
+          static_cast<unsigned long>(n_back),
+          odom_diag_.last().kind,
+          odom_diag_.last().pose_step_xy,
+          odom_diag_.last().implied_speed,
+          odom_diag_.last().stamp_age);
+      }
+    }
 
     have_odom_ = true;
     planner_manager_->updateRobotPosition(odom_pos_);

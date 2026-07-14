@@ -41,6 +41,7 @@
 #include "ego_planner/planner_manager.h"
 
 #include "traj_utils/planning_visualization.h"
+#include "traj_utils/odom_diagnostics.hpp"
 
 
 
@@ -203,6 +204,8 @@ namespace ego_planner
     Eigen::Vector3d odom_pos_, odom_vel_, odom_acc_; // odometry state
 
     Eigen::Quaterniond odom_orient_;
+
+    traj_utils::OdomReceiveDiagnostics odom_diag_;
 
 
 

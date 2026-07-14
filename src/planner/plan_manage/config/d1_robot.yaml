@@ -15,6 +15,16 @@ limits:
   max_wz: 0.5    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
   max_acc: 1.0   # 规划加速度上限 (m/s^2)
 
+# odom 接收诊断（仅日志，不停车）。注入 fsm/ + traj_server/
+# SUSPECT_JUMP: 时间戳间隔正常但隐含速度过高（更像 VIO 跳）
+# LIKELY_LAG:   stamp 间隔大 / age 高 / 墙钟落后（更像本节点处理不及时）
+odom_diag:
+  enable: true
+  period_ms: 500
+  implausible_speed: 0.5       # 与手持/实机速度阈值同量级；隐含 v 超此值才告警
+  stamp_dt_lag_sec: 0.15       # stamp 间隔 ≥ 此值时偏判 LIKELY_LAG
+  stamp_age_warn_sec: 0.10     # now-stamp 过大 → 时效差
+
 # D435i depth 640x360 — 设备上可用 ros2 topic echo .../depth/camera_info 核对
 camera:
   cx: 323.168

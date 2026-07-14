@@ -3,10 +3,12 @@
 #include "nav_msgs/msg/path.hpp"
 #include "traj_utils/msg/bspline.hpp"
 #include "traj_utils/trajectory_debug_log.hpp"
+#include "traj_utils/odom_diagnostics.hpp"
 #include "quadrotor_msgs/msg/position_command.hpp"
 #include "std_msgs/msg/empty.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
@@ -43,6 +45,7 @@ double max_yaw_dot_ = 0.5;
 
 rclcpp::Node::SharedPtr g_node;
 int g_log_trace_period_ms_ = 500;
+traj_utils::OdomReceiveDiagnostics g_odom_diag;
 
 namespace
 {
@@ -384,6 +387,38 @@ void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
   const auto & q = msg->pose.pose.orientation;
   odom_yaw_ = yawFromQuaternion(q.w, q.x, q.y, q.z);
   have_odom_ = true;
+
+  if (g_node && g_odom_diag.params().enable) {
+    const rclcpp::Time stamp(msg->header.stamp);
+    const rclcpp::Time now = g_node->now();
+    const auto sample = g_odom_diag.update(stamp, now, odom_pos_(0), odom_pos_(1));
+    if (sample.valid &&
+        (strcmp(sample.kind, "SUSPECT_JUMP") == 0 ||
+         strcmp(sample.kind, "LIKELY_LAG") == 0 ||
+         strcmp(sample.kind, "STAMP_BACK") == 0)) {
+      RCLCPP_WARN_THROTTLE(
+        g_node->get_logger(), *g_node->get_clock(), 200,
+        "[odom_diag/traj_server] %s pose=(%.3f,%.3f) step_xy=%.3f "
+        "stamp_dt=%.3f wall_dt=%.3f implied_v=%.2f age=%.3f",
+        sample.kind, odom_pos_(0), odom_pos_(1), sample.pose_step_xy,
+        sample.stamp_dt, sample.wall_dt, sample.implied_speed, sample.stamp_age);
+    }
+    uint64_t n_tot = 0, n_lag = 0, n_jump = 0, n_back = 0;
+    if (g_odom_diag.takeSummary(now, n_tot, n_lag, n_jump, n_back)) {
+      RCLCPP_INFO(
+        g_node->get_logger(),
+        "[odom_diag/traj_server] summary Hz~%.1f lag=%lu jump=%lu stamp_back=%lu "
+        "last=%s step=%.3f implied_v=%.2f age=%.3f",
+        n_tot * 1000.0 / std::max(g_odom_diag.params().period_ms, 1),
+        static_cast<unsigned long>(n_lag),
+        static_cast<unsigned long>(n_jump),
+        static_cast<unsigned long>(n_back),
+        g_odom_diag.last().kind,
+        g_odom_diag.last().pose_step_xy,
+        g_odom_diag.last().implied_speed,
+        g_odom_diag.last().stamp_age);
+    }
+  }
 }
 
 void cmdCallback()
@@ -547,6 +582,11 @@ int main(int argc, char **argv)
   node->declare_parameter("traj_server/tracking_trace_period_ms", 50);
   node->declare_parameter("traj_server/endpoint_stop_dist", 0.3);
   node->declare_parameter("traj_server/max_yaw_dot", 0.5);
+  node->declare_parameter("traj_server/odom_diag_enable", true);
+  node->declare_parameter("traj_server/odom_diag_period_ms", 500);
+  node->declare_parameter("traj_server/odom_diag_implausible_speed", 0.5);
+  node->declare_parameter("traj_server/odom_diag_stamp_dt_lag_sec", 0.15);
+  node->declare_parameter("traj_server/odom_diag_stamp_age_warn_sec", 0.10);
   node->get_parameter("traj_server/time_forward", time_forward_);
   node->get_parameter("traj_server/use_odom_progress", use_odom_progress_);
   node->get_parameter("traj_server/odom_lookahead_time", odom_lookahead_time_);
@@ -558,6 +598,26 @@ int main(int argc, char **argv)
   g_tracking_trace_csv.configure(tracking_trace_csv, tracking_trace_period_ms);
   node->get_parameter("traj_server/endpoint_stop_dist", endpoint_stop_dist_);
   node->get_parameter("traj_server/max_yaw_dot", max_yaw_dot_);
+
+  {
+    traj_utils::OdomDiagParams od;
+    node->get_parameter("traj_server/odom_diag_enable", od.enable);
+    node->get_parameter("traj_server/odom_diag_period_ms", od.period_ms);
+    node->get_parameter("traj_server/odom_diag_implausible_speed", od.implausible_speed);
+    node->get_parameter("traj_server/odom_diag_stamp_dt_lag_sec", od.stamp_dt_lag_sec);
+    node->get_parameter("traj_server/odom_diag_stamp_age_warn_sec", od.stamp_age_warn_sec);
+    od.period_ms = std::max(od.period_ms, 100);
+    od.implausible_speed = std::max(od.implausible_speed, 0.05);
+    od.stamp_dt_lag_sec = std::max(od.stamp_dt_lag_sec, 0.02);
+    od.stamp_age_warn_sec = std::max(od.stamp_age_warn_sec, 0.02);
+    g_odom_diag.setParams(od);
+    RCLCPP_INFO(
+      node->get_logger(),
+      "[odom_diag] enable=%d period_ms=%d implausible_speed=%.2f "
+      "stamp_dt_lag=%.2f stamp_age_warn=%.2f (log-only)",
+      od.enable ? 1 : 0, od.period_ms, od.implausible_speed,
+      od.stamp_dt_lag_sec, od.stamp_age_warn_sec);
+  }
 
   auto bspline_sub = node->create_subscription<traj_utils::msg::Bspline>(
       "planning/bspline",
