@@ -106,6 +106,10 @@ struct MappingParameters
   double robot_footprint_back_;
   double robot_footprint_left_;
   double robot_footprint_right_;
+  /// If true: footprint cells are not inflation seeds and inflate is not written into them.
+  bool robot_footprint_no_inflate_;
+  /// Extra clear/skip margin (m) around physical box for inflate buffer (kills ring shell).
+  double robot_footprint_clear_margin_;
 };
 
 // intermediate mapping data for fusion
@@ -256,6 +260,8 @@ private:
   void inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step, vector<Eigen::Vector3i> &inf_pts);
   void clearRobotFootprint();
   bool isInsideRobotFootprint(const Eigen::Vector3d &pos) const;
+  /// Same as footprint box/circle, expanded by margin (m) in body frame.
+  bool isInsideRobotFootprint(const Eigen::Vector3d &pos, double margin) const;
   bool robotFootprintActive() const;
   void setRobotOrientationFromQuat(const Eigen::Quaterniond &q);
   bool isGroundFilteredPoint(const Eigen::Vector3d &pos) const;

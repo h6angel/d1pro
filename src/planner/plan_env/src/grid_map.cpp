@@ -61,6 +61,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/robot_footprint_back", 0.20);
   node_->declare_parameter("grid_map/robot_footprint_left", 0.20);
   node_->declare_parameter("grid_map/robot_footprint_right", 0.20);
+  node_->declare_parameter("grid_map/robot_footprint_no_inflate", true);
+  node_->declare_parameter("grid_map/robot_footprint_clear_margin", 0.20);
 
   node_->get_parameter("grid_map/resolution", mp_.resolution_);
   node_->get_parameter("grid_map/map_size_x", x_size);
@@ -111,11 +113,14 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/robot_footprint_back", mp_.robot_footprint_back_);
   node_->get_parameter("grid_map/robot_footprint_left", mp_.robot_footprint_left_);
   node_->get_parameter("grid_map/robot_footprint_right", mp_.robot_footprint_right_);
+  node_->get_parameter("grid_map/robot_footprint_no_inflate", mp_.robot_footprint_no_inflate_);
+  node_->get_parameter("grid_map/robot_footprint_clear_margin", mp_.robot_footprint_clear_margin_);
   mp_.robot_footprint_front_ = std::max(0.0, mp_.robot_footprint_front_);
   mp_.robot_footprint_back_ = std::max(0.0, mp_.robot_footprint_back_);
   mp_.robot_footprint_left_ = std::max(0.0, mp_.robot_footprint_left_);
   mp_.robot_footprint_right_ = std::max(0.0, mp_.robot_footprint_right_);
   mp_.robot_footprint_radius_ = std::max(0.0, mp_.robot_footprint_radius_);
+  mp_.robot_footprint_clear_margin_ = std::max(0.0, mp_.robot_footprint_clear_margin_);
 
   mp_.occ_confirm_frames_ = std::max(1, mp_.occ_confirm_frames_);
   mp_.occ_clear_frames_ = std::max(1, mp_.occ_clear_frames_);
@@ -123,11 +128,14 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
 
   RCLCPP_INFO(
       node_->get_logger(),
-      "[grid_map] footprint enable=%d box F/B/L/R=(%.2f,%.2f,%.2f,%.2f) legacy_r=%.2f",
+      "[grid_map] footprint enable=%d box F/B/L/R=(%.2f,%.2f,%.2f,%.2f) legacy_r=%.2f "
+      "no_inflate=%d clear_margin=%.2f",
       mp_.robot_footprint_enable_ ? 1 : 0,
       mp_.robot_footprint_front_, mp_.robot_footprint_back_,
       mp_.robot_footprint_left_, mp_.robot_footprint_right_,
-      mp_.robot_footprint_radius_);
+      mp_.robot_footprint_radius_,
+      mp_.robot_footprint_no_inflate_ ? 1 : 0,
+      mp_.robot_footprint_clear_margin_);
 
   if (mp_.virtual_ceil_height_ - mp_.ground_height_ > z_size)
   {
@@ -716,8 +724,19 @@ void GridMap::setRobotOrientationFromQuat(const Eigen::Quaterniond &q)
 
 bool GridMap::isInsideRobotFootprint(const Eigen::Vector3d &pos) const
 {
+  return isInsideRobotFootprint(pos, 0.0);
+}
+
+bool GridMap::isInsideRobotFootprint(const Eigen::Vector3d &pos, double margin) const
+{
   if (!robotFootprintActive())
     return false;
+
+  margin = std::max(0.0, margin);
+  const double front = mp_.robot_footprint_front_ + margin;
+  const double back = mp_.robot_footprint_back_ + margin;
+  const double left = mp_.robot_footprint_left_ + margin;
+  const double right = mp_.robot_footprint_right_ + margin;
 
   const double dx = pos(0) - md_.robot_pos_(0);
   const double dy = pos(1) - md_.robot_pos_(1);
@@ -730,21 +749,20 @@ bool GridMap::isInsideRobotFootprint(const Eigen::Vector3d &pos) const
   {
     const double f = dx * md_.robot_fwd_x_ + dy * md_.robot_fwd_y_;
     const double r = dx * md_.robot_right_x_ + dy * md_.robot_right_y_;
-    return f >= -mp_.robot_footprint_back_ && f <= mp_.robot_footprint_front_ &&
-           r >= -mp_.robot_footprint_left_ && r <= mp_.robot_footprint_right_;
+    return f >= -back && f <= front && r >= -left && r <= right;
   }
 
   if (mp_.robot_footprint_radius_ > 1e-3)
-    return dx * dx + dy * dy <=
-           mp_.robot_footprint_radius_ * mp_.robot_footprint_radius_;
+  {
+    const double rad = mp_.robot_footprint_radius_ + margin;
+    return dx * dx + dy * dy <= rad * rad;
+  }
 
   // Box without yaw yet: axis-aligned extents around robot_pos.
   if (box)
   {
-    const double fmax =
-        std::max(mp_.robot_footprint_front_, mp_.robot_footprint_back_);
-    const double rmax =
-        std::max(mp_.robot_footprint_left_, mp_.robot_footprint_right_);
+    const double fmax = std::max(front, back);
+    const double rmax = std::max(left, right);
     return std::fabs(dx) <= fmax && std::fabs(dy) <= rmax;
   }
   return false;
@@ -755,18 +773,19 @@ void GridMap::clearRobotFootprint()
   if (!robotFootprintActive())
     return;
 
+  const double margin = mp_.robot_footprint_clear_margin_;
   const bool box =
       mp_.robot_footprint_front_ > 1e-3 || mp_.robot_footprint_back_ > 1e-3 ||
       mp_.robot_footprint_left_ > 1e-3 || mp_.robot_footprint_right_ > 1e-3;
 
-  double clear_r = mp_.robot_footprint_radius_;
+  double clear_r = mp_.robot_footprint_radius_ + margin;
   if (box)
   {
     clear_r = std::max(
         clear_r,
         std::hypot(
-            std::max(mp_.robot_footprint_front_, mp_.robot_footprint_back_),
-            std::max(mp_.robot_footprint_left_, mp_.robot_footprint_right_)));
+            std::max(mp_.robot_footprint_front_, mp_.robot_footprint_back_) + margin,
+            std::max(mp_.robot_footprint_left_, mp_.robot_footprint_right_) + margin));
   }
   if (clear_r <= 1e-3)
     return;
@@ -786,7 +805,7 @@ void GridMap::clearRobotFootprint()
           continue;
         Eigen::Vector3d pos;
         indexToPos(id, pos);
-        if (!isInsideRobotFootprint(pos))
+        if (!isInsideRobotFootprint(pos, margin))
           continue;
         md_.occupancy_buffer_inflate_[toAddress(id)] = 0;
       }
@@ -820,6 +839,15 @@ void GridMap::inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step,
   if (isGroundFilteredIndex(id))
     return;
 
+  // Robot body (and clear_margin shell): never act as an inflation seed.
+  if (mp_.robot_footprint_no_inflate_ && robotFootprintActive())
+  {
+    Eigen::Vector3d seed_pos;
+    indexToPos(id, seed_pos);
+    if (isInsideRobotFootprint(seed_pos, mp_.robot_footprint_clear_margin_))
+      return;
+  }
+
   inflatePoint(id, inf_step, inf_pts);
   Eigen::Vector3i inf_pt;
   const int buffer_size =
@@ -833,6 +861,14 @@ void GridMap::inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step,
     const int idx_inf = toAddress(inf_pt);
     if (idx_inf < 0 || idx_inf >= buffer_size)
       continue;
+    // Do not write inflate back into the robot body / clear shell.
+    if (mp_.robot_footprint_no_inflate_ && robotFootprintActive())
+    {
+      Eigen::Vector3d inf_pos;
+      indexToPos(inf_pt, inf_pos);
+      if (isInsideRobotFootprint(inf_pos, mp_.robot_footprint_clear_margin_))
+        continue;
+    }
     md_.occupancy_buffer_inflate_[idx_inf] = 1;
   }
 }
