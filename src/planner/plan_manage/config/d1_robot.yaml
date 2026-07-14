@@ -97,7 +97,14 @@ grid_map:
   ground_filter_enable: false  # C: 先关，避免低矮障碍被当地面滤掉
   ground_filter_margin: 0.04   # C: 若噪声大再开 filter，用更小 margin
   inflate_xy_only: true
-  robot_footprint_radius: 0.35
+  # 机身 footprint（相机/odom 原点）：用于膨胀图清空与 getInflateOccupancy 豁免
+  # 几何：相机在最前方往后 10cm；左右各 20cm。前方轴=body +Z（与 bridge 一致）
+  robot_footprint_enable: true
+  robot_footprint_front: 0.10   # 相机 → 鼻尖
+  robot_footprint_back: 0.20    # 相机后方（未单独测量，暂与半宽同量级，可改）
+  robot_footprint_left: 0.20
+  robot_footprint_right: 0.20
+  robot_footprint_radius: 0.0   # 旧圆形模型；>0 且 box 全 0 时才启用圆形
 
 manager:
   max_jerk: 4.0
