@@ -64,12 +64,12 @@ grid_map:
   use_depth_filter: true
   depth_filter_tolerance: 0.15
   depth_filter_maxdist: 5.0
-  depth_filter_mindist: 0.2
+  depth_filter_mindist: 0.10   # B: 0.2 → 0.10，缩小近场盲区
   depth_filter_margin: 2
   k_depth_scaling_factor: 1000.0
-  skip_pixel: 2
-  p_hit: 0.65
-  p_miss: 0.35
+  skip_pixel: 1                # B: 2 → 1，深度采样更密（算力紧时再退回 2）
+  p_hit: 0.70                  # A: 0.65 → 0.70，障碍命中涨更快
+  p_miss: 0.30                 # A: 0.35 → 0.30，清除更慢
   p_min: 0.12
   p_max: 0.90
   p_occ: 0.80
@@ -79,13 +79,13 @@ grid_map:
   visualization_truncate_height: 1.8
   show_occ_time: false
   pose_type: 1
-  occ_confirm_frames: 3
-  occ_clear_frames: 5
+  occ_confirm_frames: 2        # A: 3 → 2，更快确认有障碍
+  occ_clear_frames: 10         # A: 5 → 10，更慢清除（须慢于 confirm）
   use_fixed_publish_window: true
   map_vis_rate: 10.0
   odom_depth_timeout: 2.5
-  ground_filter_enable: true
-  ground_filter_margin: 0.12
+  ground_filter_enable: false  # C: 先关，避免低矮障碍被当地面滤掉
+  ground_filter_margin: 0.04   # C: 若噪声大再开 filter，用更小 margin
   inflate_xy_only: true
   robot_footprint_radius: 0.35
 
