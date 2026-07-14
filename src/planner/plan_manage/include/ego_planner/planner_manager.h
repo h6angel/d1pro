@@ -38,6 +38,7 @@ namespace ego_planner
 
     void setRobotPlanningZ(double z);
     void updateRobotPosition(const Eigen::Vector3d &pos);
+    void updateRobotPose(const Eigen::Vector3d &pos, const Eigen::Quaterniond &q);
 
     PlanParameters pp_;
     LocalTrajData local_data_;

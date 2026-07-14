@@ -76,6 +76,7 @@ def _launch_setup(context, *args, **kwargs):
     tag_update_min_dist = _float(LaunchConfiguration('tag_update_min_dist'))
     tag_replan_min_period = _float(LaunchConfiguration('tag_replan_min_period'))
     enable_tag_tracking = _bool(LaunchConfiguration('enable_tag_tracking'))
+    tracking_trace_csv = _str(LaunchConfiguration('tracking_trace_csv'))
 
     ego_overrides = {
         'fsm/thresh_replan_time': thresh_replan_time,
@@ -108,8 +109,7 @@ def _launch_setup(context, *args, **kwargs):
     }
 
     traj_overrides = {
-        'traj_server/endpoint_max_vel': max_vel,
-        'traj_server/max_yaw_dot': max_wz,
+        'traj_server/tracking_trace_csv': tracking_trace_csv,
     }
 
     ego_planner_node = Node(
@@ -191,6 +191,7 @@ def generate_launch_description():
         'tag_update_min_dist', default=str(_fsm.get('tag_update_min_dist', 0.08)))
     tag_replan_min_period = LaunchConfiguration(
         'tag_replan_min_period', default=str(_fsm.get('tag_replan_min_period', 0.5)))
+    tracking_trace_csv = LaunchConfiguration('tracking_trace_csv', default='')
 
     ld = LaunchDescription()
     ld.add_action(DeclareLaunchArgument('map_size_x', default_value=map_size_x))
@@ -252,6 +253,9 @@ def generate_launch_description():
         description='AprilTag tracking stop distance to tag center (m, XY)'))
     ld.add_action(DeclareLaunchArgument('tag_update_min_dist', default_value=tag_update_min_dist))
     ld.add_action(DeclareLaunchArgument('tag_replan_min_period', default_value=tag_replan_min_period))
+    ld.add_action(DeclareLaunchArgument(
+        'tracking_trace_csv', default_value=tracking_trace_csv,
+        description='Absolute path for tracking_trace.csv; empty disables CSV logging'))
     ld.add_action(OpaqueFunction(function=_launch_setup))
 
     return ld

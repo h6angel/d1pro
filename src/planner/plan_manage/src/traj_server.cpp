@@ -3,10 +3,14 @@
 #include "nav_msgs/msg/path.hpp"
 #include "traj_utils/msg/bspline.hpp"
 #include "traj_utils/trajectory_debug_log.hpp"
+#include "traj_utils/odom_diagnostics.hpp"
 #include "quadrotor_msgs/msg/position_command.hpp"
 #include "std_msgs/msg/empty.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include <cmath>
+#include <cstring>
+#include <fstream>
+#include <mutex>
 #include <rclcpp/rclcpp.hpp>
 
 rclcpp::Publisher<quadrotor_msgs::msg::PositionCommand>::SharedPtr pos_cmd_pub;
@@ -24,28 +28,196 @@ double traj_duration_;
 rclcpp::Time start_time_;
 int traj_id_;
 
-// yaw control
-double last_yaw_, last_yaw_dot_;
-double time_forward_;
+double last_yaw_{0.0};
+double last_yaw_dot_{0.0};
+double time_forward_{0.7};
 
 // Odom-synced playback (for slow ground robots / D1)
 bool use_odom_progress_ = false;
 bool have_odom_ = false;
 Eigen::Vector3d odom_pos_ = Eigen::Vector3d::Zero();
+double odom_yaw_ = 0.0;
 double t_progress_ = 0.0;
 double odom_lookahead_time_ = 0.4;
-// When odom is past traj end but not at endpoint: guide toward traj_end instead of freezing bad vel.
-double endpoint_approach_dist_ = 0.35;
-double endpoint_stop_dist_ = 0.08;
-double endpoint_vel_gain_ = 0.8;
-double endpoint_max_vel_ = 0.6;
+/// XY distance to traj end at/below which vel is zeroed (align with fsm goal_reach_thresh).
+double endpoint_stop_dist_ = 0.3;
 double max_yaw_dot_ = 0.5;
 
 rclcpp::Node::SharedPtr g_node;
 int g_log_trace_period_ms_ = 500;
+traj_utils::OdomReceiveDiagnostics g_odom_diag;
 
 namespace
 {
+
+class TrackingTraceCsv
+{
+public:
+  struct Sample
+  {
+    rclcpp::Time stamp;
+    int traj_id{0};
+    double t_closest{0.0};
+    double t_progress{0.0};
+    double t_cur{0.0};
+    double t_duration{0.0};
+    Eigen::Vector3d odom_pos{Eigen::Vector3d::Zero()};
+    double odom_yaw{0.0};
+    Eigen::Vector3d cmd_pos{Eigen::Vector3d::Zero()};
+    double cmd_yaw{0.0};
+    Eigen::Vector3d closest_pos{Eigen::Vector3d::Zero()};
+    double track_yaw{0.0};
+    Eigen::Vector3d vel{Eigen::Vector3d::Zero()};
+    double dist_closest_xy{0.0};
+    double dist_cmd_xy{0.0};
+    double dist_end_xy{0.0};
+    double e_lat{0.0};
+    double h_err{0.0};
+  };
+
+  void configure(const std::string & path, int period_ms)
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    closeUnlocked();
+    period_ms_ = std::max(period_ms, 1);
+    if (path.empty())
+      return;
+
+    out_.open(path, std::ios::out | std::ios::trunc);
+    if (!out_.is_open())
+    {
+      if (g_node)
+      {
+        RCLCPP_ERROR(
+          g_node->get_logger(), "Failed to open tracking_trace CSV: %s", path.c_str());
+      }
+      return;
+    }
+
+    path_ = path;
+    out_ << "stamp_sec,stamp_nsec,traj_id,"
+         << "t_closest,t_progress,t_cur,t_duration,"
+         << "odom_x,odom_y,odom_z,odom_yaw,"
+         << "cmd_x,cmd_y,cmd_z,cmd_yaw,"
+         << "closest_x,closest_y,closest_z,track_yaw,"
+         << "vel_x,vel_y,vel_z,vel_norm,"
+         << "dist_closest_xy,dist_cmd_xy,dist_end_xy,"
+         << "e_lat,h_err\n";
+    out_.flush();
+    last_write_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+    if (g_node)
+    {
+      RCLCPP_INFO(
+        g_node->get_logger(), "tracking_trace CSV: %s (period_ms=%d)",
+        path_.c_str(), period_ms_);
+    }
+  }
+
+  void maybeWrite(const Sample & sample)
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (!out_.is_open())
+      return;
+
+    if (last_write_.nanoseconds() > 0)
+    {
+      const double dt_ms = (sample.stamp - last_write_).seconds() * 1000.0;
+      if (dt_ms + 1e-6 < period_ms_)
+        return;
+    }
+
+    const double vel_norm = sample.vel.head<2>().norm();
+
+    out_ << sample.stamp.seconds() << ','
+         << sample.stamp.nanoseconds() << ','
+         << sample.traj_id << ','
+         << sample.t_closest << ','
+         << sample.t_progress << ','
+         << sample.t_cur << ','
+         << sample.t_duration << ','
+         << sample.odom_pos(0) << ','
+         << sample.odom_pos(1) << ','
+         << sample.odom_pos(2) << ','
+         << sample.odom_yaw << ','
+         << sample.cmd_pos(0) << ','
+         << sample.cmd_pos(1) << ','
+         << sample.cmd_pos(2) << ','
+         << sample.cmd_yaw << ','
+         << sample.closest_pos(0) << ','
+         << sample.closest_pos(1) << ','
+         << sample.closest_pos(2) << ','
+         << sample.track_yaw << ','
+         << sample.vel(0) << ','
+         << sample.vel(1) << ','
+         << sample.vel(2) << ','
+         << vel_norm << ','
+         << sample.dist_closest_xy << ','
+         << sample.dist_cmd_xy << ','
+         << sample.dist_end_xy << ','
+         << sample.e_lat << ','
+         << sample.h_err << '\n';
+    out_.flush();
+    last_write_ = sample.stamp;
+  }
+
+  void close()
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    closeUnlocked();
+  }
+
+private:
+  void closeUnlocked()
+  {
+    if (out_.is_open())
+      out_.close();
+    path_.clear();
+    last_write_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+  }
+
+  std::mutex mu_;
+  std::ofstream out_;
+  std::string path_;
+  int period_ms_{50};
+  rclcpp::Time last_write_{0, 0, RCL_ROS_TIME};
+};
+
+TrackingTraceCsv g_tracking_trace_csv;
+
+double yawFromQuaternion(double w, double x, double y, double z)
+{
+  const double n2 = w * w + x * x + y * y + z * z;
+  if (!std::isfinite(n2) || n2 < 1e-8)
+    return 0.0;
+  const double inv_n = 1.0 / std::sqrt(n2);
+  w *= inv_n;
+  x *= inv_n;
+  y *= inv_n;
+  z *= inv_n;
+  const double siny_cosp = 2.0 * (w * z + x * y);
+  const double cosy_cosp = 1.0 - 2.0 * (y * y + z * z);
+  return std::atan2(siny_cosp, cosy_cosp);
+}
+
+double wrapPi(double angle)
+{
+  while (angle > M_PI)
+    angle -= 2.0 * M_PI;
+  while (angle < -M_PI)
+    angle += 2.0 * M_PI;
+  return angle;
+}
+
+double signedLateralError(
+  double robot_x, double robot_y, double ref_x, double ref_y, double path_yaw)
+{
+  const double ex = robot_x - ref_x;
+  const double ey = robot_y - ref_y;
+  const double ux = std::cos(path_yaw);
+  const double uy = std::sin(path_yaw);
+  return uy * ex - ux * ey;
+}
+
 constexpr double kClosestSearchDt = 0.05;
 constexpr double kClosestSearchWindowSec = 1.0;
 
@@ -175,15 +347,20 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
     t_progress_ = std::max(0.0, std::min(t_progress_, traj_duration_));
   }
 
+  last_yaw_ = 0.0;
   last_yaw_dot_ = 0.0;
-  if (!std::isfinite(last_yaw_))
-    last_yaw_ = 0.0;
   if (have_odom_ && traj_duration_ > 1e-6) {
     const double t_yaw = std::min(t_progress_ + time_forward_, traj_duration_);
-    const Eigen::Vector3d p_ref = traj_[0].evaluateDeBoorT(t_yaw);
-    const Eigen::Vector2d diff = (p_ref.head<2>() - odom_pos_.head<2>());
-    if (diff.norm() > 0.05)
-      last_yaw_ = std::atan2(diff.y(), diff.x());
+    const Eigen::Vector3d v_ref = traj_[1].evaluateDeBoorT(t_yaw);
+    if (v_ref.head<2>().norm() > 0.05) {
+      last_yaw_ = std::atan2(v_ref(1), v_ref(0));
+    } else {
+      const Eigen::Vector3d p_ref = traj_[0].evaluateDeBoorT(t_yaw);
+      const Eigen::Vector2d diff = (p_ref.head<2>() - odom_pos_.head<2>());
+      if (diff.norm() > 0.05) {
+        last_yaw_ = std::atan2(diff.y(), diff.x());
+      }
+    }
   }
 
   receive_traj_ = true;
@@ -207,113 +384,41 @@ void odomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
   odom_pos_(0) = msg->pose.pose.position.x;
   odom_pos_(1) = msg->pose.pose.position.y;
   odom_pos_(2) = msg->pose.pose.position.z;
+  const auto & q = msg->pose.pose.orientation;
+  odom_yaw_ = yawFromQuaternion(q.w, q.x, q.y, q.z);
   have_odom_ = true;
-}
 
-std::pair<double, double> calculate_yaw(double t_cur, Eigen::Vector3d &pos, rclcpp::Time &time_now, rclcpp::Time &time_last)
-{
-  constexpr double PI = 3.1415926;
-  const double yaw_dot_max = std::max(max_yaw_dot_, 1e-3);
-  std::pair<double, double> yaw_yawdot(0, 0);
-  double yaw = 0;
-  double yawdot = 0;
-
-  if (!std::isfinite(last_yaw_))
-    last_yaw_ = 0.0;
-  if (!std::isfinite(last_yaw_dot_))
-    last_yaw_dot_ = 0.0;
-
-  const double dt = std::max((time_now - time_last).seconds(), 1e-3);
-
-  Eigen::Vector3d dir = t_cur + time_forward_ <= traj_duration_ ? traj_[0].evaluateDeBoorT(t_cur + time_forward_) - pos : traj_[0].evaluateDeBoorT(traj_duration_) - pos;
-  double yaw_temp = dir.norm() > 0.1 ? atan2(dir(1), dir(0)) : last_yaw_;
-  if (!std::isfinite(yaw_temp))
-    yaw_temp = last_yaw_;
-  double max_yaw_change = yaw_dot_max * dt;
-  if (yaw_temp - last_yaw_ > PI)
-  {
-    if (yaw_temp - last_yaw_ - 2 * PI < -max_yaw_change)
-    {
-      yaw = last_yaw_ - max_yaw_change;
-      if (yaw < -PI)
-        yaw += 2 * PI;
-
-      yawdot = -yaw_dot_max;
+  if (g_node && g_odom_diag.params().enable) {
+    const rclcpp::Time stamp(msg->header.stamp);
+    const rclcpp::Time now = g_node->now();
+    const auto sample = g_odom_diag.update(stamp, now, odom_pos_(0), odom_pos_(1));
+    if (sample.valid &&
+        (strcmp(sample.kind, "SUSPECT_JUMP") == 0 ||
+         strcmp(sample.kind, "LIKELY_LAG") == 0 ||
+         strcmp(sample.kind, "STAMP_BACK") == 0)) {
+      RCLCPP_WARN_THROTTLE(
+        g_node->get_logger(), *g_node->get_clock(), 200,
+        "[odom_diag/traj_server] %s pose=(%.3f,%.3f) step_xy=%.3f "
+        "stamp_dt=%.3f wall_dt=%.3f implied_v=%.2f age=%.3f",
+        sample.kind, odom_pos_(0), odom_pos_(1), sample.pose_step_xy,
+        sample.stamp_dt, sample.wall_dt, sample.implied_speed, sample.stamp_age);
     }
-    else
-    {
-      yaw = yaw_temp;
-      if (yaw - last_yaw_ > PI)
-        yawdot = -yaw_dot_max;
-      else
-        yawdot = (yaw_temp - last_yaw_) / dt;
+    uint64_t n_tot = 0, n_lag = 0, n_jump = 0, n_back = 0;
+    if (g_odom_diag.takeSummary(now, n_tot, n_lag, n_jump, n_back)) {
+      RCLCPP_INFO(
+        g_node->get_logger(),
+        "[odom_diag/traj_server] summary Hz~%.1f lag=%lu jump=%lu stamp_back=%lu "
+        "last=%s step=%.3f implied_v=%.2f age=%.3f",
+        n_tot * 1000.0 / std::max(g_odom_diag.params().period_ms, 1),
+        static_cast<unsigned long>(n_lag),
+        static_cast<unsigned long>(n_jump),
+        static_cast<unsigned long>(n_back),
+        g_odom_diag.last().kind,
+        g_odom_diag.last().pose_step_xy,
+        g_odom_diag.last().implied_speed,
+        g_odom_diag.last().stamp_age);
     }
   }
-  else if (yaw_temp - last_yaw_ < -PI)
-  {
-    if (yaw_temp - last_yaw_ + 2 * PI > max_yaw_change)
-    {
-      yaw = last_yaw_ + max_yaw_change;
-      if (yaw > PI)
-        yaw -= 2 * PI;
-
-      yawdot = yaw_dot_max;
-    }
-    else
-    {
-      yaw = yaw_temp;
-      if (yaw - last_yaw_ < -PI)
-        yawdot = yaw_dot_max;
-      else
-        yawdot = (yaw_temp - last_yaw_) / dt;
-    }
-  }
-  else
-  {
-    if (yaw_temp - last_yaw_ < -max_yaw_change)
-    {
-      yaw = last_yaw_ - max_yaw_change;
-      if (yaw < -PI)
-        yaw += 2 * PI;
-
-      yawdot = -yaw_dot_max;
-    }
-    else if (yaw_temp - last_yaw_ > max_yaw_change)
-    {
-      yaw = last_yaw_ + max_yaw_change;
-      if (yaw > PI)
-        yaw -= 2 * PI;
-
-      yawdot = yaw_dot_max;
-    }
-    else
-    {
-      yaw = yaw_temp;
-      if (yaw - last_yaw_ > PI)
-        yawdot = -yaw_dot_max;
-      else if (yaw - last_yaw_ < -PI)
-        yawdot = yaw_dot_max;
-      else
-        yawdot = (yaw_temp - last_yaw_) / dt;
-    }
-  }
-
-  if (fabs(yaw - last_yaw_) <= max_yaw_change)
-    yaw = 0.5 * last_yaw_ + 0.5 * yaw;
-  yawdot = 0.5 * last_yaw_dot_ + 0.5 * yawdot;
-
-  if (!std::isfinite(yaw))
-    yaw = last_yaw_;
-  if (!std::isfinite(yawdot))
-    yawdot = 0.0;
-
-  last_yaw_ = yaw;
-  last_yaw_dot_ = yawdot;
-
-  yaw_yawdot.first = yaw;
-  yaw_yawdot.second = yawdot;
-
-  return yaw_yawdot;
 }
 
 void cmdCallback()
@@ -321,114 +426,62 @@ void cmdCallback()
   if (!receive_traj_)
     return;
 
-  // Use the node ROS clock so wall-clock playback matches start_time_ (set with the
-  // planner node clock) and respects use_sim_time. A standalone rclcpp::Clock is not
-  // driven by /clock and would diverge under simulation.
   rclcpp::Time time_now = g_node->now();
-
   const Eigen::Vector3d traj_end = traj_[0].evaluateDeBoorT(traj_duration_);
 
-  double t_cur = 0.0;
-  bool endpoint_hold = false;
   double t_closest = 0.0;
+  double t_cur = 0.0;
   if (use_odom_progress_ && have_odom_)
   {
     t_closest = closestTimeOnTrajXY(odom_pos_.head<2>(), t_progress_);
-    const double dist_odom_end_xy =
-      (odom_pos_.head<2>() - traj_end.head<2>()).norm();
-
-    // Overshoot past traj end: allow t_progress to move backward with closest projection.
-    if (t_closest >= traj_duration_ - 1e-3 &&
-        dist_odom_end_xy > endpoint_approach_dist_)
-    {
+    if (t_closest >= traj_duration_ - 1e-3)
       t_progress_ = t_closest;
-    }
     else
-    {
       t_progress_ = std::max(t_progress_, t_closest);
-    }
     t_cur = std::min(t_progress_ + odom_lookahead_time_, traj_duration_);
-
-    if (t_cur >= traj_duration_ - 1e-3 &&
-        dist_odom_end_xy > endpoint_stop_dist_)
-    {
-      endpoint_hold = true;
-    }
   }
   else
   {
     t_cur = (time_now - start_time_).seconds();
   }
+  t_cur = std::max(0.0, std::min(t_cur, traj_duration_));
 
-  Eigen::Vector3d pos(Eigen::Vector3d::Zero()), vel(Eigen::Vector3d::Zero()), acc(Eigen::Vector3d::Zero()), pos_f;
-  std::pair<double, double> yaw_yawdot(0, 0);
+  Eigen::Vector3d pos = traj_[0].evaluateDeBoorT(t_cur);
+  Eigen::Vector3d vel = traj_[1].evaluateDeBoorT(t_cur);
+  Eigen::Vector3d acc = traj_[2].evaluateDeBoorT(t_cur);
+
+  const double dist_odom_end_xy = have_odom_
+    ? (odom_pos_.head<2>() - traj_end.head<2>()).norm()
+    : (pos.head<2>() - traj_end.head<2>()).norm();
+
+  if (dist_odom_end_xy <= endpoint_stop_dist_)
+  {
+    pos = traj_end;
+    vel.setZero();
+    acc.setZero();
+  }
 
   static rclcpp::Time time_last = time_now;
-  if (endpoint_hold)
-  {
-    pos = traj_end;
-    acc.setZero();
-    pos_f = traj_end;
-
-    const Eigen::Vector2d diff =
-      traj_end.head<2>() - odom_pos_.head<2>();
-    const double dist_xy = diff.norm();
-    vel.setZero();
-    if (dist_xy > endpoint_stop_dist_)
-    {
-      const double spd = std::min(endpoint_max_vel_, endpoint_vel_gain_ * dist_xy);
-      vel.head<2>() = diff / dist_xy * spd;
-    }
-
-    if (vel.head<2>().norm() > 0.05)
-    {
-      yaw_yawdot.first = std::atan2(vel(1), vel(0));
-      yaw_yawdot.second = 0.0;
-    }
-    else
-    {
-      yaw_yawdot.first = last_yaw_;
-      yaw_yawdot.second = 0.0;
-    }
-  }
-  else if (t_cur < traj_duration_ && t_cur >= 0.0)
-  {
-    pos = traj_[0].evaluateDeBoorT(t_cur);
-    vel = traj_[1].evaluateDeBoorT(t_cur);
-    acc = traj_[2].evaluateDeBoorT(t_cur);
-
-    yaw_yawdot = calculate_yaw(t_cur, pos, time_now, time_last);
-
-    double tf = min(traj_duration_, t_cur + 2.0);
-    pos_f = traj_[0].evaluateDeBoorT(tf);
-  }
-  else if (t_cur >= traj_duration_)
-  {
-    pos = traj_end;
-    acc.setZero();
-    pos_f = traj_end;
-
-    const double dist_odom_end_xy = have_odom_ ?
-      (odom_pos_.head<2>() - traj_end.head<2>()).norm() : 0.0;
-    if (have_odom_ && dist_odom_end_xy <= endpoint_stop_dist_)
-    {
-      vel.setZero();
-      yaw_yawdot.first = last_yaw_;
-      yaw_yawdot.second = 0.0;
-    }
-    else
-    {
-      vel = traj_[1].evaluateDeBoorT(std::max(traj_duration_ - 1e-3, 0.0));
-      yaw_yawdot = calculate_yaw(
-        std::max(traj_duration_ - 1e-3, 0.0), pos, time_now, time_last);
-    }
-  }
-  else
-  {
-    cout << "[Traj server]: invalid time." << endl;
-  }
-
+  const double dt = std::max((time_now - time_last).seconds(), 1e-3);
   time_last = time_now;
+
+  double yaw = last_yaw_;
+  double yawdot = 0.0;
+  const double vxy = vel.head<2>().norm();
+  if (vxy > 0.05)
+  {
+    const double yaw_vel = std::atan2(vel(1), vel(0));
+    yaw = yaw_vel;
+    if (std::isfinite(last_yaw_))
+      yawdot = wrapPi(yaw_vel - last_yaw_) / dt;
+    yawdot = std::clamp(yawdot, -max_yaw_dot_, max_yaw_dot_);
+  }
+  if (!std::isfinite(yaw))
+    yaw = std::isfinite(last_yaw_) ? last_yaw_ : 0.0;
+  if (!std::isfinite(yawdot))
+    yawdot = 0.0;
+  last_yaw_ = yaw;
+  last_yaw_dot_ = yawdot;
 
   cmd.header.stamp = time_now;
   cmd.header.frame_id = "global";
@@ -447,29 +500,25 @@ void cmdCallback()
   cmd.acceleration.y = acc(1);
   cmd.acceleration.z = acc(2);
 
-  cmd.yaw = yaw_yawdot.first;
-  cmd.yaw_dot = yaw_yawdot.second;
+  cmd.yaw = yaw;
+  cmd.yaw_dot = yawdot;
 
   if (!std::isfinite(cmd.velocity.x)) cmd.velocity.x = 0.0;
   if (!std::isfinite(cmd.velocity.y)) cmd.velocity.y = 0.0;
   if (!std::isfinite(cmd.velocity.z)) cmd.velocity.z = 0.0;
-  if (!std::isfinite(cmd.yaw)) cmd.yaw = std::isfinite(last_yaw_) ? last_yaw_ : 0.0;
-  if (!std::isfinite(cmd.yaw_dot)) cmd.yaw_dot = 0.0;
+  if (!std::isfinite(cmd.yaw)) cmd.yaw = 0.0;
 
-  double t_track = std::max(0.0, std::min(t_cur, traj_duration_));
-  if (use_odom_progress_ && have_odom_) {
-    t_track = t_closest;
-  }
+  double t_track = t_closest;
+  if (!use_odom_progress_ || !have_odom_)
+    t_track = t_cur;
+  t_track = std::max(0.0, std::min(t_track, traj_duration_));
   const Eigen::Vector3d track_pos = traj_[0].evaluateDeBoorT(t_track);
   cmd.track_point.x = track_pos(0);
   cmd.track_point.y = track_pos(1);
   cmd.track_point.z = track_pos(2);
   cmd.track_yaw = tangentYawAtTrajTime(t_track);
-  if (!std::isfinite(cmd.track_yaw)) {
+  if (!std::isfinite(cmd.track_yaw))
     cmd.track_yaw = cmd.yaw;
-  }
-
-  last_yaw_ = cmd.yaw;
 
   pos_cmd_pub->publish(cmd);
 
@@ -484,6 +533,38 @@ void cmdCallback()
       traj_utils::formatVec3(pos).c_str(),
       traj_utils::formatXYZ(vel(0), vel(1), vel(2)).c_str(),
       dist_odom_cmd);
+
+    const double t_closest_log = closestTimeOnTrajXY(
+      odom_pos_.head<2>(), use_odom_progress_ ? t_progress_ : -1.0);
+    const Eigen::Vector3d closest_pos_log = traj_[0].evaluateDeBoorT(t_closest_log);
+    const double track_yaw_log = tangentYawAtTrajTime(t_closest_log);
+    const double dist_closest_xy =
+      (odom_pos_.head<2>() - closest_pos_log.head<2>()).norm();
+    const double e_lat = signedLateralError(
+      odom_pos_(0), odom_pos_(1),
+      closest_pos_log(0), closest_pos_log(1), track_yaw_log);
+    const double h_err = wrapPi(track_yaw_log - odom_yaw_);
+
+    TrackingTraceCsv::Sample trace;
+    trace.stamp = time_now;
+    trace.traj_id = traj_id_;
+    trace.t_closest = t_closest_log;
+    trace.t_progress = t_progress_;
+    trace.t_cur = t_cur;
+    trace.t_duration = traj_duration_;
+    trace.odom_pos = odom_pos_;
+    trace.odom_yaw = odom_yaw_;
+    trace.cmd_pos = pos;
+    trace.cmd_yaw = cmd.yaw;
+    trace.closest_pos = closest_pos_log;
+    trace.track_yaw = track_yaw_log;
+    trace.vel = vel;
+    trace.dist_closest_xy = dist_closest_xy;
+    trace.dist_cmd_xy = dist_odom_cmd;
+    trace.dist_end_xy = dist_odom_end_xy;
+    trace.e_lat = e_lat;
+    trace.h_err = h_err;
+    g_tracking_trace_csv.maybeWrite(trace);
   }
 }
 
@@ -497,20 +578,46 @@ int main(int argc, char **argv)
   node->declare_parameter("traj_server/use_odom_progress", false);
   node->declare_parameter("traj_server/odom_lookahead_time", 0.4);
   node->declare_parameter("traj_server/log_trace_period_ms", 500);
-  node->declare_parameter("traj_server/endpoint_approach_dist", 0.35);
-  node->declare_parameter("traj_server/endpoint_stop_dist", 0.08);
-  node->declare_parameter("traj_server/endpoint_vel_gain", 0.8);
-  node->declare_parameter("traj_server/endpoint_max_vel", 0.6);
+  node->declare_parameter("traj_server/tracking_trace_csv", std::string(""));
+  node->declare_parameter("traj_server/tracking_trace_period_ms", 50);
+  node->declare_parameter("traj_server/endpoint_stop_dist", 0.3);
   node->declare_parameter("traj_server/max_yaw_dot", 0.5);
+  node->declare_parameter("traj_server/odom_diag_enable", true);
+  node->declare_parameter("traj_server/odom_diag_period_ms", 500);
+  node->declare_parameter("traj_server/odom_diag_implausible_speed", 0.5);
+  node->declare_parameter("traj_server/odom_diag_stamp_dt_lag_sec", 0.15);
+  node->declare_parameter("traj_server/odom_diag_stamp_age_warn_sec", 0.10);
   node->get_parameter("traj_server/time_forward", time_forward_);
   node->get_parameter("traj_server/use_odom_progress", use_odom_progress_);
   node->get_parameter("traj_server/odom_lookahead_time", odom_lookahead_time_);
   node->get_parameter("traj_server/log_trace_period_ms", g_log_trace_period_ms_);
-  node->get_parameter("traj_server/endpoint_approach_dist", endpoint_approach_dist_);
+  std::string tracking_trace_csv;
+  int tracking_trace_period_ms = 50;
+  node->get_parameter("traj_server/tracking_trace_csv", tracking_trace_csv);
+  node->get_parameter("traj_server/tracking_trace_period_ms", tracking_trace_period_ms);
+  g_tracking_trace_csv.configure(tracking_trace_csv, tracking_trace_period_ms);
   node->get_parameter("traj_server/endpoint_stop_dist", endpoint_stop_dist_);
-  node->get_parameter("traj_server/endpoint_vel_gain", endpoint_vel_gain_);
-  node->get_parameter("traj_server/endpoint_max_vel", endpoint_max_vel_);
   node->get_parameter("traj_server/max_yaw_dot", max_yaw_dot_);
+
+  {
+    traj_utils::OdomDiagParams od;
+    node->get_parameter("traj_server/odom_diag_enable", od.enable);
+    node->get_parameter("traj_server/odom_diag_period_ms", od.period_ms);
+    node->get_parameter("traj_server/odom_diag_implausible_speed", od.implausible_speed);
+    node->get_parameter("traj_server/odom_diag_stamp_dt_lag_sec", od.stamp_dt_lag_sec);
+    node->get_parameter("traj_server/odom_diag_stamp_age_warn_sec", od.stamp_age_warn_sec);
+    od.period_ms = std::max(od.period_ms, 100);
+    od.implausible_speed = std::max(od.implausible_speed, 0.05);
+    od.stamp_dt_lag_sec = std::max(od.stamp_dt_lag_sec, 0.02);
+    od.stamp_age_warn_sec = std::max(od.stamp_age_warn_sec, 0.02);
+    g_odom_diag.setParams(od);
+    RCLCPP_INFO(
+      node->get_logger(),
+      "[odom_diag] enable=%d period_ms=%d implausible_speed=%.2f "
+      "stamp_dt_lag=%.2f stamp_age_warn=%.2f (log-only)",
+      od.enable ? 1 : 0, od.period_ms, od.implausible_speed,
+      od.stamp_dt_lag_sec, od.stamp_age_warn_sec);
+  }
 
   auto bspline_sub = node->create_subscription<traj_utils::msg::Bspline>(
       "planning/bspline",
@@ -552,7 +659,10 @@ int main(int argc, char **argv)
   else
     RCLCPP_WARN(node->get_logger(), "[Traj server]: ready (wall-clock playback).");
 
+  rclcpp::on_shutdown([]() { g_tracking_trace_csv.close(); });
+
   rclcpp::spin(node);
+  g_tracking_trace_csv.close();
   rclcpp::shutdown();
 
   return 0;

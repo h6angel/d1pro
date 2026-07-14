@@ -1,39 +1,20 @@
 d1_planner_bridge_node:
   ros__parameters:
     # 话题与速度上限见 ego_planner/config/d1_robot.yaml（launch 注入）
-    # 此处仅保留 bridge 专用控制调参
 
     control_rate_hz: 100.0
 
     log_cmd_vel: true
     log_cmd_vel_period_ms: 500
 
-    # path yaw: min-error pick of cmd.yaw vs velocity; carrot bearing on overshoot
+    allow_reverse: false
+    project_velocity_to_body: true
+
     yaw_kp: 1.2
     yaw_rate_ff: 1.0
-
     align_heading_thresh_rad: 0.4
-    allow_reverse: false
+    min_turn_wz: 0.15
 
-    min_vx: 0.05
-    vx_deadband: 0.01
-
-    enable_lateral_correction: true
-    lateral_kp: 0.3
-    lateral_error_deadband: 0.05
-    max_wz_lateral_p: 0.35
-    vx_lat_damp_gain: 0.25
-    lateral_slowdown_dist: 0.4
-    min_plan_speed_for_lateral: 0.15
-    max_lateral_error_m: 2.0
-
-    cmd_vel_ema_alpha: 0.8
-
-    # plan_vel below this -> twist=(0,0); was 0.02, lowered to avoid false stops on slow replan
-    hard_stop_plan_speed: 0.005
-
-    # 看门狗：超过该时长未收到新的 pos_cmd / odom 则强制 cmd_vel=(0,0)，防止上游崩溃/卡死时按旧指令失控
+    # 看门狗：超过该时长未收到新的 pos_cmd / odom 则强制 cmd_vel=(0,0)
     cmd_timeout_sec: 0.3
     odom_timeout_sec: 0.5
-
-    project_velocity_to_body: true

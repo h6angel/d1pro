@@ -55,7 +55,14 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/ground_filter_enable", true);
   node_->declare_parameter("grid_map/ground_filter_margin", 0.12);
   node_->declare_parameter("grid_map/inflate_xy_only", true);
-  node_->declare_parameter("grid_map/robot_footprint_radius", 0.35);
+  node_->declare_parameter("grid_map/robot_footprint_enable", true);
+  node_->declare_parameter("grid_map/robot_footprint_radius", 0.0);
+  node_->declare_parameter("grid_map/robot_footprint_front", 0.10);
+  node_->declare_parameter("grid_map/robot_footprint_back", 0.20);
+  node_->declare_parameter("grid_map/robot_footprint_left", 0.20);
+  node_->declare_parameter("grid_map/robot_footprint_right", 0.20);
+  node_->declare_parameter("grid_map/robot_footprint_no_inflate", true);
+  node_->declare_parameter("grid_map/robot_footprint_clear_margin", 0.20);
 
   node_->get_parameter("grid_map/resolution", mp_.resolution_);
   node_->get_parameter("grid_map/map_size_x", x_size);
@@ -100,11 +107,35 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/ground_filter_enable", mp_.ground_filter_enable_);
   node_->get_parameter("grid_map/ground_filter_margin", mp_.ground_filter_margin_);
   node_->get_parameter("grid_map/inflate_xy_only", mp_.inflate_xy_only_);
+  node_->get_parameter("grid_map/robot_footprint_enable", mp_.robot_footprint_enable_);
   node_->get_parameter("grid_map/robot_footprint_radius", mp_.robot_footprint_radius_);
+  node_->get_parameter("grid_map/robot_footprint_front", mp_.robot_footprint_front_);
+  node_->get_parameter("grid_map/robot_footprint_back", mp_.robot_footprint_back_);
+  node_->get_parameter("grid_map/robot_footprint_left", mp_.robot_footprint_left_);
+  node_->get_parameter("grid_map/robot_footprint_right", mp_.robot_footprint_right_);
+  node_->get_parameter("grid_map/robot_footprint_no_inflate", mp_.robot_footprint_no_inflate_);
+  node_->get_parameter("grid_map/robot_footprint_clear_margin", mp_.robot_footprint_clear_margin_);
+  mp_.robot_footprint_front_ = std::max(0.0, mp_.robot_footprint_front_);
+  mp_.robot_footprint_back_ = std::max(0.0, mp_.robot_footprint_back_);
+  mp_.robot_footprint_left_ = std::max(0.0, mp_.robot_footprint_left_);
+  mp_.robot_footprint_right_ = std::max(0.0, mp_.robot_footprint_right_);
+  mp_.robot_footprint_radius_ = std::max(0.0, mp_.robot_footprint_radius_);
+  mp_.robot_footprint_clear_margin_ = std::max(0.0, mp_.robot_footprint_clear_margin_);
 
   mp_.occ_confirm_frames_ = std::max(1, mp_.occ_confirm_frames_);
   mp_.occ_clear_frames_ = std::max(1, mp_.occ_clear_frames_);
   mp_.map_vis_rate_ = std::max(0.5, mp_.map_vis_rate_);
+
+  RCLCPP_INFO(
+      node_->get_logger(),
+      "[grid_map] footprint enable=%d box F/B/L/R=(%.2f,%.2f,%.2f,%.2f) legacy_r=%.2f "
+      "no_inflate=%d clear_margin=%.2f",
+      mp_.robot_footprint_enable_ ? 1 : 0,
+      mp_.robot_footprint_front_, mp_.robot_footprint_back_,
+      mp_.robot_footprint_left_, mp_.robot_footprint_right_,
+      mp_.robot_footprint_radius_,
+      mp_.robot_footprint_no_inflate_ ? 1 : 0,
+      mp_.robot_footprint_clear_margin_);
 
   if (mp_.virtual_ceil_height_ - mp_.ground_height_ > z_size)
   {
@@ -214,6 +245,11 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.last_inflate_camera_pos_ = Eigen::Vector3d::Constant(1e6);
   md_.occ_changed_indices_.clear();
   md_.robot_pos_.setZero();
+  md_.robot_fwd_x_ = 1.0;
+  md_.robot_fwd_y_ = 0.0;
+  md_.robot_right_x_ = 0.0;
+  md_.robot_right_y_ = 1.0;
+  md_.has_robot_yaw_ = false;
   md_.has_robot_pos_ = false;
 
   // rand_noise_ = uniform_real_distribution<double>(-0.2, 0.2);
@@ -649,12 +685,112 @@ int GridMap::inflationKernelSize(int inf_step) const
   return mp_.inflate_xy_only_ ? side * side : side * side * side;
 }
 
+bool GridMap::robotFootprintActive() const
+{
+  if (!mp_.robot_footprint_enable_ || !md_.has_robot_pos_)
+    return false;
+  const bool box =
+      mp_.robot_footprint_front_ > 1e-3 || mp_.robot_footprint_back_ > 1e-3 ||
+      mp_.robot_footprint_left_ > 1e-3 || mp_.robot_footprint_right_ > 1e-3;
+  return box || mp_.robot_footprint_radius_ > 1e-3;
+}
+
+void GridMap::setRobotOrientationFromQuat(const Eigen::Quaterniond &q)
+{
+  const Eigen::Quaterniond qn = q.normalized();
+  // OpenVINS / D435 optical: body +Z forward, +X right (match d1_planner_bridge).
+  const Eigen::Vector3d fwd = qn * Eigen::Vector3d(0.0, 0.0, 1.0);
+  const Eigen::Vector3d right = qn * Eigen::Vector3d(1.0, 0.0, 0.0);
+  const double f_xy = std::hypot(fwd.x(), fwd.y());
+  const double r_xy = std::hypot(right.x(), right.y());
+  if (f_xy > 1e-6)
+  {
+    md_.robot_fwd_x_ = fwd.x() / f_xy;
+    md_.robot_fwd_y_ = fwd.y() / f_xy;
+  }
+  if (r_xy > 1e-6)
+  {
+    md_.robot_right_x_ = right.x() / r_xy;
+    md_.robot_right_y_ = right.y() / r_xy;
+  }
+  else if (f_xy > 1e-6)
+  {
+    // Fallback: planar right = rotate forward by -90° (x,y)->(y,-x)
+    md_.robot_right_x_ = md_.robot_fwd_y_;
+    md_.robot_right_y_ = -md_.robot_fwd_x_;
+  }
+  md_.has_robot_yaw_ = (f_xy > 1e-6);
+}
+
+bool GridMap::isInsideRobotFootprint(const Eigen::Vector3d &pos) const
+{
+  return isInsideRobotFootprint(pos, 0.0);
+}
+
+bool GridMap::isInsideRobotFootprint(const Eigen::Vector3d &pos, double margin) const
+{
+  if (!robotFootprintActive())
+    return false;
+
+  margin = std::max(0.0, margin);
+  const double front = mp_.robot_footprint_front_ + margin;
+  const double back = mp_.robot_footprint_back_ + margin;
+  const double left = mp_.robot_footprint_left_ + margin;
+  const double right = mp_.robot_footprint_right_ + margin;
+
+  const double dx = pos(0) - md_.robot_pos_(0);
+  const double dy = pos(1) - md_.robot_pos_(1);
+
+  const bool box =
+      mp_.robot_footprint_front_ > 1e-3 || mp_.robot_footprint_back_ > 1e-3 ||
+      mp_.robot_footprint_left_ > 1e-3 || mp_.robot_footprint_right_ > 1e-3;
+
+  if (box && md_.has_robot_yaw_)
+  {
+    const double f = dx * md_.robot_fwd_x_ + dy * md_.robot_fwd_y_;
+    const double r = dx * md_.robot_right_x_ + dy * md_.robot_right_y_;
+    return f >= -back && f <= front && r >= -left && r <= right;
+  }
+
+  if (mp_.robot_footprint_radius_ > 1e-3)
+  {
+    const double rad = mp_.robot_footprint_radius_ + margin;
+    return dx * dx + dy * dy <= rad * rad;
+  }
+
+  // Box without yaw yet: axis-aligned extents around robot_pos.
+  if (box)
+  {
+    const double fmax = std::max(front, back);
+    const double rmax = std::max(left, right);
+    return std::fabs(dx) <= fmax && std::fabs(dy) <= rmax;
+  }
+  return false;
+}
+
 void GridMap::clearRobotFootprint()
 {
-  if (mp_.robot_footprint_radius_ <= 1e-3 || !md_.has_robot_pos_)
+  if (!robotFootprintActive())
     return;
 
-  const int r_step = static_cast<int>(ceil(mp_.robot_footprint_radius_ / mp_.resolution_));
+  const double margin = mp_.robot_footprint_clear_margin_;
+  const bool box =
+      mp_.robot_footprint_front_ > 1e-3 || mp_.robot_footprint_back_ > 1e-3 ||
+      mp_.robot_footprint_left_ > 1e-3 || mp_.robot_footprint_right_ > 1e-3;
+
+  double clear_r = mp_.robot_footprint_radius_ + margin;
+  if (box)
+  {
+    clear_r = std::max(
+        clear_r,
+        std::hypot(
+            std::max(mp_.robot_footprint_front_, mp_.robot_footprint_back_) + margin,
+            std::max(mp_.robot_footprint_left_, mp_.robot_footprint_right_) + margin));
+  }
+  if (clear_r <= 1e-3)
+    return;
+
+  const int r_step = static_cast<int>(ceil(clear_r / mp_.resolution_));
   Eigen::Vector3i center_id;
   posToIndex(md_.robot_pos_, center_id);
 
@@ -662,13 +798,14 @@ void GridMap::clearRobotFootprint()
   {
     for (int dy = -r_step; dy <= r_step; ++dy)
     {
-      if (dx * dx + dy * dy > (r_step + 1) * (r_step + 1))
-        continue;
-
       for (int z = 0; z < mp_.map_voxel_num_(2); ++z)
       {
         const Eigen::Vector3i id(center_id(0) + dx, center_id(1) + dy, z);
         if (!isInMap(id))
+          continue;
+        Eigen::Vector3d pos;
+        indexToPos(id, pos);
+        if (!isInsideRobotFootprint(pos, margin))
           continue;
         md_.occupancy_buffer_inflate_[toAddress(id)] = 0;
       }
@@ -702,6 +839,15 @@ void GridMap::inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step,
   if (isGroundFilteredIndex(id))
     return;
 
+  // Robot body (and clear_margin shell): never act as an inflation seed.
+  if (mp_.robot_footprint_no_inflate_ && robotFootprintActive())
+  {
+    Eigen::Vector3d seed_pos;
+    indexToPos(id, seed_pos);
+    if (isInsideRobotFootprint(seed_pos, mp_.robot_footprint_clear_margin_))
+      return;
+  }
+
   inflatePoint(id, inf_step, inf_pts);
   Eigen::Vector3i inf_pt;
   const int buffer_size =
@@ -715,6 +861,14 @@ void GridMap::inflateOccupiedVoxel(const Eigen::Vector3i &id, int inf_step,
     const int idx_inf = toAddress(inf_pt);
     if (idx_inf < 0 || idx_inf >= buffer_size)
       continue;
+    // Do not write inflate back into the robot body / clear shell.
+    if (mp_.robot_footprint_no_inflate_ && robotFootprintActive())
+    {
+      Eigen::Vector3d inf_pos;
+      indexToPos(inf_pt, inf_pos);
+      if (isInsideRobotFootprint(inf_pos, mp_.robot_footprint_clear_margin_))
+        continue;
+    }
     md_.occupancy_buffer_inflate_[idx_inf] = 1;
   }
 }
@@ -958,9 +1112,14 @@ void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
   md_.camera_pos_(0) = pose->pose.position.x;
   md_.camera_pos_(1) = pose->pose.position.y;
   md_.camera_pos_(2) = pose->pose.position.z;
-  md_.camera_r_m_ = Eigen::Quaterniond(pose->pose.orientation.w, pose->pose.orientation.x,
-                                       pose->pose.orientation.y, pose->pose.orientation.z)
-                        .toRotationMatrix();
+  {
+    const Eigen::Quaterniond q(pose->pose.orientation.w, pose->pose.orientation.x,
+                               pose->pose.orientation.y, pose->pose.orientation.z);
+    md_.camera_r_m_ = q.toRotationMatrix();
+    md_.robot_pos_ = md_.camera_pos_;
+    md_.has_robot_pos_ = true;
+    setRobotOrientationFromQuat(q);
+  }
   if (isInMap(md_.camera_pos_))
   {
     md_.has_odom_ = true;
@@ -985,6 +1144,12 @@ void GridMap::updateRobotPosition(const Eigen::Vector3d &pos)
 
   md_.camera_pos_ = pos;
   md_.has_odom_ = true;
+}
+
+void GridMap::updateRobotPose(const Eigen::Vector3d &pos, const Eigen::Quaterniond &q)
+{
+  updateRobotPosition(pos);
+  setRobotOrientationFromQuat(q);
 }
 
 void GridMap::publishMap()
@@ -1157,6 +1322,7 @@ void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                                  odom->pose.pose.orientation.x,
                                                  odom->pose.pose.orientation.y,
                                                  odom->pose.pose.orientation.z);
+  setRobotOrientationFromQuat(body_q);
   Eigen::Matrix3d body_r_m = body_q.toRotationMatrix();
   Eigen::Matrix4d body2world;
   body2world.block<3, 3>(0, 0) = body_r_m;

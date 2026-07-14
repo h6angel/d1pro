@@ -15,6 +15,16 @@ limits:
   max_wz: 0.5    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
   max_acc: 1.0   # 规划加速度上限 (m/s^2)
 
+# odom 接收诊断（仅日志，不停车）。注入 fsm/ + traj_server/
+# SUSPECT_JUMP: 时间戳间隔正常但隐含速度过高（更像 VIO 跳）
+# LIKELY_LAG:   stamp 间隔大 / age 高 / 墙钟落后（更像本节点处理不及时）
+odom_diag:
+  enable: true
+  period_ms: 500
+  implausible_speed: 0.5       # 与手持/实机速度阈值同量级；隐含 v 超此值才告警
+  stamp_dt_lag_sec: 0.15       # stamp 间隔 ≥ 此值时偏判 LIKELY_LAG
+  stamp_age_warn_sec: 0.10     # now-stamp 过大 → 时效差
+
 # D435i depth 640x360 — 设备上可用 ros2 topic echo .../depth/camera_info 核对
 camera:
   cx: 323.168
@@ -32,13 +42,12 @@ planner:
   tag_stop_dist: 0.25   # AprilTag 追踪：距检测点 XY 距离 ≤ 此值则停车 (m)
   thresh_replan_time: 2.5
   collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)
-  obstacles_inflation: 0.09
+  obstacles_inflation: 0.20
   optimization_dist0: 0.55
   lambda_fitness: 1.5
 
 fsm:
   thresh_no_replan_meter: 1.0
-  odom_traj_mismatch_thresh: 0.22
   planning_horizen_time: 3.0
   emergency_time: 1.0
   estop_imminent_time: 0.3       # PR-2: inflate-only estop if hit within this (s) and moving toward hit
@@ -65,12 +74,12 @@ grid_map:
   use_depth_filter: true
   depth_filter_tolerance: 0.15
   depth_filter_maxdist: 5.0
-  depth_filter_mindist: 0.2
+  depth_filter_mindist: 0.10   # B: 0.2 → 0.10，缩小近场盲区
   depth_filter_margin: 2
   k_depth_scaling_factor: 1000.0
-  skip_pixel: 2
-  p_hit: 0.65
-  p_miss: 0.35
+  skip_pixel: 1                # B: 2 → 1，深度采样更密（算力紧时再退回 2）
+  p_hit: 0.70                  # A: 0.65 → 0.70，障碍命中涨更快
+  p_miss: 0.30                 # A: 0.35 → 0.30，清除更慢
   p_min: 0.12
   p_max: 0.90
   p_occ: 0.80
@@ -80,15 +89,25 @@ grid_map:
   visualization_truncate_height: 1.8
   show_occ_time: false
   pose_type: 1
-  occ_confirm_frames: 3
-  occ_clear_frames: 5
+  occ_confirm_frames: 2        # A: 3 → 2，更快确认有障碍
+  occ_clear_frames: 10         # A: 5 → 10，更慢清除（须慢于 confirm）
   use_fixed_publish_window: true
   map_vis_rate: 10.0
   odom_depth_timeout: 2.5
-  ground_filter_enable: true
-  ground_filter_margin: 0.12
+  ground_filter_enable: false  # C: 先关，避免低矮障碍被当地面滤掉
+  ground_filter_margin: 0.04   # C: 若噪声大再开 filter，用更小 margin
   inflate_xy_only: true
-  robot_footprint_radius: 0.35
+  # 机身 footprint（相机/odom 原点）：用于膨胀图清空与 getInflateOccupancy 豁免
+  # 几何：相机在最前方往后 10cm；左右各 20cm。前方轴=body +Z（与 bridge 一致）
+  robot_footprint_enable: true
+  robot_footprint_front: 0.10   # 相机 → 鼻尖
+  robot_footprint_back: 0.20    # 相机后方（未单独测量，暂与半宽同量级，可改）
+  robot_footprint_left: 0.20
+  robot_footprint_right: 0.20
+  robot_footprint_radius: 0.0   # 旧圆形模型；>0 且 box 全 0 时才启用圆形
+  # 机身不当膨胀种子、膨胀结果不写回；清洞=物理 box ⊕ clear_margin（消洞边假墙）
+  robot_footprint_no_inflate: true
+  robot_footprint_clear_margin: 0.20  # 建议 ≈ obstacles_inflation；贴身真障被抹可再降到 0.10
 
 manager:
   max_jerk: 4.0
@@ -109,6 +128,5 @@ traj_server:
   use_odom_progress: true
   odom_lookahead_time: 0.5
   log_trace_period_ms: 500
-  endpoint_approach_dist: 0.35
-  endpoint_stop_dist: 0.08
-  endpoint_vel_gain: 0.8
+  tracking_trace_period_ms: 50   # CSV row interval
+  endpoint_stop_dist: 0.3        # same as planner.goal_reach_thresh; vel=0 inside this radius

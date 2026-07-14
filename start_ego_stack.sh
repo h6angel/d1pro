@@ -82,6 +82,26 @@ INTERRUPTED=false
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
+# 上次 Ctrl+C 后子进程常残留并占用 D435i USB，导致 RealSense busy / OpenVINS SIGABRT / 无点云。
+kill_stale_stack_nodes() {
+  local sig="$1"
+  pkill "-${sig}" -f 'realsense2_camera_node' 2>/dev/null || true
+  pkill "-${sig}" -f 'run_subscribe_msckf' 2>/dev/null || true
+  pkill "-${sig}" -f 'ego_planner_node' 2>/dev/null || true
+  pkill "-${sig}" -f '/traj_server' 2>/dev/null || true
+  pkill "-${sig}" -f 'd1_planner_bridge_node' 2>/dev/null || true
+  pkill "-${sig}" -f 'rviz2' 2>/dev/null || true
+  pkill "-${sig}" -f 'apriltag_detect' 2>/dev/null || true
+}
+
+preflight_cleanup() {
+  log "清理残留节点（避免相机 USB busy、VIO 崩溃、RViz 无点云）..."
+  kill_stale_stack_nodes TERM
+  sleep 2
+  kill_stale_stack_nodes KILL
+  sleep 1
+}
+
 launch_bg() {
   local name="$1"
   shift
@@ -102,10 +122,12 @@ cleanup() {
   for pid in "${PIDS[@]}"; do
     kill -TERM "${pid}" 2>/dev/null || true
   done
+  kill_stale_stack_nodes TERM
   sleep 1
   for pid in "${PIDS[@]}"; do
     kill -KILL "${pid}" 2>/dev/null || true
   done
+  kill_stale_stack_nodes KILL
   log "已退出。日志保留在: ${LOG_DIR}"
 }
 
@@ -181,6 +203,39 @@ wait_for_message() {
   return 1
 }
 
+check_openvins_alive() {
+  if pgrep -f 'run_subscribe_msckf' >/dev/null; then
+    return 0
+  fi
+  log "[错误] OpenVINS 进程已退出 → 无 odom/TF/点云，见 ${LOG_DIR}/openvins.log" >&2
+  return 1
+}
+
+launch_apriltag_stack() {
+  resolved_apriltag="$(ros2 pkg prefix apriltag_detect 2>/dev/null || true)"
+  log "apriltag_detect 包路径: ${resolved_apriltag}"
+  if [[ "${resolved_apriltag}" != "${EGO_APRILTAG_PREFIX}" ]]; then
+    log "[错误] apriltag_detect 仍解析到旧工作区: ${resolved_apriltag}" >&2
+    log "       请检查 ~/.bashrc 是否 source 了 ../apriltagdetect/install/setup.bash" >&2
+    exit 1
+  fi
+  # apriltag_ros 与 OpenVINS 共用 infra1；VIO 刚就绪时立刻加负载易触发 IMU 断言崩溃。
+  log "VIO 稳定化等待 10s（再启动 AprilTag，避免与 OpenVINS 抢相机）..."
+  sleep 10 || exit 130
+  check_openvins_alive || exit 1
+  launch_bg apriltag \
+    ros2 launch apriltag_detect apriltag.launch.py
+  sleep 2 || exit 130
+  check_openvins_alive || exit 1
+  if [[ "${SKIP_WAIT}" == "false" ]]; then
+    wait_for_topic /apriltag/target_detected 30 || true
+    wait_for_message /ov_msckf/odomimu 15 || {
+      log "[错误] AprilTag 启动后 /ov_msckf/odomimu 中断，见 openvins.log" >&2
+      exit 1
+    }
+  fi
+}
+
 log "工作区: realsense=${REALSENSE_WS}"
 log "        openvins=${OPENVINS_WS}"
 log "        ego_control=${EGO_WS}"
@@ -188,6 +243,8 @@ log "日志目录: ${LOG_DIR}"
 log "enable_tag_tracking=${ENABLE_TAG_TRACKING}"
 log "D1 config: ${D1_CONFIG}"
 log "D1 limits: max_vx=${D1_MAX_VX} m/s max_wz=${D1_MAX_WZ} rad/s max_acc=${D1_MAX_ACC} m/s^2"
+
+preflight_cleanup
 
 # 1. RealSense D435i
 launch_bg realsense \
@@ -207,30 +264,28 @@ launch_bg openvins \
 if [[ "${SKIP_WAIT}" == "false" ]]; then
   wait_for_topic /ov_msckf/pose_stamped 30 || exit $?
   wait_for_message /ov_msckf/pose_stamped 90 || exit $?
+  wait_for_message /ov_msckf/odomimu 30 || exit $?
 fi
 
-# 3. AprilTag 感知（仅追踪模式）
-if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
-  resolved_apriltag="$(ros2 pkg prefix apriltag_detect 2>/dev/null || true)"
-  log "apriltag_detect 包路径: ${resolved_apriltag}"
-  if [[ "${resolved_apriltag}" != "${EGO_APRILTAG_PREFIX}" ]]; then
-    log "[错误] apriltag_detect 仍解析到旧工作区: ${resolved_apriltag}" >&2
-    log "       请检查 ~/.bashrc 是否 source 了 ../apriltagdetect/install/setup.bash" >&2
-    exit 1
-  fi
-  launch_bg apriltag \
-    ros2 launch apriltag_detect apriltag.launch.py
-  if [[ "${SKIP_WAIT}" == "false" ]]; then
-    wait_for_topic /apriltag/target_detected 30 || true
-  fi
-fi
-
-# 4. EGO 规划（速度/话题默认来自 d1_robot.yaml）
+# 3. EGO 规划（速度/话题默认来自 d1_robot.yaml）
+check_openvins_alive || exit 1
 launch_bg ego_planner \
   ros2 launch ego_planner single_run.launch.py \
-  enable_tag_tracking:=${ENABLE_TAG_TRACKING}
+  enable_tag_tracking:=${ENABLE_TAG_TRACKING} \
+  tracking_trace_csv:=${LOG_DIR}/tracking_trace.csv
 
 sleep 2 || exit 130
+
+if [[ "${SKIP_WAIT}" == "false" ]]; then
+  wait_for_topic /drone_0_grid/grid_map/occupancy_inflate 30 || {
+    log "[警告] 点云话题未出现，检查 openvins/realsense 日志" >&2
+  }
+fi
+
+# 4. AprilTag 感知（追踪模式；放在 EGO 之后，让 VIO 多跑一会儿再分担 infra1）
+if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
+  launch_apriltag_stack
+fi
 
 # 5. D1 底盘桥接
 launch_bg d1_bridge \
@@ -238,8 +293,10 @@ launch_bg d1_bridge \
 
 # 6. 可选 RViz（Fixed Frame 选 global）
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
-  launch_bg rviz \
-    ros2 launch ego_planner rviz.launch.py
+  log "启动 rviz ..."
+  ros2 launch ego_planner rviz.launch.py >/dev/null 2>&1 &
+  PIDS+=("$!")
+  log "rviz PID=$!  (不写入日志文件)"
 fi
 
 log "=========================================="
@@ -250,9 +307,11 @@ if [[ "${ENABLE_TAG_TRACKING}" == "true" ]]; then
   log "  AprilTag   -> ${LOG_DIR}/apriltag.log"
 fi
 log "  EGO 规划   -> ${LOG_DIR}/ego_planner.log"
+log "  跟踪 CSV   -> ${LOG_DIR}/tracking_trace.csv"
+log "               关键列: dist_closest_xy(跟踪误差) e_lat h_err dist_end_xy"
 log "  D1 桥接    -> ${LOG_DIR}/d1_bridge.log"
 if [[ "${ENABLE_RVIZ}" == "true" ]]; then
-  log "  RViz       -> ${LOG_DIR}/rviz.log"
+  log "  RViz       -> (无日志文件)"
 fi
 log "=========================================="
 

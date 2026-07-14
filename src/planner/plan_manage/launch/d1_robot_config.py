@@ -99,6 +99,17 @@ def build_ego_planner_params(cfg, overrides=None):
     params['bspline/limit_vel'] = limits['max_vel']
     params['bspline/limit_acc'] = limits['max_acc']
 
+    odom_diag = cfg.get('odom_diag', {})
+    if odom_diag:
+        params['fsm/odom_diag_enable'] = odom_diag.get('enable', True)
+        params['fsm/odom_diag_period_ms'] = odom_diag.get('period_ms', 500)
+        params['fsm/odom_diag_implausible_speed'] = odom_diag.get(
+            'implausible_speed', 0.5)
+        params['fsm/odom_diag_stamp_dt_lag_sec'] = odom_diag.get(
+            'stamp_dt_lag_sec', 0.15)
+        params['fsm/odom_diag_stamp_age_warn_sec'] = odom_diag.get(
+            'stamp_age_warn_sec', 0.10)
+
     for key, value in overrides.items():
         params[key] = value
 
@@ -108,11 +119,23 @@ def build_ego_planner_params(cfg, overrides=None):
 def build_traj_server_params(cfg, overrides=None):
     """Build traj_server parameters from d1_robot.yaml."""
     overrides = overrides or {}
+    planner = cfg.get('planner', {})
     limits = cfg.get('limits', {})
 
     params = flatten_ros_params(cfg.get('traj_server', {}), 'traj_server')
-    params['traj_server/endpoint_max_vel'] = limits['max_vel']
+    params['traj_server/endpoint_stop_dist'] = planner['goal_reach_thresh']
     params['traj_server/max_yaw_dot'] = limits['max_wz']
+
+    odom_diag = cfg.get('odom_diag', {})
+    if odom_diag:
+        params['traj_server/odom_diag_enable'] = odom_diag.get('enable', True)
+        params['traj_server/odom_diag_period_ms'] = odom_diag.get('period_ms', 500)
+        params['traj_server/odom_diag_implausible_speed'] = odom_diag.get(
+            'implausible_speed', 0.5)
+        params['traj_server/odom_diag_stamp_dt_lag_sec'] = odom_diag.get(
+            'stamp_dt_lag_sec', 0.15)
+        params['traj_server/odom_diag_stamp_age_warn_sec'] = odom_diag.get(
+            'stamp_age_warn_sec', 0.10)
 
     for key, value in overrides.items():
         params[key] = value

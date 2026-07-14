@@ -1,5 +1,6 @@
 
 #include <algorithm>
+#include <cstring>
 #include <limits>
 
 #include <ego_planner/ego_replan_fsm.h>
@@ -68,13 +69,17 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/estop_min_approach_speed", 0.05);
     node_->declare_parameter("fsm/safety_replan_trials", 5);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
-    node_->declare_parameter("fsm/odom_traj_mismatch_thresh", 0.22);
     node_->declare_parameter("fsm/collision_check_step", 0.05);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
     node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
     node_->declare_parameter("fsm/gen_new_traj_backoff_base_sec", 0.25);
     node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
+    node_->declare_parameter("fsm/odom_diag_enable", true);
+    node_->declare_parameter("fsm/odom_diag_period_ms", 500);
+    node_->declare_parameter("fsm/odom_diag_implausible_speed", 0.5);
+    node_->declare_parameter("fsm/odom_diag_stamp_dt_lag_sec", 0.15);
+    node_->declare_parameter("fsm/odom_diag_stamp_age_warn_sec", 0.10);
 
     node_->get_parameter("fsm/thresh_replan_time", replan_thresh_);
     node_->get_parameter("fsm/thresh_no_replan_meter", no_replan_thresh_);
@@ -91,8 +96,6 @@ double advanceTForArcStep(
     estop_min_approach_speed_ = std::max(estop_min_approach_speed_, 0.0);
     safety_replan_trials_ = std::max(safety_replan_trials_, 1);
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
-    node_->get_parameter("fsm/odom_traj_mismatch_thresh", odom_traj_mismatch_thresh_);
-    odom_traj_mismatch_thresh_ = std::max(odom_traj_mismatch_thresh_, 0.01);
     node_->get_parameter("fsm/collision_check_step", collision_check_step_);
     collision_check_step_ = std::max(collision_check_step_, 0.01);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
@@ -104,6 +107,26 @@ double advanceTForArcStep(
     gen_new_traj_backoff_base_sec_ = std::max(gen_new_traj_backoff_base_sec_, 0.05);
     gen_new_traj_backoff_max_sec_ = std::max(
       gen_new_traj_backoff_max_sec_, gen_new_traj_backoff_base_sec_);
+
+    {
+      traj_utils::OdomDiagParams od;
+      node_->get_parameter("fsm/odom_diag_enable", od.enable);
+      node_->get_parameter("fsm/odom_diag_period_ms", od.period_ms);
+      node_->get_parameter("fsm/odom_diag_implausible_speed", od.implausible_speed);
+      node_->get_parameter("fsm/odom_diag_stamp_dt_lag_sec", od.stamp_dt_lag_sec);
+      node_->get_parameter("fsm/odom_diag_stamp_age_warn_sec", od.stamp_age_warn_sec);
+      od.period_ms = std::max(od.period_ms, 100);
+      od.implausible_speed = std::max(od.implausible_speed, 0.05);
+      od.stamp_dt_lag_sec = std::max(od.stamp_dt_lag_sec, 0.02);
+      od.stamp_age_warn_sec = std::max(od.stamp_age_warn_sec, 0.02);
+      odom_diag_.setParams(od);
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[odom_diag] enable=%d period_ms=%d implausible_speed=%.2f "
+        "stamp_dt_lag=%.2f stamp_age_warn=%.2f (log-only)",
+        od.enable ? 1 : 0, od.period_ms, od.implausible_speed,
+        od.stamp_dt_lag_sec, od.stamp_age_warn_sec);
+    }
 
     node_->declare_parameter("fsm/enable_tag_tracking", false);
     node_->declare_parameter("fsm/tag_pose_topic", "/apriltag/target_pose_global");
@@ -295,8 +318,43 @@ double advanceTForArcStep(
 
     // odom_acc_ = estimateAcc( msg );
 
+    if (odom_diag_.params().enable)
+    {
+      const rclcpp::Time stamp(msg->header.stamp);
+      const rclcpp::Time now = node_->now();
+      const auto sample = odom_diag_.update(stamp, now, odom_pos_(0), odom_pos_(1));
+      if (sample.valid &&
+          (strcmp(sample.kind, "SUSPECT_JUMP") == 0 ||
+           strcmp(sample.kind, "LIKELY_LAG") == 0 ||
+           strcmp(sample.kind, "STAMP_BACK") == 0))
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(), 200,
+          "[odom_diag/planner] %s pose=(%.3f,%.3f) step_xy=%.3f "
+          "stamp_dt=%.3f wall_dt=%.3f implied_v=%.2f age=%.3f",
+          sample.kind, odom_pos_(0), odom_pos_(1), sample.pose_step_xy,
+          sample.stamp_dt, sample.wall_dt, sample.implied_speed, sample.stamp_age);
+      }
+      uint64_t n_tot = 0, n_lag = 0, n_jump = 0, n_back = 0;
+      if (odom_diag_.takeSummary(now, n_tot, n_lag, n_jump, n_back))
+      {
+        RCLCPP_INFO(
+          node_->get_logger(),
+          "[odom_diag/planner] summary Hz~%.1f lag=%lu jump=%lu stamp_back=%lu "
+          "last=%s step=%.3f implied_v=%.2f age=%.3f",
+          n_tot * 1000.0 / std::max(odom_diag_.params().period_ms, 1),
+          static_cast<unsigned long>(n_lag),
+          static_cast<unsigned long>(n_jump),
+          static_cast<unsigned long>(n_back),
+          odom_diag_.last().kind,
+          odom_diag_.last().pose_step_xy,
+          odom_diag_.last().implied_speed,
+          odom_diag_.last().stamp_age);
+      }
+    }
+
     have_odom_ = true;
-    planner_manager_->updateRobotPosition(odom_pos_);
+    planner_manager_->updateRobotPose(odom_pos_, odom_orient_);
   }
 
   void EGOReplanFSM::changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call)
@@ -420,68 +478,26 @@ double advanceTForArcStep(
 
     case EXEC_TRAJ:
     {
-      /* determine if need to replan */
       LocalTrajData *info = &planner_manager_->local_data_;
-      rclcpp::Time time_now = node_->now();
-      const double t_wall = (time_now - info->start_time_).seconds();
-      double t_cur = std::min(info->duration_, t_wall);
-
-      Eigen::Vector3d pos = info->position_traj_.evaluateDeBoorT(t_cur);
-
       const double dist_to_goal_xy =
         (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
-      const bool at_goal = dist_to_goal_xy < goal_reach_thresh_;
-      const double local_tgt_xy_err =
-        (local_target_pt_.head<2>() - end_pt_.head<2>()).norm();
-      // XY only: local_target z is overwritten with odom z in callReboundReplan().
-      const bool local_target_is_goal = local_tgt_xy_err < 0.15;
-      const bool near_goal_phase =
-        local_target_is_goal || dist_to_goal_xy < planning_horizen_;
 
-      /* && (end_pt_ - pos).norm() < 0.5 */
-      if (near_goal_phase)
+      if (dist_to_goal_xy < goal_reach_thresh_ && !isTagFollowing())
       {
-        RCLCPP_INFO_THROTTLE(
-          node_->get_logger(), *node_->get_clock(),
-          std::max(log_trace_period_ms_, 1),
-          "[exec_trace] odom=%s goal=%s dist_goal_xy=%.3f t_wall=%.2f t_cur=%.2f/%.2f at_goal=%d",
+        RCLCPP_INFO(
+          node_->get_logger(),
+          "[goal_reached] odom=%s goal=%s dist_xy=%.3f -> WAIT_TARGET (stop planning)",
           traj_utils::formatVec3(odom_pos_).c_str(),
           traj_utils::formatVec3(end_pt_).c_str(),
-          dist_to_goal_xy, t_wall, t_cur, info->duration_, at_goal ? 1 : 0);
-
-        if (t_cur > info->duration_ - 1e-2)
-        {
-          if (at_goal && !isTagFollowing())
-          {
-            RCLCPP_INFO(
-              node_->get_logger(),
-              "[goal_reached] odom=%s goal=%s dist_xy=%.3f -> WAIT_TARGET (stop planning)",
-              traj_utils::formatVec3(odom_pos_).c_str(),
-              traj_utils::formatVec3(end_pt_).c_str(),
-              dist_to_goal_xy);
-            have_target_ = false;
-
-            changeFSMExecState(WAIT_TARGET, "FSM");
-            goto force_return;
-          }
-          else
-          {
-            RCLCPP_WARN(
-              node_->get_logger(),
-              "[goal_timeout] traj ended dist_goal_xy=%.3f > thresh=%.3f -> REPLAN",
-              dist_to_goal_xy, goal_reach_thresh_);
-            changeFSMExecState(REPLAN_TRAJ, "FSM");
-          }
-        }
-        else if (!at_goal && t_wall > replan_thresh_)
-        {
-          changeFSMExecState(REPLAN_TRAJ, "FSM");
-        }
+          dist_to_goal_xy);
+        have_target_ = false;
+        changeFSMExecState(WAIT_TARGET, "FSM");
+        break;
       }
-      else if (t_wall > replan_thresh_)
-      {
+
+      const double t_wall = (node_->now() - info->start_time_).seconds();
+      if (t_wall > replan_thresh_)
         changeFSMExecState(REPLAN_TRAJ, "FSM");
-      }
 
       break;
     }
@@ -648,22 +664,10 @@ double advanceTForArcStep(
       return;
 
     /* ---------- check trajectory (segment raycast, arc-length spatial steps) ---------- */
-    // Use node ROS clock to match start_time_ (set with node_->now() in planner_manager).
     double t_cur = (node_->now() - info->start_time_).seconds();
 
-    Eigen::Vector3d p_cur = info->position_traj_.evaluateDeBoorT(t_cur);
-    const double odom_traj_xy_dist = (odom_pos_.head<2>() - p_cur.head<2>()).norm();
-    if (odom_traj_xy_dist > odom_traj_mismatch_thresh_)
-    {
-      RCLCPP_WARN_THROTTLE(
-        node_->get_logger(), *node_->get_clock(),
-        std::max(log_trace_period_ms_, 500),
-        "Odom-traj mismatch %.3fm (>%.3fm), force replan (odom jump / stale traj).",
-        odom_traj_xy_dist, odom_traj_mismatch_thresh_);
-      changeFSMExecState(REPLAN_TRAJ, "ODOM_JUMP");
-      return;
-    }
-
+    Eigen::Vector3d p_cur = info->position_traj_.evaluateDeBoorT(
+      std::min(t_cur, info->duration_));
     const double t_2_3 = info->duration_ * 2 / 3;
     const double t_end = (t_cur < t_2_3) ? std::min(t_2_3, info->duration_) : info->duration_;
     const double planning_z = odom_pos_(2);
