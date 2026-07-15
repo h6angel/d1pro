@@ -98,6 +98,9 @@ struct MappingParameters
   bool ground_filter_enable_;
   double ground_filter_margin_;
   bool inflate_xy_only_;
+  /// Plan A: treat (x,y) occupied if any inflate voxel in [ground_height+eps, query_z].
+  bool column_collision_enable_;
+  double column_collision_z_eps_;
   /// Legacy isotropic clear radius (m); used only if box extents are all ~0.
   double robot_footprint_radius_;
   bool robot_footprint_enable_;
@@ -207,6 +210,13 @@ public:
   inline int getInflateOccupancy(Eigen::Vector3d pos);
   /// Inflated occupancy without robot footprint exemption (for body-in-obstacle checks).
   inline int getInflateOccupancyNoFootprint(Eigen::Vector3d pos);
+
+  /**
+   * 2.5D column check at (pos.x, pos.y): scan inflate from
+   * ground_height + column_collision_z_eps up to max(pos.z, that floor).
+   * Returns 1 if any voxel occupied, 0 if free, -1 if XY out of map.
+   */
+  int getColumnInflateOccupancy(const Eigen::Vector3d &pos, bool footprint_exempt);
 
   /// True if segment p0→p1 crosses an inflated occupied voxel (read-only raycast).
   bool checkSegmentInflateOccupied(const Eigen::Vector3d &p0, const Eigen::Vector3d &p1);
@@ -400,6 +410,9 @@ inline int GridMap::getOccupancy(Eigen::Vector3d pos)
 
 inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos)
 {
+  if (mp_.column_collision_enable_)
+    return getColumnInflateOccupancy(pos, true);
+
   if (!isInMap(pos))
     return -1;
 
@@ -414,6 +427,9 @@ inline int GridMap::getInflateOccupancy(Eigen::Vector3d pos)
 
 inline int GridMap::getInflateOccupancyNoFootprint(Eigen::Vector3d pos)
 {
+  if (mp_.column_collision_enable_)
+    return getColumnInflateOccupancy(pos, false);
+
   if (!isInMap(pos))
     return -1;
 

@@ -70,7 +70,7 @@ grid_map:
   local_update_range_y: 8.0
   local_update_range_z: 4.5
   local_map_margin: 10
-  ground_height: -0.01
+  ground_height: -0.5
   use_depth_filter: true
   depth_filter_tolerance: 0.15
   depth_filter_maxdist: 5.0
@@ -97,6 +97,9 @@ grid_map:
   ground_filter_enable: false  # C: 先关，避免低矮障碍被当地面滤掉
   ground_filter_margin: 0.04   # C: 若噪声大再开 filter，用更小 margin
   inflate_xy_only: true
+  # 方案A：查询时对 (x,y) 做高度柱检查 [ground_height+z_eps, query_z]
+  column_collision_enable: true
+  column_collision_z_eps: 0.05
   # 机身 footprint（相机/odom 原点）：用于膨胀图清空与 getInflateOccupancy 豁免
   # 几何：相机在最前方往后 10cm；左右各 20cm。前方轴=body +Z（与 bridge 一致）
   robot_footprint_enable: true

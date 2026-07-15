@@ -55,6 +55,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/ground_filter_enable", true);
   node_->declare_parameter("grid_map/ground_filter_margin", 0.12);
   node_->declare_parameter("grid_map/inflate_xy_only", true);
+  node_->declare_parameter("grid_map/column_collision_enable", false);
+  node_->declare_parameter("grid_map/column_collision_z_eps", 0.05);
   node_->declare_parameter("grid_map/robot_footprint_enable", true);
   node_->declare_parameter("grid_map/robot_footprint_radius", 0.0);
   node_->declare_parameter("grid_map/robot_footprint_front", 0.10);
@@ -107,6 +109,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/ground_filter_enable", mp_.ground_filter_enable_);
   node_->get_parameter("grid_map/ground_filter_margin", mp_.ground_filter_margin_);
   node_->get_parameter("grid_map/inflate_xy_only", mp_.inflate_xy_only_);
+  node_->get_parameter("grid_map/column_collision_enable", mp_.column_collision_enable_);
+  node_->get_parameter("grid_map/column_collision_z_eps", mp_.column_collision_z_eps_);
   node_->get_parameter("grid_map/robot_footprint_enable", mp_.robot_footprint_enable_);
   node_->get_parameter("grid_map/robot_footprint_radius", mp_.robot_footprint_radius_);
   node_->get_parameter("grid_map/robot_footprint_front", mp_.robot_footprint_front_);
@@ -126,16 +130,21 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   mp_.occ_clear_frames_ = std::max(1, mp_.occ_clear_frames_);
   mp_.map_vis_rate_ = std::max(0.5, mp_.map_vis_rate_);
 
+  mp_.column_collision_z_eps_ = std::max(0.0, mp_.column_collision_z_eps_);
+
   RCLCPP_INFO(
       node_->get_logger(),
       "[grid_map] footprint enable=%d box F/B/L/R=(%.2f,%.2f,%.2f,%.2f) legacy_r=%.2f "
-      "no_inflate=%d clear_margin=%.2f",
+      "no_inflate=%d clear_margin=%.2f column_collision=%d z_eps=%.3f ground_height=%.3f",
       mp_.robot_footprint_enable_ ? 1 : 0,
       mp_.robot_footprint_front_, mp_.robot_footprint_back_,
       mp_.robot_footprint_left_, mp_.robot_footprint_right_,
       mp_.robot_footprint_radius_,
       mp_.robot_footprint_no_inflate_ ? 1 : 0,
-      mp_.robot_footprint_clear_margin_);
+      mp_.robot_footprint_clear_margin_,
+      mp_.column_collision_enable_ ? 1 : 0,
+      mp_.column_collision_z_eps_,
+      mp_.ground_height_);
 
   if (mp_.virtual_ceil_height_ - mp_.ground_height_ > z_size)
   {
@@ -1266,10 +1275,66 @@ void GridMap::getRegion(Eigen::Vector3d &ori, Eigen::Vector3d &size)
   ori = mp_.map_origin_, size = mp_.map_size_;
 }
 
+int GridMap::getColumnInflateOccupancy(const Eigen::Vector3d &pos, bool footprint_exempt)
+{
+  // XY must lie in map; query z is the column top (planning_z / odom z).
+  if (pos(0) < mp_.map_min_boundary_(0) + 1e-4 || pos(1) < mp_.map_min_boundary_(1) + 1e-4 ||
+      pos(0) > mp_.map_max_boundary_(0) - 1e-4 || pos(1) > mp_.map_max_boundary_(1) - 1e-4)
+    return -1;
+
+  if (footprint_exempt && isInsideRobotFootprint(pos))
+    return 0;
+
+  const double z_floor = mp_.ground_height_ + mp_.column_collision_z_eps_;
+  const double z_top = std::max(pos(2), z_floor);
+
+  Eigen::Vector3d p_lo(pos(0), pos(1), z_floor);
+  Eigen::Vector3d p_hi(pos(0), pos(1), z_top);
+  // Clamp into map Z so a slightly out-of-band planning_z still scans the covered column.
+  p_lo(2) = std::min(std::max(p_lo(2), mp_.map_min_boundary_(2) + 1e-4),
+                     mp_.map_max_boundary_(2) - 1e-4);
+  p_hi(2) = std::min(std::max(p_hi(2), mp_.map_min_boundary_(2) + 1e-4),
+                     mp_.map_max_boundary_(2) - 1e-4);
+  if (p_hi(2) < p_lo(2))
+    std::swap(p_hi(2), p_lo(2));
+
+  Eigen::Vector3i id_lo, id_hi, id_xy;
+  posToIndex(p_lo, id_lo);
+  posToIndex(p_hi, id_hi);
+  posToIndex(pos, id_xy);
+  boundIndex(id_lo);
+  boundIndex(id_hi);
+  if (id_xy(0) < 0 || id_xy(0) >= mp_.map_voxel_num_(0) || id_xy(1) < 0 ||
+      id_xy(1) >= mp_.map_voxel_num_(1))
+    return -1;
+
+  for (int iz = id_lo(2); iz <= id_hi(2); ++iz)
+  {
+    Eigen::Vector3i id(id_xy(0), id_xy(1), iz);
+    if (!isInMap(id))
+      continue;
+    if (md_.occupancy_buffer_inflate_[toAddress(id)] == 1)
+      return 1;
+  }
+  return 0;
+}
+
 bool GridMap::checkSegmentInflateOccupied(const Eigen::Vector3d &p0, const Eigen::Vector3d &p1)
 {
-  if (!isInMap(p0) || !isInMap(p1))
+  // Column mode: only require XY in map; z may sit on planning_z while obstacles are lower.
+  if (mp_.column_collision_enable_)
+  {
+    const auto xy_in_map = [this](const Eigen::Vector3d &p) {
+      return p(0) >= mp_.map_min_boundary_(0) + 1e-4 && p(1) >= mp_.map_min_boundary_(1) + 1e-4 &&
+             p(0) <= mp_.map_max_boundary_(0) - 1e-4 && p(1) <= mp_.map_max_boundary_(1) - 1e-4;
+    };
+    if (!xy_in_map(p0) || !xy_in_map(p1))
+      return true;
+  }
+  else if (!isInMap(p0) || !isInMap(p1))
+  {
     return true;
+  }
 
   // Match getInflateOccupancy: footprint radius around robot_pos_ is not treated as occupied.
   const auto pos_inflated_occupied = [this](const Eigen::Vector3d &pos) -> bool {
