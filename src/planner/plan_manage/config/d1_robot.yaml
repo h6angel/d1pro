@@ -94,8 +94,11 @@ grid_map:
   use_fixed_publish_window: true
   map_vis_rate: 10.0
   odom_depth_timeout: 2.5
-  ground_filter_enable: false  # C: 先关，避免低矮障碍被当地面滤掉
-  ground_filter_margin: 0.04   # C: 若噪声大再开 filter，用更小 margin
+  # 地面 vs 凸起：z_ground = camera_z - camera_to_ground；h < obstacle_min_height → free
+  ground_filter_enable: true
+  ground_filter_margin: 0.04   # 仅当 camera_to_ground<=0 时的旧逻辑备用
+  camera_to_ground: 0.40       # 相机离地估计 (m)；过大易把矮障当地板滤掉
+  obstacle_min_height: 0.10    # 离地低于此值当地板；脚边矮障约 0.10~0.20 会保留
   inflate_xy_only: true
   # 方案A：查询时对 (x,y) 做高度柱检查 [ground_height+z_eps, query_z]
   column_collision_enable: true

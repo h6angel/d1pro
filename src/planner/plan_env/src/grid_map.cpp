@@ -54,6 +54,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/map_vis_rate", 25.0);
   node_->declare_parameter("grid_map/ground_filter_enable", true);
   node_->declare_parameter("grid_map/ground_filter_margin", 0.12);
+  node_->declare_parameter("grid_map/camera_to_ground", 0.65);
+  node_->declare_parameter("grid_map/obstacle_min_height", 0.10);
   node_->declare_parameter("grid_map/inflate_xy_only", true);
   node_->declare_parameter("grid_map/column_collision_enable", false);
   node_->declare_parameter("grid_map/column_collision_z_eps", 0.05);
@@ -108,6 +110,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/map_vis_rate", mp_.map_vis_rate_);
   node_->get_parameter("grid_map/ground_filter_enable", mp_.ground_filter_enable_);
   node_->get_parameter("grid_map/ground_filter_margin", mp_.ground_filter_margin_);
+  node_->get_parameter("grid_map/camera_to_ground", mp_.camera_to_ground_);
+  node_->get_parameter("grid_map/obstacle_min_height", mp_.obstacle_min_height_);
   node_->get_parameter("grid_map/inflate_xy_only", mp_.inflate_xy_only_);
   node_->get_parameter("grid_map/column_collision_enable", mp_.column_collision_enable_);
   node_->get_parameter("grid_map/column_collision_z_eps", mp_.column_collision_z_eps_);
@@ -131,11 +135,15 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   mp_.map_vis_rate_ = std::max(0.5, mp_.map_vis_rate_);
 
   mp_.column_collision_z_eps_ = std::max(0.0, mp_.column_collision_z_eps_);
+  mp_.camera_to_ground_ = std::max(0.0, mp_.camera_to_ground_);
+  mp_.obstacle_min_height_ = std::max(0.0, mp_.obstacle_min_height_);
+  mp_.ground_filter_margin_ = std::max(0.0, mp_.ground_filter_margin_);
 
   RCLCPP_INFO(
       node_->get_logger(),
       "[grid_map] footprint enable=%d box F/B/L/R=(%.2f,%.2f,%.2f,%.2f) legacy_r=%.2f "
-      "no_inflate=%d clear_margin=%.2f column_collision=%d z_eps=%.3f ground_height=%.3f",
+      "no_inflate=%d clear_margin=%.2f column_collision=%d z_eps=%.3f ground_height=%.3f "
+      "ground_filter=%d cam_to_ground=%.3f obs_min_h=%.3f",
       mp_.robot_footprint_enable_ ? 1 : 0,
       mp_.robot_footprint_front_, mp_.robot_footprint_back_,
       mp_.robot_footprint_left_, mp_.robot_footprint_right_,
@@ -144,7 +152,10 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
       mp_.robot_footprint_clear_margin_,
       mp_.column_collision_enable_ ? 1 : 0,
       mp_.column_collision_z_eps_,
-      mp_.ground_height_);
+      mp_.ground_height_,
+      mp_.ground_filter_enable_ ? 1 : 0,
+      mp_.camera_to_ground_,
+      mp_.obstacle_min_height_);
 
   if (mp_.virtual_ceil_height_ - mp_.ground_height_ > z_size)
   {
@@ -673,10 +684,25 @@ Eigen::Vector3d GridMap::closetPointInMap(const Eigen::Vector3d &pt, const Eigen
   return camera_pt + (min_t - 1e-3) * diff;
 }
 
+double GridMap::estimatedGroundZ() const
+{
+  // Primary: ground plane is camera_to_ground below current camera (post-lift ~0.65m).
+  if (mp_.camera_to_ground_ > 1e-6)
+    return md_.camera_pos_(2) - mp_.camera_to_ground_;
+  // Legacy fallback: absolute band above map floor.
+  return mp_.ground_height_;
+}
+
 bool GridMap::isGroundFilteredPoint(const Eigen::Vector3d &pos) const
 {
   if (!mp_.ground_filter_enable_)
     return false;
+
+  if (mp_.camera_to_ground_ > 1e-6)
+  {
+    // Floor band: [−inf, z_ground + obstacle_min_height). Protrusions above stay obstacles.
+    return pos(2) < estimatedGroundZ() + mp_.obstacle_min_height_;
+  }
   return pos(2) < mp_.ground_height_ + mp_.ground_filter_margin_;
 }
 
@@ -685,6 +711,8 @@ bool GridMap::isGroundFilteredIndex(const Eigen::Vector3i &id) const
   if (!mp_.ground_filter_enable_)
     return false;
   const double z = (id(2) + 0.5) * mp_.resolution_ + mp_.map_origin_(2);
+  if (mp_.camera_to_ground_ > 1e-6)
+    return z < estimatedGroundZ() + mp_.obstacle_min_height_;
   return z < mp_.ground_height_ + mp_.ground_filter_margin_;
 }
 

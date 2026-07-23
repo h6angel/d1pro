@@ -96,7 +96,12 @@ struct MappingParameters
 
   /* D1 ground robot */
   bool ground_filter_enable_;
+  /// Legacy: z < ground_height + margin (used only if camera_to_ground_ <= 0).
   double ground_filter_margin_;
+  /// After lift: estimated ground plane is camera_z - camera_to_ground (m).
+  double camera_to_ground_;
+  /// Points with (z - z_ground) < this are treated as floor (free), not obstacles.
+  double obstacle_min_height_;
   bool inflate_xy_only_;
   /// Plan A: treat (x,y) occupied if any inflate voxel in [ground_height+eps, query_z].
   bool column_collision_enable_;
@@ -276,6 +281,8 @@ private:
   void setRobotOrientationFromQuat(const Eigen::Quaterniond &q);
   bool isGroundFilteredPoint(const Eigen::Vector3d &pos) const;
   bool isGroundFilteredIndex(const Eigen::Vector3i &id) const;
+  /// Estimated world-z of ground under current camera (camera_z - camera_to_ground).
+  double estimatedGroundZ() const;
   int inflationKernelSize(int inf_step) const;
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
