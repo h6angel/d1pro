@@ -17,7 +17,7 @@
 | 项 | 主题 | 优先级 | 状态 | 主要文件 |
 |----|------|--------|------|----------|
 | 1 | 急停后全局参考（直线 minSnap → 可执行折线） | P1 | 部分完成 | `ego_replan_fsm.cpp` |
-| 2 | 占据 / 急停分层调参与误急停压降 | P1 | **主体已落地，待实机标定** | FSM + `d1_robot.yaml` |
+| 2 | 占据 / 急停分层（含高度/膨胀实机参数） | P1 | **已落地；参数已调妥** | FSM + `d1_robot.yaml` |
 | 3 | 非 EXEC 安全检测收敛 | P2 | **已落地** | `ego_replan_fsm.cpp` |
 | 4 | 执行层急停体验（惯性 / 航向抑制） | P2 | 待做 | bridge / traj_server |
 | 5 | 文档与指标对齐 | P3 | **本次已同步** | `docs/*` |
@@ -50,15 +50,14 @@
 - `estop_imminent_time`、`estop_min_approach_speed`、`safety_replan_trials`、`safety_slowdown_enable`、`safety_fail_estop_count`
 - 高度柱 + 地面滤波 + 膨胀 0.20 m（见 [docs/06](docs/06_ground_obstacle_modeling.md)）
 
-### 仍待做
+### 实机参数
 
-- 实机标定：膨胀、footprint clear、`obstacle_min_height`、`camera_to_ground`
-- 「First 3 CP in obstacle」时若 odom 自由，尝试 `flag_polyInit=true` 脱困（可选）
+`camera_to_ground` / `obstacle_min_height` / 膨胀与 footprint **已确认合适**，日常不必再当待办。
 
-### 验收
+### 可选后续
 
-- 同场景 `EMERGENCY_STOP` 次数显著下降；真撞仍能停
-- 指标见 [docs/03_planning_metrics.md](docs/03_planning_metrics.md) §6
+- 「First 3 CP in obstacle」时若 odom 自由，尝试 `flag_polyInit=true` 脱困
+- 换安装高度或机身外形后再复核上述参数
 
 ---
 

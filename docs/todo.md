@@ -92,7 +92,7 @@ flowchart LR
 | 阶段 | 目标 | 主要改动 | 状态 |
 |------|------|----------|------|
 | **Phase 0** | 熟悉基线 | 读 `01`/`02`/`06`，跑通实机，记失败 case | 进行中 |
-| **Phase 0.5** | 建图与安全 | 已落地：地面滤波、高度柱、`[SAFETY_TIER]`；继续标定与减误急停 | 部分完成 |
+| **Phase 0.5** | 建图与安全 | 地面滤波、高度柱、`[SAFETY_TIER]`；**实机高度/膨胀参数已调妥** | **完成** |
 | **Phase 1** | 强化障碍与初值 | ESDF；评估 Hybrid A\* 初值 | [ ] |
 | **Phase 2** | 优化器升级 | iLQR/MPC 原型；调 `lambda` | [ ] |
 | **Phase 3** | 执行层一致 | bridge 层 MPC / 非完整前馈；可选恢复横向纠偏 | [ ] |
@@ -113,7 +113,7 @@ flowchart LR
 | 全局断线 | RRT\* / BIT\* | `ego_replan_fsm.cpp` 全局航点逻辑 |
 | 跟踪与规划模型脱节 | MPC @ bridge | `d1_planner_bridge_node.cpp` |
 | 与业界地面栈对齐 | TEB / Nav2 SMAC | 新包或并行 launch 对比 |
-| 矮障 / 抬升漏检 | 继续标定柱与地面滤波 | `d1_robot.yaml`，`grid_map.cpp` |
+| 矮障 / 抬升漏检 | 参数已调妥；换机身后再改 yaml | `d1_robot.yaml`，`grid_map.cpp` |
 
 ---
 
