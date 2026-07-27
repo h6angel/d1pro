@@ -56,6 +56,12 @@ fsm:
   global_replan_drift_thresh: 0.25
   fail_safe: true
   log_trace_period_ms: 500
+  # P0-1: local target 若在膨胀占据内，沿全局路径回退到最近 free 点
+  local_target_free_search: true
+  local_target_free_step: 0.1
+  # P0-2: 轨迹前方撞障且 escape replan 失败 → 发布停车样条；连续失败再 EMERGENCY_STOP
+  safety_slowdown_enable: true
+  safety_fail_estop_count: 3
   gen_new_traj_max_failures: 8
   gen_new_traj_backoff_base_sec: 0.25
   gen_new_traj_backoff_max_sec: 2.0
