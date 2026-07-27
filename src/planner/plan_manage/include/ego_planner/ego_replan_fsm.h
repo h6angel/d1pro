@@ -115,6 +115,20 @@ namespace ego_planner
     /// Trajectory safety check: arc-length step between segment raycasts (m).
     double collision_check_step_{0.05};
 
+    /// P0-1: if local target lies in inflate occupancy, retreat along global path to free.
+    bool local_target_free_search_{true};
+
+    /// Arc / line sample step when searching a free local target (m).
+    double local_target_free_step_{0.1};
+
+    /// P0-2: publish hold-stop B-spline when traj_hit escape replan fails (stay in REPLAN).
+    bool safety_slowdown_enable_{true};
+
+    /// Consecutive traj_hit + failed escape before EMERGENCY_STOP (body free cases).
+    int safety_fail_estop_count_{3};
+
+    int safety_traj_fail_streak_{0};
+
     bool enable_fail_safe_;
 
 
@@ -170,6 +184,9 @@ namespace ego_planner
     bool have_target_, have_odom_, have_new_target_;
 
     bool pending_estop_global_replan_{false};
+
+    /// After SAFETY_HOLD: GEN_NEW_TRAJ should force-rebuild global (odom → goal, straight poly).
+    bool pending_safety_global_replan_{false};
 
   /// Tag tracking finish: EMERGENCY_STOP until odom speed drops, then WAIT_TARGET (not GEN_NEW_TRAJ).
 
@@ -263,6 +280,11 @@ namespace ego_planner
     /// Tier-2: after replan escape fails, decide EMERGENCY_STOP vs REPLAN_TRAJ.
     bool shouldEmergencyStopOnTrajHit(double dt_to_hit, const Eigen::Vector3d &hit_pos) const;
 
+    /// P0-2: traj forward hit + planFromCurrentTraj failed — hold stop, then REPLAN or estop.
+    void handleTrajHitAfterReplanFailed(double dt_to_hit, const Eigen::Vector3d &hit_pos);
+
+    void resetSafetyTrajFailStreak();
+
     /* return value: std::pair< Times of the same state be continuously called, current continuously called state > */
 
     void changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call);
@@ -277,8 +299,19 @@ namespace ego_planner
 
     void getLocalTarget();
 
+    /// True if inflate occupancy at planning_z is free (0). Out-of-map / occupied => false.
+    bool isPlanningPointFree(const Eigen::Vector3d &pt) const;
+
+    /// If local_target_pt_ is occupied, retreat along global arc [s_lo, s_hi] (or line to start).
+    /// Updates local_target_pt_/vel_ and last_progress_time_. Returns false if no free point found.
+    bool ensureLocalTargetFree(double s_lo, double s_hi);
+
     double distToGlobalTrajXY(const Eigen::Vector3d &pos, double *nearest_t_out = nullptr);
 
+    /// Always rebuild global_data_ as straight poly from current odom to end_pt_.
+    bool forceReplanGlobalFromOdom(const char *reason);
+
+    /// Estop recovery: rebuild only if XY drift from old global exceeds thresh.
     bool maybeReplanGlobalAfterEstop();
 
 

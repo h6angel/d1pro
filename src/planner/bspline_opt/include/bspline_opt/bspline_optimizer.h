@@ -106,7 +106,7 @@ namespace ego_planner
                       const vector<int> &waypt_idx); // N-2 constraints at most
     void setLocalTargetPt(const Eigen::Vector3d local_target_pt) { local_target_pt_ = local_target_pt; };
 
-    /** Ground robot: plan in XY; collision queries use (x,y,planning_z_). */
+    /** Ground robot: plan in XY; query z is planning_z_ (column top when column_collision is on). */
     void setPlanningZ(double z)
     {
       planning_z_ = z;

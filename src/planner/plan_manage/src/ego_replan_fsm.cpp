@@ -70,6 +70,10 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/safety_replan_trials", 5);
     node_->declare_parameter("fsm/global_replan_drift_thresh", 0.25);
     node_->declare_parameter("fsm/collision_check_step", 0.05);
+    node_->declare_parameter("fsm/local_target_free_search", true);
+    node_->declare_parameter("fsm/local_target_free_step", 0.1);
+    node_->declare_parameter("fsm/safety_slowdown_enable", true);
+    node_->declare_parameter("fsm/safety_fail_estop_count", 3);
     node_->declare_parameter("fsm/fail_safe", true);
     node_->declare_parameter("fsm/log_trace_period_ms", 500);
     node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
@@ -98,6 +102,13 @@ double advanceTForArcStep(
     node_->get_parameter("fsm/global_replan_drift_thresh", global_replan_drift_thresh_);
     node_->get_parameter("fsm/collision_check_step", collision_check_step_);
     collision_check_step_ = std::max(collision_check_step_, 0.01);
+    node_->get_parameter("fsm/local_target_free_search", local_target_free_search_);
+    node_->get_parameter("fsm/local_target_free_step", local_target_free_step_);
+    if (local_target_free_step_ < 1e-3)
+      local_target_free_step_ = 0.1;
+    node_->get_parameter("fsm/safety_slowdown_enable", safety_slowdown_enable_);
+    node_->get_parameter("fsm/safety_fail_estop_count", safety_fail_estop_count_);
+    safety_fail_estop_count_ = std::max(safety_fail_estop_count_, 1);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
     node_->get_parameter("fsm/log_trace_period_ms", log_trace_period_ms_);
     node_->get_parameter("fsm/gen_new_traj_max_failures", gen_new_traj_max_failures_);
@@ -142,6 +153,13 @@ double advanceTForArcStep(
     tag_stop_dist_ = std::max(tag_stop_dist_, 0.05);
     node_->get_parameter("fsm/tag_update_min_dist", tag_update_min_dist_);
     node_->get_parameter("fsm/tag_replan_min_period", tag_replan_min_period_);
+
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "[fsm] local_target_free_search=%d step=%.3f planning_horizon=%.2f "
+      "safety_slowdown=%d fail_estop_count=%d",
+      local_target_free_search_ ? 1 : 0, local_target_free_step_, planning_horizen_,
+      safety_slowdown_enable_ ? 1 : 0, safety_fail_estop_count_);
 
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
@@ -438,6 +456,11 @@ double advanceTForArcStep(
         pending_estop_global_replan_ = false;
         maybeReplanGlobalAfterEstop();
       }
+      if (pending_safety_global_replan_)
+      {
+        pending_safety_global_replan_ = false;
+        forceReplanGlobalFromOdom("safety_hold");
+      }
 
       bool success = planFromGlobalTraj(10); // zx-todo
       if (success)
@@ -601,6 +624,60 @@ double advanceTForArcStep(
     return vel_toward >= estop_min_approach_speed_;
   }
 
+  void EGOReplanFSM::resetSafetyTrajFailStreak()
+  {
+    safety_traj_fail_streak_ = 0;
+  }
+
+  void EGOReplanFSM::handleTrajHitAfterReplanFailed(
+    const double dt_to_hit, const Eigen::Vector3d &hit_pos)
+  {
+    const bool odom_inflate = isOdomBodyInObstacle();
+
+    if (safety_slowdown_enable_ && have_odom_)
+    {
+      callEmergencyStop(odom_pos_);
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "[SAFETY_TIER] traj_hit dt=%.3f odom_inflate=%d -> SAFETY_HOLD (replan failed, stop bspline)",
+        dt_to_hit, odom_inflate ? 1 : 0);
+    }
+
+    safety_traj_fail_streak_++;
+
+    if (odom_inflate && shouldEmergencyStopOnTrajHit(dt_to_hit, hit_pos))
+    {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "[SAFETY_TIER] imminent dt=%.3f odom_inflate=1 -> EMERGENCY_STOP",
+        dt_to_hit);
+      safety_traj_fail_streak_ = 0;
+      enterEmergencyStop("SAFETY");
+      return;
+    }
+
+    if (safety_traj_fail_streak_ >= safety_fail_estop_count_)
+    {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "[SAFETY_TIER] traj_hit streak=%d >= %d -> EMERGENCY_STOP",
+        safety_traj_fail_streak_, safety_fail_estop_count_);
+      safety_traj_fail_streak_ = 0;
+      enterEmergencyStop("SAFETY");
+      return;
+    }
+
+    // Hold then rebuild global from current odom and re-seed local traj (GEN_NEW).
+    pending_safety_global_replan_ = true;
+    resetGenNewTrajRetry();
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "[SAFETY_TIER] traj_hit dt=%.3f streak=%d odom_inflate=%d -> GEN_NEW_TRAJ + global_replan (hold=%d)",
+      dt_to_hit, safety_traj_fail_streak_, odom_inflate ? 1 : 0,
+      safety_slowdown_enable_ ? 1 : 0);
+    changeFSMExecState(GEN_NEW_TRAJ, "SAFETY");
+  }
+
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
   {
     if (!have_odom_)
@@ -691,35 +768,12 @@ double advanceTForArcStep(
         const double dt_hit = t_next - t_cur;
         if (planFromCurrentTraj(safety_replan_trials_))
         {
+          resetSafetyTrajFailStreak();
           changeFSMExecState(EXEC_TRAJ, "SAFETY");
           return;
         }
 
-        const bool odom_inflate = isOdomBodyInObstacle();
-        if (!odom_inflate)
-        {
-          RCLCPP_WARN(
-            node_->get_logger(),
-            "[SAFETY_TIER] traj_hit dt=%.3f odom_inflate=0 -> REPLAN (body free)",
-            dt_hit);
-          changeFSMExecState(REPLAN_TRAJ, "SAFETY");
-        }
-        else if (shouldEmergencyStopOnTrajHit(dt_hit, p_next))
-        {
-          RCLCPP_WARN(
-            node_->get_logger(),
-            "[SAFETY_TIER] imminent dt=%.3f odom_inflate=1 -> EMERGENCY_STOP",
-            dt_hit);
-          enterEmergencyStop("SAFETY");
-        }
-        else
-        {
-          RCLCPP_WARN(
-            node_->get_logger(),
-            "[SAFETY_TIER] not imminent dt=%.3f odom_inflate=1 -> REPLAN",
-            dt_hit);
-          changeFSMExecState(REPLAN_TRAJ, "SAFETY");
-        }
+        handleTrajHitAfterReplanFailed(dt_hit, p_next);
         return;
       }
 
@@ -751,6 +805,7 @@ double advanceTForArcStep(
 
     if (plan_and_refine_success)
     {
+      resetSafetyTrajFailStreak();
 
       auto info = &planner_manager_->local_data_;
 
@@ -854,6 +909,43 @@ double advanceTForArcStep(
     return planner_manager_->global_data_.distToTrajXY(pos, nearest_t_out, nullptr);
   }
 
+  bool EGOReplanFSM::forceReplanGlobalFromOdom(const char *reason)
+  {
+    if (!have_target_ || !have_odom_)
+      return false;
+
+    planner_manager_->setRobotPlanningZ(odom_pos_(2));
+    const bool ok = planner_manager_->planGlobalTraj(
+        odom_pos_, odom_vel_, Eigen::Vector3d::Zero(),
+        end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+
+    if (ok)
+    {
+      constexpr double step_size_t = 0.1;
+      const int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
+      vector<Eigen::Vector3d> global_traj(i_end);
+      for (int i = 0; i < i_end; i++)
+        global_traj[i] = planner_manager_->global_data_.global_traj_.evaluate(i * step_size_t);
+      visualization_->displayGlobalPathList(global_traj, 0.1, 0);
+
+      RCLCPP_INFO(
+        node_->get_logger(),
+        "[global_replan] force reason=%s odom=%s goal=%s",
+        reason ? reason : "?",
+        traj_utils::formatVec3(odom_pos_).c_str(),
+        traj_utils::formatVec3(end_pt_).c_str());
+    }
+    else
+    {
+      RCLCPP_WARN(
+        node_->get_logger(),
+        "[global_replan] force failed reason=%s",
+        reason ? reason : "?");
+    }
+
+    return ok;
+  }
+
   bool EGOReplanFSM::maybeReplanGlobalAfterEstop()
   {
     if (!have_target_ || !have_odom_)
@@ -872,34 +964,12 @@ double advanceTForArcStep(
       return false;
     }
 
-    planner_manager_->setRobotPlanningZ(odom_pos_(2));
-    const bool ok = planner_manager_->planGlobalTraj(
-        odom_pos_, odom_vel_, Eigen::Vector3d::Zero(),
-        end_pt_, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
-
-    if (ok)
-    {
-      constexpr double step_size_t = 0.1;
-      const int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
-      vector<Eigen::Vector3d> global_traj(i_end);
-      for (int i = 0; i < i_end; i++)
-        global_traj[i] = planner_manager_->global_data_.global_traj_.evaluate(i * step_size_t);
-      visualization_->displayGlobalPathList(global_traj, 0.1, 0);
-    }
-
+    const bool ok = forceReplanGlobalFromOdom("estop_drift");
     if (ok)
       RCLCPP_INFO(
         node_->get_logger(),
-        "[global_replan] replan drift_xy=%.3f > thresh=%.3f odom=%s goal=%s",
-        drift, global_replan_drift_thresh_,
-        traj_utils::formatVec3(odom_pos_).c_str(),
-        traj_utils::formatVec3(end_pt_).c_str());
-    else
-      RCLCPP_WARN(
-        node_->get_logger(),
-        "[global_replan] failed drift_xy=%.3f > thresh=%.3f",
+        "[global_replan] estop drift_xy=%.3f > thresh=%.3f",
         drift, global_replan_drift_thresh_);
-
     return ok;
   }
 
@@ -912,6 +982,8 @@ double advanceTForArcStep(
       local_target_pt_ = end_pt_;
       gd.last_progress_time_ = gd.global_duration_;
       local_target_vel_ = Eigen::Vector3d::Zero();
+      if (local_target_free_search_)
+        ensureLocalTargetFree(0.0, 0.0);
       return;
     }
 
@@ -941,6 +1013,124 @@ double advanceTForArcStep(
       local_target_vel_ = Eigen::Vector3d::Zero();
     else
       local_target_vel_ = gd.getVelocity(t_target);
+
+    if (local_target_free_search_)
+      ensureLocalTargetFree(s_start, s_target);
+  }
+
+  bool EGOReplanFSM::isPlanningPointFree(const Eigen::Vector3d &pt) const
+  {
+    if (!planner_manager_ || !planner_manager_->grid_map_)
+      return false;
+
+    Eigen::Vector3d q = pt;
+    if (have_odom_)
+      q(2) = odom_pos_(2);
+
+    // Same semantics as BsplineOptimizer::checkOccupancy: only 0 is free.
+    // Out-of-map (-1) and occupied (1) are both unusable terminals.
+    return planner_manager_->grid_map_->getInflateOccupancy(q) == 0;
+  }
+
+  bool EGOReplanFSM::ensureLocalTargetFree(const double s_lo, const double s_hi)
+  {
+    if (isPlanningPointFree(local_target_pt_))
+      return true;
+
+    auto &gd = planner_manager_->global_data_;
+    const Eigen::Vector3d occupied_pt = local_target_pt_;
+    const double step = std::max(local_target_free_step_, 1e-3);
+
+    auto finalize_free = [&](const Eigen::Vector3d &pt, double t_at) {
+      local_target_pt_ = pt;
+      if (have_odom_)
+        local_target_pt_(2) = odom_pos_(2);
+
+      const double brake_dist =
+          (planner_manager_->pp_.max_vel_ * planner_manager_->pp_.max_vel_) /
+          (2 * std::max(planner_manager_->pp_.max_acc_, 1e-3));
+      if ((end_pt_ - local_target_pt_).norm() < brake_dist)
+        local_target_vel_ = Eigen::Vector3d::Zero();
+      else if (gd.arcTableValid() && t_at >= 0.0)
+        local_target_vel_ = gd.getVelocity(t_at);
+      else
+        local_target_vel_ = Eigen::Vector3d::Zero();
+
+      if (have_odom_)
+        local_target_vel_(2) = 0.0;
+    };
+
+    // Path A: retreat along global arc from s_hi toward s_lo.
+    if (gd.arcTableValid() && gd.totalArcLength() > 1e-6)
+    {
+      const double s_from = std::min(std::max(s_hi, 0.0), gd.totalArcLength());
+      const double s_to = std::min(std::max(s_lo, 0.0), s_from);
+
+      for (double s = s_from; s >= s_to - 1e-9; s -= step)
+      {
+        Eigen::Vector3d pt;
+        double t = 0.0;
+        if (!gd.queryAtArcS(std::max(0.0, s), pt, t))
+          continue;
+        if (!isPlanningPointFree(pt))
+          continue;
+
+        finalize_free(pt, t);
+        RCLCPP_WARN(
+          node_->get_logger(),
+          "[local_target] occupied (%.2f,%.2f) -> free retreat s=%.2f->%.2f pt=(%.2f,%.2f)",
+          occupied_pt(0), occupied_pt(1), s_from, std::max(0.0, s),
+          local_target_pt_(0), local_target_pt_(1));
+        return true;
+      }
+
+      // Also try the exact s_lo endpoint once more (step may have skipped it).
+      {
+        Eigen::Vector3d pt;
+        double t = 0.0;
+        if (gd.queryAtArcS(s_to, pt, t) && isPlanningPointFree(pt))
+        {
+          finalize_free(pt, t);
+          RCLCPP_WARN(
+            node_->get_logger(),
+            "[local_target] occupied (%.2f,%.2f) -> free at s_lo=%.2f pt=(%.2f,%.2f)",
+            occupied_pt(0), occupied_pt(1), s_to,
+            local_target_pt_(0), local_target_pt_(1));
+          return true;
+        }
+      }
+    }
+
+    // Path B: no arc table, or arc retreat failed — sample line start_pt_ → end_pt_.
+    {
+      const Eigen::Vector3d p0 = have_odom_ ? start_pt_ : init_pt_;
+      const Eigen::Vector3d p1 = end_pt_;
+      const double len = (p1.head<2>() - p0.head<2>()).norm();
+      const int n = std::max(1, static_cast<int>(std::ceil(len / step)));
+
+      for (int i = n; i >= 0; --i)
+      {
+        const double u = static_cast<double>(i) / static_cast<double>(n);
+        Eigen::Vector3d pt = (1.0 - u) * p0 + u * p1;
+        if (!isPlanningPointFree(pt))
+          continue;
+
+        finalize_free(pt, -1.0);
+        RCLCPP_WARN(
+          node_->get_logger(),
+          "[local_target] occupied (%.2f,%.2f) -> free line u=%.2f pt=(%.2f,%.2f)",
+          occupied_pt(0), occupied_pt(1), u,
+          local_target_pt_(0), local_target_pt_(1));
+        return true;
+      }
+    }
+
+    RCLCPP_WARN_THROTTLE(
+      node_->get_logger(), *node_->get_clock(),
+      std::max(log_trace_period_ms_, 500),
+      "[local_target] no free point found near occupied (%.2f,%.2f); keeping target (replan may skip)",
+      occupied_pt(0), occupied_pt(1));
+    return false;
   }
 
   bool EGOReplanFSM::isTagFollowing() const
