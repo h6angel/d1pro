@@ -256,6 +256,7 @@ flowchart LR
 | [04_apriltag_integration.md](04_apriltag_integration.md) | AprilTag 感知接入 |
 | [05_demo.md](05_demo.md) | 实机 Demo |
 | [06_ground_obstacle_modeling.md](06_ground_obstacle_modeling.md) | 地面矮障 / 高度柱（已落地） |
+| [07_astar_hybrid_fusion.md](07_astar_hybrid_fusion.md) | 全局 A\* 避障 × Hybrid 非完整约束融合 |
 | [todo.md](todo.md) | 算法学习与改进路线 |
 | [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md) | Tag 跟随 FSM |
 | [REMAINING_PRS.md](../REMAINING_PRS.md) | 急停/安全后续项 |

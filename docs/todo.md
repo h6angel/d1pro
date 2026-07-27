@@ -62,11 +62,11 @@ flowchart LR
   - **可落地位置：** 优化层替代部分 `combineCostRebound`；执行层短 horizon MPC。
   - **验收：** 简单 2D / 差速模型上复现避障轨迹，对比当前单步耗时。
 
-- [ ] **非完整运动规划：Hybrid A\* / State Lattice**
-  - **学什么：** $(x,y,\theta)$ 搜索、Dubin / Reeds-Shepp、运动原语。
-  - **为何重要：** 当前 `dyn_a_star` 为几何栅格 A\*，对差速「不能横移」约束弱。
-  - **可落地位置：** 替换或并联 `dyn_a_star.cpp`；FSM 全局航点层。
-  - **验收：** 同地图对比几何 A\* 与 Hybrid A\* 初值下 `reboundReplan` 成功率。
+- [ ] **非完整运动规划：Hybrid A\* / State Lattice（建议按融合方案落地）**
+  - **学什么：** $(x,y,\theta)$、运动原语；同时搞清与普通 A\* 的分工。
+  - **本仓主张：** 全局避障用 A\*，去质点用 Hybrid 运动学逻辑——见 [07_astar_hybrid_fusion.md](07_astar_hybrid_fusion.md)。
+  - **可落地位置：** 替换 `planGlobalTraj` 直线插点；局部 `dyn_a_star` 仍可服务 rebound。
+  - **验收：** 同地图下急停恢复 / 首次规划成功率与初值可执行性。
 
 - [ ] **ESDF（欧氏符号距离场）障碍表示**
   - **学什么：** 占据 → ESDF 增量更新；距离与梯度查表。
@@ -151,4 +151,5 @@ flowchart LR
 - [规划数学原理](01_planning_math.md)
 - [控制数学原理](02_control_math.md)
 - [地面障碍建模](06_ground_obstacle_modeling.md)
+- [A\* × Hybrid 融合](07_astar_hybrid_fusion.md)
 - [评估指标](03_planning_metrics.md)
