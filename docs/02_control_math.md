@@ -6,13 +6,13 @@
 
 ## 1. 控制链路概览
 
-EGO 原生输出四旋翼 **位置/速度/加速度 + 偏航** 高层指令。D1 为差速底盘，需要 **`linear.x`（前进）** 与 **`angular.z`（绕竖轴）**。
+规划输出为 **位置 / 速度 / 加速度 + 偏航** 高层指令。D1 为差速底盘，需要 **`linear.x`（前进）** 与 **`angular.z`（绕竖轴）**。
 
 ```mermaid
 flowchart LR
     BS["B-spline"] --> TS["traj_server\nDe Boor + odom 进度"]
-    TS --> PC["PositionCommand\npos, vel, acc, yaw"]
-    PC --> BR["TrajectoryTracker\n投影 + P 反馈"]
+    TS --> PC["PositionCommand\npos, vel, yaw, track_*"]
+    PC --> BR["TrajectoryTracker\n投影 + 航向 P"]
     BR --> CV["cmd_vel\nvx, wz"]
     Odom["/odom"] --> TS
     Odom --> BR
@@ -23,7 +23,7 @@ flowchart LR
 | `traj_server` | B 样条 + odom | `pos_cmd` | 100 Hz |
 | `d1_planner_bridge` | `pos_cmd` + odom | `/command/cmd_twist` | `control_rate_hz`（默认 100） |
 
-消息定义：`src/quadrotor_msgs/msg/PositionCommand.msg`。D1 未使用 `kx`/`kv` 位置增益（`traj_server` 中置零）。
+消息：`src/quadrotor_msgs/msg/PositionCommand.msg`。D1 未使用 `kx`/`kv`（置零）。
 
 ---
 
@@ -33,19 +33,15 @@ flowchart LR
 
 ### 2.1 B 样条重建与求导
 
-收到 `traj_utils/Bspline` 后：
-
 $$
 \mathbf{p}(t) = \text{DeBoor}(\mathbf{Q}, t), \quad
 \mathbf{v}(t) = \mathbf{p}'(t), \quad
 \mathbf{a}(t) = \mathbf{p}''(t)
 $$
 
-实现为 `UniformBspline` 及其两次 `getDerivative()`。
-
 ### 2.2 时间参数：墙钟 vs 里程计进度
 
-#### 模式 A：`use_odom_progress = false`（四旋翼默认）
+#### 模式 A：`use_odom_progress = false`
 
 $$
 t_{\mathrm{cur}} = t_{\mathrm{now}} - t_{\mathrm{start}}
@@ -53,18 +49,16 @@ $$
 
 #### 模式 B：`use_odom_progress = true`（D1 默认）
 
-**Step 1 — 轨迹上最近点**（仅 XY）：
+**Step 1 — 轨迹上最近点**（仅 XY，$\Delta t = 0.05\,\text{s}$ 穷举）：
 
 $$
 t_{\mathrm{closest}} = \arg\min_{t \in [0, T]} \|\mathbf{p}^{xy}(t) - \mathbf{p}_{\mathrm{odom}}^{xy}\|^2
 $$
 
-实现为步长 $\Delta t = 0.05\,\text{s}$ 的穷举（`closestTimeOnTrajXY`）。
-
 **Step 2 — 单调进度** $t_{\mathrm{progress}}$：
 
-- 一般：$t_{\mathrm{progress}} \leftarrow \max(t_{\mathrm{progress}},\, t_{\mathrm{closest}})$（只前进）
-- **过冲修正**：若 $t_{\mathrm{closest}} \approx T$ 且 odom 离终点仍远（$> \texttt{endpoint\_approach\_dist}$），允许 $t_{\mathrm{progress}} = t_{\mathrm{closest}}$ 回退
+- 一般：$t_{\mathrm{progress}} \leftarrow \max(t_{\mathrm{progress}},\, t_{\mathrm{closest}})$
+- 若 $t_{\mathrm{closest}} \approx T$，允许直接对齐到末端
 
 **Step 3 — 前瞻采样**：
 
@@ -73,26 +67,15 @@ t_{\mathrm{cur}} = \min\bigl(t_{\mathrm{progress}} + \tau_{\mathrm{la}},\, T\big
 \tau_{\mathrm{la}} = \texttt{odom\_lookahead\_time}
 $$
 
-D1 默认 $\tau_{\mathrm{la}} = 0.5\,\text{s}$。
+默认 $\tau_{\mathrm{la}} = 0.5\,\text{s}$（`d1_robot.yaml` → `traj_server`）。
 
-**Step 4 — 终点 hold**（`endpoint_hold`）：
+**Step 4 — 终点零速**：
 
-当 $t_{\mathrm{cur}} \ge T$ 且 $\|\mathbf{p}_{\mathrm{odom}}^{xy} - \mathbf{p}_{\mathrm{end}}^{xy}\| > \texttt{endpoint\_stop\_dist}$：
+当 $\|\mathbf{p}_{\mathrm{odom}}^{xy} - \mathbf{p}_{\mathrm{end}}^{xy}\| \le \texttt{endpoint\_stop\_dist}$（默认与 `goal_reach_thresh` 同为 **0.3 m**）：
 
-- `position` = 轨迹终点 $\mathbf{p}_{\mathrm{end}}$
-- 速度指向终点：
-
-$$
-\mathbf{v} = \frac{\mathbf{p}_{\mathrm{end}}^{xy} - \mathbf{p}_{\mathrm{odom}}^{xy}}{\|\cdot\|} \cdot \min(v_{\max}^{\mathrm{end}},\; k_{\mathrm{end}} \cdot d_{xy})
-$$
-
-默认 $k_{\mathrm{end}}=0.8$，$v_{\max}^{\mathrm{end}}=$ `endpoint_max_vel`（与 `d1_robot.yaml` 的 `limits.max_vel` 一致，当前默认 **0.6** m/s）。
-
-这样慢车不会在“轨迹时间走完”后仍离终点较远时得到错误的高速采样。
+- `position` = 轨迹终点，$\mathbf{v}=\mathbf{0}$，$\mathbf{a}=\mathbf{0}$
 
 ### 2.3 发布量
-
-在 $t_{\mathrm{cur}}$（或 hold 逻辑）采样：
 
 $$
 \texttt{cmd.position} = \mathbf{p}(t_{\mathrm{cur}}), \quad
@@ -100,35 +83,29 @@ $$
 \texttt{cmd.acceleration} = \mathbf{a}(t_{\mathrm{cur}})
 $$
 
-**注意**：`cmd.position` 是轨迹上的 **前瞻跟踪点（carrot）**，不是机器人当前位置。桥接器横向误差即对比该点与 odom。
+另填：
+
+- `track_point` / `track_yaw`：基于 $t_{\mathrm{closest}}$（或墙钟 $t_{\mathrm{cur}}$）的最近点与切向，供调试与桥接兜底航向
+
+`cmd.position` 是前瞻跟踪点（carrot），不是机器人当前位置。
 
 ### 2.4 Yaw 与 `yaw_dot`
 
-由空间前瞻方向确定期望偏航：
+当前实现：若 $\|\mathbf{v}^{xy}\| > 0.05$，则
 
 $$
-\Delta \mathbf{p} = \mathbf{p}(t_{\mathrm{cur}} + \tau_{\mathrm{fwd}}) - \mathbf{p}(t_{\mathrm{cur}}), \quad
-\psi_{\mathrm{des}} = \mathrm{atan2}(\Delta y,\, \Delta x)
+\psi = \mathrm{atan2}(v_y, v_x), \quad
+\dot\psi = \mathrm{clamp}\bigl(\mathrm{wrap\_pi}(\psi - \psi_{\mathrm{last}})/\Delta t,\; \pm \dot\psi_{\max}\bigr)
 $$
 
-$\tau_{\mathrm{fwd}} =$ `time_forward`（D1 默认 0.7 s）。若 $\|\Delta \mathbf{p}\| < 0.1$，沿用 `last_yaw`。
-
-角速度限幅：$|\dot\psi| \le \pi\,\text{rad/s}$，处理 $\pm\pi$ 跳变。
-
-输出前低通：
-
-$$
-\psi \leftarrow 0.5\,\psi_{\mathrm{last}} + 0.5\,\psi_{\mathrm{des}}, \quad
-\dot\psi \leftarrow 0.5\,\dot\psi_{\mathrm{last}} + 0.5\,\dot\psi_{\mathrm{des}}
-$$
-
-重规划时 $\psi$ 可能跳变 $\pm\pi$；桥接侧对 `yaw_dot` 前馈限幅缓解。
+$\dot\psi_{\max} =$ `max_yaw_dot`（= `limits.max_wz`，默认 0.5）。低速时保持 `last_yaw`。  
+（空间前瞻 `time_forward` 仍用于新轨迹到达时初始化 `last_yaw`。）
 
 ---
 
 ## 3. `d1_planner_bridge` 控制律
 
-源码：`src/d1_planner_bridge/src/trajectory_tracker.cpp`。
+源码：`trajectory_tracker.cpp`、`d1_planner_bridge_node.cpp`。
 
 仅当 `trajectory_flag == TRAJECTORY_STATUS_READY` 输出非零速度。
 
@@ -136,221 +113,122 @@ $$
 
 | 符号 | 含义 |
 |------|------|
-| $\psi_r$ | 机器人 yaw（由 odom 四元数提取） |
-| $\psi_p$ | 路径切向 yaw（由规划速度或 `cmd.yaw`） |
-| $\mathbf{v}_w$ | 世界系规划速度 $(v_x^w, v_y^w)$ |
-| $(x_r,y_r)$ | `cmd.position`（前瞻点） |
-| $(x,y)$ | odom 位置 |
+| $\psi_r$ | 车体前进方向 yaw：odom 四元数下 body **+Z** 轴在水平面投影（与 OpenVINS 相机光轴约定一致） |
+| $\psi_p$ | 路径切向：$\|\mathbf{v}^{xy}\|>0.05$ 时用规划速度，否则 `cmd.yaw` / `cmd.track_yaw` |
+| $\mathbf{v}_w$ | 世界系规划速度 |
 
-### 3.2 路径切向航向
+### 3.2 纵向速度
 
 $$
-\psi_p = \begin{cases}
-\mathrm{atan2}(v_y^w,\, v_x^w) & \|\mathbf{v}_w^{xy}\| > 0.05 \\
-\texttt{cmd.yaw} & \text{otherwise}
-\end{cases}
+v_x = \mathbf{u}_r \cdot \mathbf{v}_w^{xy}
 $$
 
-### 3.3 有符号横向误差（cross-track）
+（`project_velocity_to_body=true`；$\mathbf{u}_r$ 为 body +Z 水平单位向量）
 
-路径切向单位向量 $\mathbf{u} = (\cos\psi_p,\, \sin\psi_p)$，位置误差 $\mathbf{e} = (x-x_r,\, y-y_r)$：
+禁止倒车：`vx ← max(0, vx)`。
 
-$$
-e_{\mathrm{lat}} = u_y e_x - u_x e_y
-$$
-
-路径**左侧**为正（`signedLateralError`）。
-
-### 3.4 航向误差
+### 3.3 航向误差与角速度
 
 $$
-e_\psi = \mathrm{wrap\_pi}(\psi_p - \psi_r) \in (-\pi,\pi]
-$$
-
-### 3.5 分支 A：大航向偏差 — 原地转向
-
-若 $|e_\psi| > \theta_{\mathrm{align}}$（`align_heading_thresh_rad`，默认 0.6 rad ≈ 34°）：
-
-$$
-v_x = 0
+e_\psi = \mathrm{wrap\_pi}(\psi_p - \psi_r)
 $$
 
 $$
-\omega_z = \mathrm{clamp}(k_\psi\, e_\psi,\; -\omega_{\max},\; \omega_{\max})
+\omega_z = k_{\mathrm{ff}} \cdot \dot\psi_{\mathrm{cmd}} + k_\psi\, e_\psi
 $$
 
-若 $|e_\psi| > 0.15$ 且 $|\omega_z| < \omega_{\min}^{\mathrm{turn}}$，则施加最小转向角速度 $\omega_{\min}^{\mathrm{turn}}$（`min_turn_wz`），避免“转不动”。
+默认 $k_{\mathrm{ff}}=1.0$，$k_\psi=1.2$。
 
-### 3.6 分支 B：已对准 — 前馈 + 反馈
+### 3.4 大航向偏差 — 原地转向
 
-#### 3.6.1 纵向速度前馈
-
-世界系速度投影到车体前进方向：
+若 $|e_\psi| > \theta_{\mathrm{align}}$（`align_heading_thresh_rad`，默认 **0.4** rad）：
 
 $$
-v_x = \cos\psi_r \cdot v_x^w + \sin\psi_r \cdot v_y^w
+v_x = 0, \quad \omega_z = k_\psi\, e_\psi
 $$
 
-（`project_velocity_to_body=true`）
+若 $|e_\psi| > 0.15$ 且 $|\omega_z| < \omega_{\min}^{\mathrm{turn}}$，抬升到 `min_turn_wz`（默认 **0.15**）。
 
-禁止倒车（`allow_reverse=false`）：
-
-$$
-v_x \leftarrow \max(0,\, v_x)
-$$
-
-**最小前进速度**（克服静摩擦）：若 $v_{\mathrm{deadband}} < |v_x| < v_{\min}$，则抬升到 $v_{\min}$（`min_vx`，默认 0.08）。
-
-#### 3.6.2 角速度：前馈 + 航向 P
+### 3.5 限幅
 
 $$
-\omega_z = k_{\mathrm{ff}} \cdot \mathrm{clamp}(\dot\psi_{\mathrm{cmd}},\; \pm \dot\psi_{\mathrm{ff,max}})
+v_x \leftarrow \mathrm{clamp}(v_x,\, \pm v_{\max}), \quad
+\omega_z \leftarrow \mathrm{clamp}(\omega_z,\, \pm \omega_{\max})
 $$
 
-$$
-\omega_z \mathrel{+}= \mathrm{clamp}(k_\psi\, e_\psi,\; -\omega_{\mathrm{yaw,p,max}},\; \omega_{\mathrm{yaw,p,max}})
-$$
+$v_{\max}=0.6$，$\omega_{\max}=0.5$（`d1_robot.yaml` → launch 注入）。
 
-默认 $k_{\mathrm{ff}}=1.0$，$\dot\psi_{\mathrm{ff,max}}=0.5$，$k_\psi=1.2$。
+### 3.6 看门狗（节点层）
 
-#### 3.6.3 横向 P 纠偏
+| 条件 | 行为 |
+|------|------|
+| 尚无 `pos_cmd` | 发布零速 |
+| `cmd_age > cmd_timeout_sec`（默认 0.3 s） | 强制零速，`[watchdog]` |
+| 需要 odom 且 `odom_age > odom_timeout_sec`（默认 0.5 s） | 强制零速 |
 
-启用条件：`enable_lateral_correction` 且 $\|\mathbf{v}_w^{xy}\| \ge v_{\min}^{\mathrm{lat}}$ 且 $|e_{\mathrm{lat}}| \le e_{\max}^{\mathrm{lat}}$。
+### 3.7 已移除 / 不再存在的项
 
-死区：
-
-$$
-e_{\mathrm{lat,eff}} = \begin{cases}
-0 & |e_{\mathrm{lat}}| < \text{deadband} \\
-e_{\mathrm{lat}} & \text{otherwise}
-\end{cases}
-$$
-
-$$
-\omega_z \mathrel{+}= \mathrm{clamp}(-k_{\mathrm{lat}}\, e_{\mathrm{lat,eff}},\; -\omega_{\mathrm{lat,p,max}},\; \omega_{\mathrm{lat,p,max}})
-$$
-
-负号含义：车在路径左侧（$e_{\mathrm{lat}}>0$）时需右转（$\omega_z<0$）回到路径。
-
-#### 3.6.4 横向减速（可选）
-
-$$
-\text{scale} = 1 - g_{\mathrm{lat}} \cdot \min\left(\frac{|e_{\mathrm{lat}}|}{d_{\mathrm{slow}}},\, 1\right)
-$$
-
-$$
-v_x \leftarrow v_x \cdot \max(0,\, \text{scale})
-$$
-
-默认 $g_{\mathrm{lat}}=0.25$，$d_{\mathrm{slow}}=0.4\,\text{m}$。
-
-#### 3.6.5 限幅
-
-$$
-v_x \leftarrow \mathrm{clamp}(v_x,\, -v_{\max},\, v_{\max}), \quad
-\omega_z \leftarrow \mathrm{clamp}(\omega_z,\, -\omega_{\max},\, \omega_{\max})
-$$
-
-D1 默认 $v_{\max}=0.6\,\text{m/s}$，$\omega_{\max}=0.5\,\text{rad/s}$（来自 `d1_robot.yaml` 的 `limits.max_vel` / `limits.max_wz`，由 launch 注入 traj_server 与 bridge）。
-
-### 3.7 输出 EMA 平滑
-
-节点层（`d1_planner_bridge_node.cpp`）对发布前指令做一阶滤波：
-
-$$
-v_x^{\mathrm{out}} \leftarrow \alpha\, v_x + (1-\alpha)\, v_x^{\mathrm{out}}
-$$
-
-$$
-\omega_z^{\mathrm{out}} \leftarrow \alpha\, \omega_z + (1-\alpha)\, \omega_z^{\mathrm{out}}
-$$
-
-$\alpha =$ `cmd_vel_ema_alpha`（默认 0.8），抑制重规划导致的 `cmd_vel` 跳变。
-
-### 3.9 急停硬停（`hard_stop`）
-
-当 `PositionCommand` 中规划速度 $\|\mathbf{v}^{xy}\| < \texttt{hard\_stop\_plan\_speed}$ 时，bridge **强制**发布 `twist = (0, 0)` 并重置 EMA 状态：
-
-- 参数：`d1_bridge.yaml` → `hard_stop_plan_speed`（默认 **0.005** m/s；早期为 0.02，因慢速重规划误触发而降低）
-- 典型场景：`enterEmergencyStop()` 发布的停车 B 样条经 `traj_server` 采样后 `plan_vel ≈ 0`
-- log：`[cmd_vel_pub] hard_stop traj_id=... plan_vel=... twist=(0,0)`
+相对旧文档，当前桥接 **没有**：横向 CTE P 纠偏、`min_vx`、输出 EMA、`hard_stop_plan_speed`。停车依赖规划侧停车样条 + traj_server 终点零速 + 看门狗。
 
 ### 3.8 ROS 消息映射
 
 $$
-\texttt{Twist.linear.x} = v_x^{\mathrm{out}}, \quad
-\texttt{Twist.angular.z} = \omega_z^{\mathrm{out}}
+\texttt{Twist.linear.x} = v_x, \quad
+\texttt{Twist.angular.z} = \omega_z
 $$
-
-其余分量为 0。
 
 ---
 
 ## 4. 闭环与坐标系约定
 
-- 所有量均在 **global 世界系**（与 `/ov_msckf/odomimu`、深度建图一致）下规划与采样。
-- Bridge 仅将 **速度** 从世界系投影到车体；位置误差使用世界系坐标差 + 路径切向角。
-- VIO 里程计同时驱动：FSM 状态、规划 z 锁定、traj 进度、底盘跟踪，形成 **三层闭环**（规划 2.5D / 轨迹时间 / 轮速）。
+- 规划与采样在 **global** 系（与 VIO、建图一致）。
+- Bridge 将速度投影到车体前进方向；航向用 body +Z 水平投影，**不是** 常规 IMU yaw（body +X）。
+- VIO 同时驱动：FSM、规划 $z$、traj 进度、底盘跟踪。
 
 ---
 
 ## 5. 参数表
 
-### 5.1 `traj_server`（`single_run.launch.py`，限速来自 `d1_robot.yaml`）
+### 5.1 `traj_server`（来自 `d1_robot.yaml`）
 
 | 参数 | 默认 | 含义 |
 |------|------|------|
-| `use_odom_progress` | true | 启用 odom 进度同步 |
+| `use_odom_progress` | true | odom 进度同步 |
 | `odom_lookahead_time` | 0.5 | $\tau_{\mathrm{la}}$ |
-| `time_forward` | 0.7 | yaw 空间前瞻 $\tau_{\mathrm{fwd}}$ |
-| `endpoint_approach_dist` | 0.35 | 过末端仍“未到位”判定距离 |
-| `endpoint_stop_dist` | 0.08 | 认为到达终点的 XY 距离 |
-| `endpoint_vel_gain` | 0.8 | 终点引导 $k_{\mathrm{end}}$ |
-| `endpoint_max_vel` | 0.6 | 终点引导速度上限（= `limits.max_vel`） |
-| `max_yaw_dot` | 0.5 | yaw 角速度上限（= `limits.max_wz`） |
+| `time_forward` | 0.7 | 新轨迹 yaw 初始化前瞻 |
+| `endpoint_stop_dist` | 0.3 | 距终点 XY 内速度清零（= `goal_reach_thresh`） |
+| `max_yaw_dot` | 0.5 | yaw 角速度上限（= `max_wz`） |
 
-### 5.2 `d1_bridge.yaml`（话题/限速默认仍来自 `d1_robot.yaml`）
+### 5.2 `d1_bridge.yaml`
 
 | 参数 | 默认 | 含义 |
 |------|------|------|
-| `max_vx` | 0.6 | 前进速度上限（launch 注入，= `limits.max_vel`） |
-| `max_wz` | 0.5 | 角速度上限（launch 注入，= `limits.max_wz`） |
-| `yaw_kp` | 1.2 | 航向 P 增益 $k_\psi$ |
-| `yaw_rate_ff` | 1.0 | $\dot\psi$ 前馈增益 $k_{\mathrm{ff}}$ |
-| `max_yaw_dot_ff` | 0.5 | 前馈 $\dot\psi$ 限幅（launch 设为 `max_wz`） |
-| `max_wz_yaw_p` | 0.5 | 行驶中航向 P 项上限（launch 设为 `max_wz`） |
-| `align_heading_thresh_rad` | 0.4 | 原地转阈值 $\theta_{\mathrm{align}}$ |
-| `min_turn_wz` | 0.5 | 原地转最小 $\omega$（launch 设为 `max_wz`） |
-| `lateral_kp` | 0.3 | 横向增益 $k_{\mathrm{lat}}$ |
-| `lateral_error_deadband` | 0.05 | 横向死区 |
-| `max_wz_lateral_p` | 0.35 | 横向 P 项上限 |
-| `min_plan_speed_for_lateral` | 0.15 | 规划速度过低不做横向 |
-| `max_lateral_error_m` | 2.0 | 横向失效距离 |
-| `vx_lat_damp_gain` | 0.25 | 横向减速 $g_{\mathrm{lat}}$ |
-| `lateral_slowdown_dist` | 0.4 | 减速归一化距离 |
-| `min_vx` | 0.05 | 最小前进速度 |
-| `cmd_vel_ema_alpha` | 0.8 | 输出 EMA 系数 $\alpha$ |
-| `hard_stop_plan_speed` | 0.005 | 规划速度低于此值强制零速 |
+| `max_vx` / `max_wz` | 0.6 / 0.5 | launch 注入限速 |
+| `yaw_kp` | 1.2 | 航向 P |
+| `yaw_rate_ff` | 1.0 | $\dot\psi$ 前馈 |
+| `align_heading_thresh_rad` | 0.4 | 原地转阈值 |
+| `min_turn_wz` | 0.15 | 原地转最小角速度 |
+| `cmd_timeout_sec` | 0.3 | pos_cmd 看门狗 |
+| `odom_timeout_sec` | 0.5 | odom 看门狗 |
 | `allow_reverse` | false | 禁止倒车 |
-| `project_velocity_to_body` | true | 世界→车体速度投影 |
+| `project_velocity_to_body` | true | 世界→车体投影 |
 
 ### 5.3 与规划参数的耦合
 
 | 规划 | 控制 | 建议 |
 |------|------|------|
-| `max_vel` | `max_vx`, `endpoint_max_vel` | 保持一致，避免规划速度被截断或饱和 |
-| `thresh_replan_time` | — | 过小会导致周期性减速重规划 |
-| `goal_reach_thresh` | `endpoint_stop_dist` | 到达判定分别用于 FSM 与 traj hold，数量级应协调 |
+| `max_vel` | `max_vx` | 保持一致 |
+| `thresh_replan_time` | — | 过小 → 周期性减速重规划 |
+| `goal_reach_thresh` | `endpoint_stop_dist` | 已由配置对齐为同值 |
 
 ---
 
 ## 6. 调参思路（简要）
 
-1. **跟不紧轨迹**：增大 `odom_lookahead_time`；检查 `max_vx` 是否与规划一致。
-2. **车头摇摆**：降低 `yaw_kp`、`max_yaw_dot_ff`；增大 `cmd_vel_ema_alpha` 更平滑但滞后更大。
-3. **走 S 形**：增大 `lateral_kp` 或减小 `max_wz_lateral_p`；检查 `cmd.position` 前瞻是否合理。
-4. **到终点冲过头**：减小 `endpoint_vel_gain` 或增大 `endpoint_stop_dist`；规划侧检查 XY `goal_reach_thresh`。
-5. **重规划顿挫**：增大 `thresh_replan_time`；EMA $\alpha$ 略降（更平滑）或略升（更跟手）需实机权衡。
+1. **跟不紧**：增大 `odom_lookahead_time`；核对 `max_vx`。
+2. **车头摇摆 / 只转不走**：降低 `yaw_kp`；略增 `align_heading_thresh_rad`；检查 `min_turn_wz`。
+3. **到终点不停**：查 FSM `goal_reach_thresh` 与 traj `endpoint_stop_dist`。
+4. **突然零速**：看 `[watchdog]` 是否超时；查 VIO / pos_cmd 频率。
 
 ---
 
@@ -360,5 +238,5 @@ $$
 |------|------|
 | 轨迹采样 | `src/planner/plan_manage/src/traj_server.cpp` |
 | 跟踪律 | `src/d1_planner_bridge/src/trajectory_tracker.cpp` |
-| 节点与 EMA | `src/d1_planner_bridge/src/d1_planner_bridge_node.cpp` |
-| 参数 | `src/d1_planner_bridge/config/d1_bridge.yaml` |
+| 节点与看门狗 | `src/d1_planner_bridge/src/d1_planner_bridge_node.cpp` |
+| 参数 | `src/d1_planner_bridge/config/d1_bridge.yaml`，`d1_robot.yaml` |
