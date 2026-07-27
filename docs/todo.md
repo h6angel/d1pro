@@ -93,7 +93,9 @@ flowchart LR
 |------|------|----------|------|
 | **Phase 0** | 熟悉基线 | 读 `01`/`02`/`06`，跑通实机，记失败 case | 进行中 |
 | **Phase 0.5** | 建图与安全 | 地面滤波、高度柱、`[SAFETY_TIER]`；**实机高度/膨胀参数已调妥** | **完成** |
-| **Phase 1** | 强化障碍与初值 | ESDF；评估 Hybrid A\* 初值 | [ ] |
+| **Phase 1a** | 全局 A\* 避障 | `planGlobalTraj` = 平面 A\* + min-snap | **完成** |
+| **Phase 1b** | Hybrid 可执行化 | 方案 L 曲率修圆 | **完成** |
+| **Phase 1c** | ESDF 等 | 障碍表示升级 | [ ] |
 | **Phase 2** | 优化器升级 | iLQR/MPC 原型；调 `lambda` | [ ] |
 | **Phase 3** | 执行层一致 | bridge 层 MPC / 非完整前馈；可选恢复横向纠偏 | [ ] |
 | **Phase 4** | 架构对照 | TEB 或 MINCO 分支对比 | [ ] |

@@ -5,6 +5,7 @@
 
 #include <bspline_opt/bspline_optimizer.h>
 #include <bspline_opt/uniform_bspline.h>
+#include <path_searching/dyn_a_star.h>
 #include <plan_env/grid_map.h>
 #include <traj_utils/plan_container.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -56,9 +57,30 @@ namespace ego_planner
     // ros::Publisher obj_pub_; //zx-todo 
 
     BsplineOptimizer::Ptr bspline_optimizer_;
+    AStar::Ptr global_a_star_;
 
     int continous_failures_count_{0};
     bool use_robot_z_planning_{true};
+
+    bool global_astar_enable_{true};
+    double global_astar_step_{0.2};
+    double global_astar_timeout_{0.5};
+    bool global_astar_fallback_straight_{true};
+    double global_astar_simplify_eps_{0.25};
+    double global_astar_insert_dist_{4.0};
+
+    // Scheme L: curvature fillets on A* polyline (non-holonomic soft constraint)
+    bool hybrid_enable_{true};
+    double hybrid_max_curvature_{0.83};
+    double hybrid_corner_angle_thresh_{0.5};
+    double hybrid_arc_sample_step_{0.2};
+    int hybrid_max_arc_points_{30};
+    bool hybrid_use_odom_start_yaw_{true};
+    bool hybrid_blend_start_yaw_{true};
+    double hybrid_align_yaw_thresh_{0.4};
+
+    bool have_robot_yaw_{false};
+    double robot_yaw_{0.0};
 
     void updateTrajInfo(const UniformBspline &position_traj, const rclcpp::Time time_now);
 
@@ -66,6 +88,17 @@ namespace ego_planner
                         double &time_inc);
 
     bool refineTrajAlgo(UniformBspline &traj, vector<Eigen::Vector3d> &start_end_derivative, double ratio, double &ts, Eigen::MatrixXd &optimal_control_points);
+
+    /// Build waypoint list for global poly: A* path (optional) then densify / simplify.
+    bool buildGlobalWaypoints(const Eigen::Vector3d &start, const Eigen::Vector3d &end,
+                              std::vector<Eigen::Vector3d> &waypoints);
+
+    /// Scheme L: round sharp corners + optional start-yaw blend (mutates waypoints).
+    void applyHybridCurvatureL(std::vector<Eigen::Vector3d> &waypoints);
+
+    bool fitGlobalPolynomial(const std::vector<Eigen::Vector3d> &waypoints,
+                             const Eigen::Vector3d &start_vel, const Eigen::Vector3d &end_vel,
+                             const Eigen::Vector3d &start_acc, const Eigen::Vector3d &end_acc);
 
     // !SECTION stable
 

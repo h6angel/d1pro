@@ -1,5 +1,8 @@
 // #include <fstream>
 #include <ego_planner/planner_manager.h>
+#include <algorithm>
+#include <cmath>
+#include <functional>
 #include <thread>
 #include "visualization_msgs/msg/marker.hpp" // zx-todo
 
@@ -28,6 +31,117 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
   for (int i = 0; i < ctrl_pts.cols(); ++i)
     ctrl_pts(2, i) = z_ref;
 }
+
+/// Douglas–Peucker on XY; keep Z of retained samples.
+std::vector<Eigen::Vector3d> simplifyPolylineXY(const std::vector<Eigen::Vector3d> &in, double eps)
+{
+  if (in.size() <= 2 || eps <= 1e-6)
+    return in;
+
+  std::vector<char> keep(in.size(), 0);
+  keep.front() = 1;
+  keep.back() = 1;
+
+  std::function<void(int, int)> rdp = [&](int i0, int i1) {
+    if (i1 <= i0 + 1)
+      return;
+    const Eigen::Vector2d a = in[static_cast<size_t>(i0)].head<2>();
+    const Eigen::Vector2d b = in[static_cast<size_t>(i1)].head<2>();
+    const Eigen::Vector2d ab = b - a;
+    const double ab2 = ab.squaredNorm();
+    double max_d = 0.0;
+    int imax = i0;
+    for (int i = i0 + 1; i < i1; ++i)
+    {
+      double d = 0.0;
+      if (ab2 < 1e-12)
+        d = (in[static_cast<size_t>(i)].head<2>() - a).norm();
+      else
+      {
+        const double t = std::clamp(
+            (in[static_cast<size_t>(i)].head<2>() - a).dot(ab) / ab2, 0.0, 1.0);
+        d = (in[static_cast<size_t>(i)].head<2>() - (a + t * ab)).norm();
+      }
+      if (d > max_d)
+      {
+        max_d = d;
+        imax = i;
+      }
+    }
+    if (max_d > eps)
+    {
+      keep[static_cast<size_t>(imax)] = 1;
+      rdp(i0, imax);
+      rdp(imax, i1);
+    }
+  };
+  rdp(0, static_cast<int>(in.size()) - 1);
+
+  std::vector<Eigen::Vector3d> out;
+  out.reserve(in.size());
+  for (size_t i = 0; i < in.size(); ++i)
+    if (keep[i])
+      out.push_back(in[i]);
+  return out;
+}
+
+bool segmentInflateFree(const GridMap::Ptr &map, const Eigen::Vector3d &a, const Eigen::Vector3d &b,
+                        double step)
+{
+  if (!map)
+    return false;
+  const double len = (b - a).norm();
+  if (len < 1e-6)
+    return map->getInflateOccupancy(a) == 0;
+  step = std::max(step, 0.05);
+  const int n = std::max(1, static_cast<int>(std::ceil(len / step)));
+  for (int i = 0; i <= n; ++i)
+  {
+    const double t = static_cast<double>(i) / static_cast<double>(n);
+    const Eigen::Vector3d p = a + t * (b - a);
+    if (map->getInflateOccupancy(p) != 0)
+      return false;
+  }
+  return true;
+}
+
+void densifyWaypoints(const std::vector<Eigen::Vector3d> &points, double dist_thresh,
+                      std::vector<Eigen::Vector3d> &inter_points)
+{
+  inter_points.clear();
+  if (points.empty())
+    return;
+  for (size_t i = 0; i + 1 < points.size(); ++i)
+  {
+    inter_points.push_back(points[i]);
+    const double dist = (points[i + 1] - points[i]).norm();
+    if (dist > dist_thresh)
+    {
+      const int id_num = static_cast<int>(std::floor(dist / dist_thresh)) + 1;
+      for (int j = 1; j < id_num; ++j)
+      {
+        inter_points.push_back(points[i] * (1.0 - double(j) / id_num) +
+                               points[i + 1] * (double(j) / id_num));
+      }
+    }
+  }
+  inter_points.push_back(points.back());
+}
+
+double wrapPi(double a)
+{
+  while (a > M_PI)
+    a -= 2.0 * M_PI;
+  while (a < -M_PI)
+    a += 2.0 * M_PI;
+  return a;
+}
+
+void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, double min_dist)
+{
+  if (out.empty() || (p.head<2>() - out.back().head<2>()).norm() >= min_dist)
+    out.push_back(p);
+}
 } // namespace
 
   EGOPlannerManager::EGOPlannerManager() {}
@@ -45,6 +159,20 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     node->declare_parameter("manager/control_points_distance", -1.0);
     node->declare_parameter("manager/planning_horizon", 5.0);
     node->declare_parameter("manager/use_robot_z_planning", true);
+    node->declare_parameter("manager/global_astar_enable", true);
+    node->declare_parameter("manager/global_astar_step", 0.2);
+    node->declare_parameter("manager/global_astar_timeout", 0.5);
+    node->declare_parameter("manager/global_astar_fallback_straight", true);
+    node->declare_parameter("manager/global_astar_simplify_eps", 0.25);
+    node->declare_parameter("manager/global_astar_insert_dist", 4.0);
+    node->declare_parameter("manager/hybrid_enable", true);
+    node->declare_parameter("manager/hybrid_max_curvature", 0.83);
+    node->declare_parameter("manager/hybrid_corner_angle_thresh", 0.5);
+    node->declare_parameter("manager/hybrid_arc_sample_step", 0.2);
+    node->declare_parameter("manager/hybrid_max_arc_points", 30);
+    node->declare_parameter("manager/hybrid_use_odom_start_yaw", true);
+    node->declare_parameter("manager/hybrid_blend_start_yaw", true);
+    node->declare_parameter("manager/hybrid_align_yaw_thresh", 0.4);
 
     node->get_parameter("manager/max_vel", pp_.max_vel_);
     node->get_parameter("manager/max_acc", pp_.max_acc_);
@@ -53,6 +181,30 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     node->get_parameter("manager/control_points_distance", pp_.ctrl_pt_dist);
     node->get_parameter("manager/planning_horizon", pp_.planning_horizen_);
     node->get_parameter("manager/use_robot_z_planning", use_robot_z_planning_);
+    node->get_parameter("manager/global_astar_enable", global_astar_enable_);
+    node->get_parameter("manager/global_astar_step", global_astar_step_);
+    node->get_parameter("manager/global_astar_timeout", global_astar_timeout_);
+    node->get_parameter("manager/global_astar_fallback_straight", global_astar_fallback_straight_);
+    node->get_parameter("manager/global_astar_simplify_eps", global_astar_simplify_eps_);
+    node->get_parameter("manager/global_astar_insert_dist", global_astar_insert_dist_);
+    node->get_parameter("manager/hybrid_enable", hybrid_enable_);
+    node->get_parameter("manager/hybrid_max_curvature", hybrid_max_curvature_);
+    node->get_parameter("manager/hybrid_corner_angle_thresh", hybrid_corner_angle_thresh_);
+    node->get_parameter("manager/hybrid_arc_sample_step", hybrid_arc_sample_step_);
+    node->get_parameter("manager/hybrid_max_arc_points", hybrid_max_arc_points_);
+    node->get_parameter("manager/hybrid_use_odom_start_yaw", hybrid_use_odom_start_yaw_);
+    node->get_parameter("manager/hybrid_blend_start_yaw", hybrid_blend_start_yaw_);
+    node->get_parameter("manager/hybrid_align_yaw_thresh", hybrid_align_yaw_thresh_);
+
+    global_astar_step_ = std::max(global_astar_step_, 0.05);
+    global_astar_timeout_ = std::max(global_astar_timeout_, 0.05);
+    global_astar_simplify_eps_ = std::max(global_astar_simplify_eps_, 0.0);
+    global_astar_insert_dist_ = std::max(global_astar_insert_dist_, 0.5);
+    hybrid_max_curvature_ = std::max(hybrid_max_curvature_, 0.05);
+    hybrid_corner_angle_thresh_ = std::max(hybrid_corner_angle_thresh_, 0.05);
+    hybrid_arc_sample_step_ = std::max(hybrid_arc_sample_step_, 0.05);
+    hybrid_max_arc_points_ = std::max(hybrid_max_arc_points_, 4);
+    hybrid_align_yaw_thresh_ = std::max(hybrid_align_yaw_thresh_, 0.05);
 
     local_data_.traj_id_ = 0;
     grid_map_.reset(new GridMap);
@@ -65,6 +217,27 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     bspline_optimizer_->setEnvironment(grid_map_);
     bspline_optimizer_->a_star_.reset(new AStar);
     bspline_optimizer_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
+
+    // Global A*: larger pool so start→goal (+ detour) fits; Z thin (planar search).
+    Eigen::Vector3d map_ori, map_size;
+    grid_map_->getRegion(map_ori, map_size);
+    const double cover = std::max(map_size(0), map_size(1)) + 4.0;
+    int pool_xy = static_cast<int>(std::ceil(cover / global_astar_step_)) + 4;
+    pool_xy = std::clamp(pool_xy, 120, 420);
+    global_a_star_.reset(new AStar);
+    global_a_star_->initGridMap(grid_map_, Eigen::Vector3i(pool_xy, pool_xy, 5));
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[global_astar] enable=%d step=%.2f timeout=%.2fs pool=%dx%dx5 fallback_straight=%d",
+        global_astar_enable_ ? 1 : 0, global_astar_step_, global_astar_timeout_, pool_xy, pool_xy,
+        global_astar_fallback_straight_ ? 1 : 0);
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "[hybrid_L] enable=%d kappa_max=%.3f corner_thresh=%.2f arc_step=%.2f "
+        "use_odom_yaw=%d blend_start=%d align_thresh=%.2f",
+        hybrid_enable_ ? 1 : 0, hybrid_max_curvature_, hybrid_corner_angle_thresh_,
+        hybrid_arc_sample_step_, hybrid_use_odom_start_yaw_ ? 1 : 0,
+        hybrid_blend_start_yaw_ ? 1 : 0, hybrid_align_yaw_thresh_);
 
     visualization_ = vis;
   }
@@ -89,6 +262,25 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
   {
     if (grid_map_)
       grid_map_->updateRobotPose(pos, q);
+
+    // Body +Z horizontal projection (same convention as d1_planner_bridge).
+    const double n2 = q.w() * q.w() + q.x() * q.x() + q.y() * q.y() + q.z() * q.z();
+    if (std::isfinite(n2) && n2 > 1e-8)
+    {
+      const double inv_n = 1.0 / std::sqrt(n2);
+      const double w = q.w() * inv_n;
+      const double x = q.x() * inv_n;
+      const double y = q.y() * inv_n;
+      const double z = q.z() * inv_n;
+      const double zx = 2.0 * (x * z + w * y);
+      const double zy = 2.0 * (y * z - w * x);
+      const double horiz = std::hypot(zx, zy);
+      if (std::isfinite(horiz) && horiz > 1e-6)
+      {
+        robot_yaw_ = std::atan2(zy, zx);
+        have_robot_yaw_ = std::isfinite(robot_yaw_);
+      }
+    }
   }
 
   bool EGOPlannerManager::reboundReplan(Eigen::Vector3d start_pt, Eigen::Vector3d start_vel,
@@ -468,12 +660,281 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
     return true;
   }
 
+  bool EGOPlannerManager::buildGlobalWaypoints(const Eigen::Vector3d &start, const Eigen::Vector3d &end,
+                                               std::vector<Eigen::Vector3d> &waypoints)
+  {
+    waypoints.clear();
+
+    const double check_step = std::min(global_astar_step_, 0.15);
+    const bool straight_free = segmentInflateFree(grid_map_, start, end, check_step);
+
+    if (!global_astar_enable_ || straight_free)
+    {
+      waypoints.push_back(start);
+      waypoints.push_back(end);
+      if (straight_free && global_astar_enable_)
+      {
+        RCLCPP_INFO(node_->get_logger(),
+                    "[global_astar] skip search: straight line free (len=%.2f)",
+                    (end - start).norm());
+      }
+      applyHybridCurvatureL(waypoints);
+      return true;
+    }
+
+    if (!global_a_star_)
+    {
+      RCLCPP_WARN(node_->get_logger(), "[global_astar] planner not initialized");
+      if (global_astar_fallback_straight_)
+      {
+        waypoints.push_back(start);
+        waypoints.push_back(end);
+        applyHybridCurvatureL(waypoints);
+        return true;
+      }
+      return false;
+    }
+
+    const bool ok = global_a_star_->AstarSearch(global_astar_step_, start, end, global_astar_timeout_);
+    if (!ok)
+    {
+      RCLCPP_WARN(node_->get_logger(),
+                  "[global_astar] search failed start=(%.2f,%.2f) end=(%.2f,%.2f) fallback=%d",
+                  start(0), start(1), end(0), end(1), global_astar_fallback_straight_ ? 1 : 0);
+      if (global_astar_fallback_straight_)
+      {
+        waypoints.push_back(start);
+        waypoints.push_back(end);
+        applyHybridCurvatureL(waypoints);
+        return true;
+      }
+      return false;
+    }
+
+    waypoints = global_a_star_->getPath();
+    if (waypoints.size() < 2)
+    {
+      waypoints.clear();
+      waypoints.push_back(start);
+      waypoints.push_back(end);
+    }
+    else
+    {
+      // Snap endpoints to exact start/goal (search may adjust occupied cells).
+      waypoints.front() = start;
+      waypoints.back() = end;
+      if (bspline_optimizer_->usePlanningZ())
+      {
+        const double z_ref = bspline_optimizer_->getPlanningZ();
+        flattenPointSetZ(z_ref, waypoints);
+      }
+      waypoints = simplifyPolylineXY(waypoints, global_astar_simplify_eps_);
+    }
+
+    RCLCPP_INFO(node_->get_logger(),
+                "[global_astar] ok waypoints=%zu len≈%.2f simplify_eps=%.2f",
+                waypoints.size(), (end - start).norm(), global_astar_simplify_eps_);
+
+    applyHybridCurvatureL(waypoints);
+
+    if (visualization_)
+    {
+      std::vector<std::vector<Eigen::Vector3d>> vis_paths;
+      vis_paths.push_back(waypoints);
+      visualization_->displayAStarList(vis_paths, 0);
+    }
+
+    return true;
+  }
+
+  void EGOPlannerManager::applyHybridCurvatureL(std::vector<Eigen::Vector3d> &waypoints)
+  {
+    if (!hybrid_enable_ || waypoints.size() < 2)
+      return;
+
+    const double z_ref = waypoints.front()(2);
+    const double R_nom = 1.0 / hybrid_max_curvature_;
+    const double min_keep = 0.5 * hybrid_arc_sample_step_;
+    const size_t n_in = waypoints.size();
+
+    // --- Optional: blend from current body yaw onto first segment ---
+    if (hybrid_use_odom_start_yaw_ && hybrid_blend_start_yaw_ && have_robot_yaw_)
+    {
+      const Eigen::Vector2d d0 = (waypoints[1] - waypoints[0]).head<2>();
+      if (d0.norm() > 1e-3)
+      {
+        const double path_yaw = std::atan2(d0.y(), d0.x());
+        const double dyaw = wrapPi(path_yaw - robot_yaw_);
+        if (std::abs(dyaw) > hybrid_align_yaw_thresh_)
+        {
+          const double R = R_nom;
+          const Eigen::Vector2d p0 = waypoints[0].head<2>();
+          const Eigen::Vector2d dir(std::cos(robot_yaw_), std::sin(robot_yaw_));
+          Eigen::Vector2d n(-dir.y(), dir.x());
+          if (dyaw < 0.0)
+            n = -n;
+          const Eigen::Vector2d center = p0 + n * R;
+          const double a0 = std::atan2((p0 - center).y(), (p0 - center).x());
+          const double sweep = dyaw;
+          const int n_samp = std::clamp(
+              static_cast<int>(std::ceil(R * std::abs(sweep) / hybrid_arc_sample_step_)),
+              2, hybrid_max_arc_points_);
+
+          std::vector<Eigen::Vector3d> blended;
+          blended.reserve(waypoints.size() + static_cast<size_t>(n_samp) + 2);
+          for (int k = 0; k <= n_samp; ++k)
+          {
+            const double a = a0 + sweep * static_cast<double>(k) / static_cast<double>(n_samp);
+            Eigen::Vector3d p(center.x() + R * std::cos(a), center.y() + R * std::sin(a), z_ref);
+            appendIfFar(blended, p, min_keep);
+          }
+          for (size_t i = 1; i < waypoints.size(); ++i)
+            appendIfFar(blended, waypoints[i], min_keep);
+          waypoints.swap(blended);
+          RCLCPP_INFO(node_->get_logger(),
+                      "[hybrid_L] start_yaw_blend dyaw=%.2f rad R=%.2f samples=%d",
+                      dyaw, R, n_samp);
+        }
+      }
+    }
+
+    if (waypoints.size() < 3)
+      return;
+
+    // --- Round sharp corners with constant-curvature fillets ---
+    std::vector<Eigen::Vector3d> out;
+    out.reserve(waypoints.size() * 2);
+    out.push_back(waypoints.front());
+
+    int corners_rounded = 0;
+    for (size_t i = 1; i + 1 < waypoints.size(); ++i)
+    {
+      const Eigen::Vector3d &A = out.back();
+      const Eigen::Vector3d &B = waypoints[i];
+      const Eigen::Vector3d &C = waypoints[i + 1];
+
+      Eigen::Vector2d d1 = (B - A).head<2>();
+      Eigen::Vector2d d2 = (C - B).head<2>();
+      const double len1 = d1.norm();
+      const double len2 = d2.norm();
+      if (len1 < 1e-4 || len2 < 1e-4)
+      {
+        appendIfFar(out, B, min_keep);
+        continue;
+      }
+      d1 /= len1;
+      d2 /= len2;
+
+      const double yaw1 = std::atan2(d1.y(), d1.x());
+      const double yaw2 = std::atan2(d2.y(), d2.x());
+      const double turn = wrapPi(yaw2 - yaw1);
+      if (std::abs(turn) < hybrid_corner_angle_thresh_)
+      {
+        appendIfFar(out, B, min_keep);
+        continue;
+      }
+
+      const double half = 0.5 * std::abs(turn);
+      const double tan_half = std::tan(half);
+      if (tan_half < 1e-4)
+      {
+        appendIfFar(out, B, min_keep);
+        continue;
+      }
+
+      double R = R_nom;
+      double t_len = R * tan_half;
+      const double max_t = 0.45 * std::min(len1, len2);
+      if (t_len > max_t)
+      {
+        t_len = max_t;
+        R = t_len / tan_half;
+      }
+      if (R < 0.05 || t_len < hybrid_arc_sample_step_ * 0.5)
+      {
+        appendIfFar(out, B, min_keep);
+        continue;
+      }
+
+      const Eigen::Vector2d entry = B.head<2>() - d1 * t_len;
+      const Eigen::Vector2d exitp = B.head<2>() + d2 * t_len;
+      Eigen::Vector2d n_in(-d1.y(), d1.x());
+      if (turn < 0.0)
+        n_in = -n_in;
+      const Eigen::Vector2d center = entry + n_in * R;
+      const double a0 = std::atan2((entry - center).y(), (entry - center).x());
+      double a1 = std::atan2((exitp - center).y(), (exitp - center).x());
+      double sweep = wrapPi(a1 - a0);
+      if (turn > 0.0 && sweep < 0.0)
+        sweep += 2.0 * M_PI;
+      if (turn < 0.0 && sweep > 0.0)
+        sweep -= 2.0 * M_PI;
+
+      const int n_samp = std::clamp(
+          static_cast<int>(std::ceil(R * std::abs(sweep) / hybrid_arc_sample_step_)),
+          2, hybrid_max_arc_points_);
+
+      appendIfFar(out, Eigen::Vector3d(entry.x(), entry.y(), z_ref), min_keep);
+      for (int k = 1; k < n_samp; ++k)
+      {
+        const double a = a0 + sweep * static_cast<double>(k) / static_cast<double>(n_samp);
+        appendIfFar(out,
+                    Eigen::Vector3d(center.x() + R * std::cos(a), center.y() + R * std::sin(a), z_ref),
+                    min_keep);
+      }
+      appendIfFar(out, Eigen::Vector3d(exitp.x(), exitp.y(), z_ref), min_keep);
+      ++corners_rounded;
+    }
+    appendIfFar(out, waypoints.back(), min_keep);
+
+    if (bspline_optimizer_->usePlanningZ())
+      flattenPointSetZ(bspline_optimizer_->getPlanningZ(), out);
+
+    waypoints.swap(out);
+    RCLCPP_INFO(node_->get_logger(),
+                "[hybrid_L] corners_rounded=%d waypoints %zu -> %zu kappa_max=%.3f",
+                corners_rounded, n_in, waypoints.size(), hybrid_max_curvature_);
+  }
+
+  bool EGOPlannerManager::fitGlobalPolynomial(const std::vector<Eigen::Vector3d> &waypoints,
+                                              const Eigen::Vector3d &start_vel, const Eigen::Vector3d &end_vel,
+                                              const Eigen::Vector3d &start_acc, const Eigen::Vector3d &end_acc)
+  {
+    if (waypoints.size() < 2)
+      return false;
+
+    std::vector<Eigen::Vector3d> inter_points;
+    densifyWaypoints(waypoints, global_astar_insert_dist_, inter_points);
+
+    const int pt_num = static_cast<int>(inter_points.size());
+    Eigen::MatrixXd pos(3, pt_num);
+    for (int i = 0; i < pt_num; ++i)
+      pos.col(i) = inter_points[static_cast<size_t>(i)];
+
+    Eigen::VectorXd time(pt_num - 1);
+    for (int i = 0; i < pt_num - 1; ++i)
+      time(i) = (pos.col(i + 1) - pos.col(i)).norm() / std::max(pp_.max_vel_, 0.05);
+
+    time(0) *= 2.0;
+    time(time.rows() - 1) *= 2.0;
+
+    PolynomialTraj gl_traj;
+    if (pos.cols() >= 3)
+      gl_traj = PolynomialTraj::minSnapTraj(pos, start_vel, end_vel, start_acc, end_acc, time);
+    else if (pos.cols() == 2)
+      gl_traj = PolynomialTraj::one_segment_traj_gen(
+          waypoints.front(), start_vel, start_acc, waypoints.back(), end_vel, end_acc, time(0));
+    else
+      return false;
+
+    const double arc_t_step = pp_.planning_horizen_ / 20.0 / std::max(pp_.max_vel_, 0.1);
+    global_data_.setGlobalTraj(gl_traj, node_->now(), arc_t_step);
+    return true;
+  }
+
   bool EGOPlannerManager::planGlobalTraj(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
                                          const Eigen::Vector3d &end_pos, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc)
   {
-
-    // generate global reference trajectory
-
     Eigen::Vector3d start = start_pos;
     Eigen::Vector3d end = end_pos;
     Eigen::Vector3d sv = start_vel;
@@ -491,66 +952,11 @@ void flattenControlPointsZ(const double z_ref, Eigen::MatrixXd &ctrl_pts)
       ea(2) = 0.0;
     }
 
-    vector<Eigen::Vector3d> points;
-    points.push_back(start);
-    points.push_back(end);
-
-    // insert intermediate points if too far
-    vector<Eigen::Vector3d> inter_points;
-    const double dist_thresh = 4.0;
-
-    for (size_t i = 0; i < points.size() - 1; ++i)
-    /*挨个读取点并计算点距判断是否需要插点，随后计算插点并写入矩阵，最后根据插点数量生成全局轨迹
-      最终返回值为是否规划成功的布尔值 */
-    {
-      inter_points.push_back(points.at(i));
-      double dist = (points.at(i + 1) - points.at(i)).norm();
-
-      if (dist > dist_thresh)
-      {
-        int id_num = floor(dist / dist_thresh) + 1;
-
-        for (int j = 1; j < id_num; ++j)
-        {
-          Eigen::Vector3d inter_pt =
-              points.at(i) * (1.0 - double(j) / id_num) + points.at(i + 1) * double(j) / id_num;
-          inter_points.push_back(inter_pt);
-        }
-      }
-    }
-
-    inter_points.push_back(points.back());
-
-    // write position matrix
-    int pt_num = inter_points.size();
-    Eigen::MatrixXd pos(3, pt_num);
-    for (int i = 0; i < pt_num; ++i)
-      pos.col(i) = inter_points[i];
-
-    Eigen::Vector3d zero(0, 0, 0);
-    Eigen::VectorXd time(pt_num - 1);
-    for (int i = 0; i < pt_num - 1; ++i)
-    {
-      time(i) = (pos.col(i + 1) - pos.col(i)).norm() / (pp_.max_vel_);
-    }
-
-    time(0) *= 2.0;
-    time(time.rows() - 1) *= 2.0;
-
-    PolynomialTraj gl_traj;
-    if (pos.cols() >= 3)
-      gl_traj = PolynomialTraj::minSnapTraj(pos, sv, ev, sa, ea, time);
-    else if (pos.cols() == 2)
-      gl_traj = PolynomialTraj::one_segment_traj_gen(start, sv, sa, end, ev, ea, time(0));
-    else
+    std::vector<Eigen::Vector3d> waypoints;
+    if (!buildGlobalWaypoints(start, end, waypoints))
       return false;
 
-    auto time_now = node_->now();
-
-    const double arc_t_step = pp_.planning_horizen_ / 20.0 / std::max(pp_.max_vel_, 0.1);
-    global_data_.setGlobalTraj(gl_traj, time_now, arc_t_step);
-
-    return true;
+    return fitGlobalPolynomial(waypoints, sv, ev, sa, ea);
   }
 
   bool EGOPlannerManager::refineTrajAlgo(UniformBspline &traj, vector<Eigen::Vector3d> &start_end_derivative, double ratio, double &ts, Eigen::MatrixXd &optimal_control_points)

@@ -151,7 +151,7 @@ stateDiagram-v2
 
 | 机制 | 行为 |
 |------|------|
-| **首次规划** | `planFromGlobalTraj`：`flag_polyInit=true`，多项式初值 |
+| **首次规划** | `planFromGlobalTraj`：`flag_polyInit=true`；全局参考由 **平面 A\***（可绕障）+ min-snap 生成 |
 | **局部重规划** | `REPLAN_TRAJ` → `planFromCurrentTraj`：warm-start，**前 3 个控制点钉在 odom** |
 | **规划起点** | `start_pt_ = odom_pos_`，`start_vel_ = odom_vel_` |
 | **固定 z** | `setRobotPlanningZ(odom_z)`，局部目标 z 同 odom |

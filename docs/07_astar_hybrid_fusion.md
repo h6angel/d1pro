@@ -117,28 +117,50 @@ flowchart TB
   Global --> Local["局部 reboundReplan<br/>（现有 B 样条 + L-BFGS）"]
 ```
 
-### 4.1 阶段 1 — 只要 A\* 的避障
+### 4.1 阶段 1 — 只要 A\* 的避障（**已落地**）
 
-- 在 **与规划一致** 的碰撞模型上跑平面 A\*（建议直接复用 / 扩展 `dyn_a_star` + `getInflateOccupancy` 柱语义）
-- 起终点：当前 odom → `end_pt_`
-- 后处理：路径简化（RDP）、可选膨胀走廊宽度 $w$（与 footprint + inflation 相关）
-- **输出 $P$ 只表达「绕哪些障」**，不要求可开
+入口：`EGOPlannerManager::planGlobalTraj` → `buildGlobalWaypoints` + `fitGlobalPolynomial`。
 
-这一步替代今天 `planGlobalTraj` 里「直线插点」的几何部分。
+行为：
 
-### 4.2 阶段 2 — 只要 Hybrid 的「非质点」逻辑（三种强度，由易到难）
+1. 直线通畅则跳过搜索（短距加速）
+2. 否则用独立 `global_a_star_`（大 pool、可配置超时）在膨胀/柱占据上平面搜索
+3. RDP 简化折线 → 按 `global_astar_insert_dist` 加密 → 现有 min-snap 写入 `global_data_`
+4. 失败时可 `global_astar_fallback_straight` 回退直线
 
-不必一上来做完整开环 Hybrid A\*。按投入选一档：
+参数（`d1_robot.yaml` → `manager/`）：`global_astar_enable`、`global_astar_step`、`global_astar_timeout`、`global_astar_fallback_straight`、`global_astar_simplify_eps`、`global_astar_insert_dist`。
 
-#### 方案 L（轻量，先验证价值）
+局部 rebound 用的 `bspline_optimizer_->a_star_`（小池）**不变**。
 
-1. 沿 A\* 折线给每个顶点赋航向：$\theta_i = \mathrm{atan2}(p_{i+1}-p_i)$  
-2. 检测折线夹角 / 曲率；超过差速可转阈值则 **插入圆角 / Dubins 短接**（局部几何修正）  
-3. 再对修正后的航点做现有 `minSnapTraj` / 采样进 `global_data_`
+下一阶段再做 Hybrid 可执行化（§4.2）。
 
-**保留的 Hybrid 思想：** 显式 $\theta$ + 曲率限制；**不做** 全状态搜索。
+#### ~~阶段 1 设计备忘（实现前）~~
 
-#### 方案 M（推荐主线：引导式 Hybrid / SMAC 风格走廊搜索）
+- ~~在膨胀占据图上跑平面 A\*~~ → 已实现
+- ~~起终点：当前 odom → `end_pt_`~~ → 已实现
+- ~~后处理：路径简化~~ → RDP `simplify_eps`
+- ~~输出 $P$ 只表达「绕哪些障」~~ → 已实现；min-snap 仍只做时空平滑
+
+### 4.2 阶段 2 — Hybrid 可执行化
+
+#### 方案 L（轻量）— **已落地**
+
+参数（`d1_robot.yaml` → `manager/`）：
+
+| 参数 | 默认 | 含义 |
+|------|------|------|
+| `hybrid_enable` | true | 总开关 |
+| `hybrid_max_curvature` | 0.83 | $\kappa_{\max}\approx$max_wz/max_vel |
+| `hybrid_corner_angle_thresh` | 0.5 | 超过此转角才修圆（rad） |
+| `hybrid_arc_sample_step` | 0.2 | 圆弧采样步长（m） |
+| `hybrid_max_arc_points` | 30 | 单拐角最多点数 |
+| `hybrid_use_odom_start_yaw` | true | 起点用车头航向 |
+| `hybrid_blend_start_yaw` | true | 车头与首段切向差大时插入对准弧 |
+| `hybrid_align_yaw_thresh` | 0.4 | 对准阈值（rad） |
+
+实现：`EGOPlannerManager::applyHybridCurvatureL`（A\* 折线之后、min-snap 之前）。日志：`[hybrid_L]`。
+
+#### 方案 M / H（未做）
 
 1. 阶段 1 得折线 $P$ 与走廊  
 2. 状态 $(x,y,\theta)$，用 **差速 / 自行车运动原语** 扩展  
@@ -161,7 +183,7 @@ flowchart TB
 
 | 层 | 现在 | 融合后建议 |
 |----|------|------------|
-| `planGlobalTraj` | 直线点 + min-snap | 阶段 1+2 的结果写入 `global_data_` |
+| `planGlobalTraj` | 直线点 + min-snap | **平面 A\* 折线 + min-snap**（已落地）；Hybrid 可执行化待做 |
 | `getLocalTarget` | 沿全局时长 / 弧长切片 | 不变；全局变「可绕障 + 更可开」后局部目标更合理 |
 | `reboundReplan` 初值 | 多项式 / warm-start + **局部** A\* rebound | 保留；全局更好后局部失败率应下降 |
 | 局部 `dyn_a_star` | rebound 弹性方向 | **继续保留**（局部贴障），与全局 A\* 分工不同 |
@@ -197,9 +219,9 @@ $$
 
 ## 7. 建议落地顺序
 
-1. **只换阶段 1**：`planGlobalTraj` 改为「平面 A\* 折线 + 现有 min-snap」——先验证全局绕障是否减少急停后无解  
-2. **加方案 L**：折线圆角 / 曲率限制——低成本观察跟踪是否更稳  
-3. **上方案 M**：走廊内运动原语搜索——正式去掉全局质点假设  
+1. **只换阶段 1**：**已落地**（平面 A\* + min-snap）  
+2. **加方案 L**：**已落地**（曲率修圆 + 起点航向对准）——实机微调 `hybrid_max_curvature` / `corner_angle_thresh`  
+3. **上方案 M**：走廊内运动原语搜索  
 4. 方案 H 仅作失败兜底  
 
 验收可对照 [03_planning_metrics.md](03_planning_metrics.md)：全局重建后 `reboundReplan` 成功率、初值碰撞率、急停次数、桥接航向误差。

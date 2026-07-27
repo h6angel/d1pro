@@ -120,8 +120,17 @@ bool AStar::ConvertToIndexAndAdjustStartEndPoints(Vector3d start_pt, Vector3d en
 
 bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_pt)
 {
+    return AstarSearch(step_size, start_pt, end_pt, 0.2);
+}
+
+bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_pt,
+                        double max_search_time)
+{
     rclcpp::Time time_1 = rclcpp::Clock().now();
     ++rounds_;
+
+    if (max_search_time < 0.05)
+        max_search_time = 0.05;
 
     step_size_ = step_size;
     inv_step_size_ = 1 / step_size;
@@ -238,9 +247,11 @@ bool AStar::AstarSearch(const double step_size, Vector3d start_pt, Vector3d end_
                     }
                 }
         rclcpp::Time time_2 = rclcpp::Clock().now();
-        if ((time_2 - time_1).seconds() > 0.2)
+        if ((time_2 - time_1).seconds() > max_search_time)
         {
-            RCLCPP_WARN(rclcpp::get_logger("AstarSearch"), "Failed in A star path searching !!! 0.2 seconds time limit exceeded.");
+            RCLCPP_WARN(rclcpp::get_logger("AstarSearch"),
+                        "Failed in A star path searching !!! %.2f seconds time limit exceeded.",
+                        max_search_time);
             return false;
         }
     }

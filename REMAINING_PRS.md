@@ -30,9 +30,11 @@
 
 `maybeReplanGlobalAfterEstop()`：漂移 ≤ `global_replan_drift_thresh`（0.25 m）则 skip；否则 `planGlobalTraj()` 重建。
 
+`planGlobalTraj` 几何层已改为 **平面 A\* 折线 + min-snap**（直线通畅则跳过搜索；失败可 fallback 直线）。见 [docs/07_astar_hybrid_fusion.md](docs/07_astar_hybrid_fusion.md)。
+
 ### 仍待做
 
-- 全局层改为 **odom → goal 的 A\* / Hybrid A\*** 折线再平滑（替代直线 minSnap）
+- **Hybrid 可执行化**：走廊内运动原语 / 曲率约束（去质点），见 `07` 方案 L/M
 - 漂移 ≤ 阈值时仍可能因旧 global 形状导致连续失败 → 可下调阈值或强制重建
 
 ### 验收
