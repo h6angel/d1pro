@@ -228,31 +228,35 @@ traj_server 正常播非零速度；bridge 跟速
 | 问题 | 状态 | 日志特征 |
 |------|------|----------|
 | 到点后继续发非零 `plan_vel` | **已修** | `traj_hold_stop` + hold 期间 `plan_vel=0` |
-| 近障新目标撞障 | **未修** | `collided, keep optimizing` → 仍 `bspline_publish` → z 崩 → `Depth Lost` |
+| 近障新目标撞障 | **初版已落地（待实机验收）** | 期望见 `[publish_gate]` / `start_yaw_blend skipped` / `odom_anomaly`，不再直接擦障执行 |
 
 不要把第三次目标的 `EMERGENCY_STOP` 误判成停速闩锁失效：estop 前的 `traj_id=56` 是紧急停车轨迹，且立即 `traj_hold_stop reason=endpoint`。
 
 ---
 
-## 6. 改进方向（分析级，未实现）
+## 6. 改进方向（已实现初版）
 
-按侵入性由小到大：
+按侵入性由小到大（对应代码 / `d1_robot.yaml`）：
 
-1. **GEN_NEW 门禁**  
-   - 近障 / 连续 `plan_success=0` 时禁止下发；达到失败上限必须 `WAIT_TARGET` + 零速（现有 `onGenNewTrajPlanFailed` 在满 8 次才会清目标，但中间某次「假成功」会提前逃出）。  
-   - 发布前对整条 B 样条做一次硬碰撞扫描，不过则当失败。
+1. **GEN_NEW 门禁** — **已落地**  
+   - `publish_collision_gate_enable`：`callReboundReplan` 发布前对整条 B 样条做硬碰撞扫描，不过则当失败（`[publish_gate]`）。  
+   - `near_obstacle_block_escape`：机身在膨胀内时跳过 random poly escape，避免「假成功」。  
+   - 达到失败上限仍走原有 `WAIT_TARGET` + 零速。
 
-2. **限制近障大转角起步**  
-   - `start_yaw_blend` 前检查圆弧采样点占用；失败则：原地对齐航向（仅 wz）或缩小 R / 禁用 blend，而不是硬插 1.2 m 弧。
+2. **限制近障大转角起步** — **已落地**  
+   - `hybrid_blend_occ_check` + `hybrid_blend_r_shrink_tries`：`start_yaw_blend` 前检查圆弧采样占用；失败则缩 R（0.7 / 0.45），仍占障则跳过 blend（`[hybrid_L] start_yaw_blend skipped`）。
 
-3. **增大贴障水平裕度**  
-   - 评估略增 inflation / footprint / clear 策略（与 [06](06_ground_obstacle_modeling.md) 清洞假墙权衡）。
+3. **增大贴障水平裕度** — **已落地（保守）**  
+   - `obstacles_inflation` 0.10 → 0.12；`robot_footprint_clear_margin` 同步 0.12。
 
-4. **执行期更早刹停**  
-   - 缩短 collision 前视或降低 estop 触发门槛；odom 异常（\|z\| 跳变、implied_v 异常）也可触发 hold，不单靠 Depth Lost。
+4. **执行期更早刹停** — **已落地**  
+   - `estop_imminent_time` 0.30 → 0.45；`safety_fail_estop_count` 3 → 2。  
+   - `odom_anomaly_hold_enable`：`|Δz|` 超 `odom_z_jump_thresh` 或 `SUSPECT_JUMP` 且 implied_v 过高 → `EMERGENCY_STOP`（不单靠 Depth Lost）。
 
-5. **近障专用行为**  
-   - 检测到 `isOdomBodyInObstacle` 或前方 N 米柱占用时：先 `callEmergencyStop` / 慢速脱出，再允许 `GEN_NEW_TRAJ`。
+5. **近障专用行为** — **已落地**  
+   - `near_obstacle_stop_before_plan` + `near_obstacle_check_radius`：GEN_NEW 前若机身在障或半径内有占用且仍在动，先 `callEmergencyStop` 再规划。
+
+复现验收见 §7；关键日志关键字：`[publish_gate]`、`start_yaw_blend skipped`、`[near_obs]`、`odom_anomaly`。
 
 ---
 

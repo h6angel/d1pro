@@ -8,6 +8,8 @@
 
 #include <algorithm>
 
+#include <atomic>
+
 #include <iostream>
 
 #include "nav_msgs/msg/path.hpp"
@@ -130,6 +132,32 @@ namespace ego_planner
     int safety_traj_fail_streak_{0};
 
     bool enable_fail_safe_;
+
+    /// Publish gate: reject B-spline that collides on inflate map before bspline_pub.
+    bool publish_collision_gate_enable_{true};
+
+    /// Skip first this much arc length (m) at traj start (footprint / start noise).
+    double publish_collision_gate_skip_start_m_{0.08};
+
+    /// Near-obstacle: sample inflate occupancy within this XY radius of odom (m).
+    double near_obstacle_check_radius_{0.6};
+
+    /// If body in inflate, skip random-poly escape stage (avoid "fake success").
+    bool near_obstacle_block_escape_{true};
+
+    /// If body in inflate at GEN_NEW start, publish stop before planning.
+    bool near_obstacle_stop_before_plan_{true};
+
+    /// EXEC/REPLAN: |Δz| between odom samples above this → hold/estop.
+    bool odom_anomaly_hold_enable_{true};
+    double odom_z_jump_thresh_{0.15};
+    /// Also hold when odom_diag SUSPECT_JUMP and implied_v above this (m/s).
+    double odom_anomaly_implied_v_{1.5};
+
+    bool have_odom_z_prev_{false};
+    double odom_z_prev_{0.0};
+    /// Set from odom callback; consumed in checkCollisionCallback (thread-safe flag).
+    std::atomic<bool> odom_anomaly_pending_{false};
 
 
 
@@ -281,8 +309,16 @@ namespace ego_planner
 
     bool isOdomBodyInObstacle() const;
 
+    /// True if inflate occupancy within near_obstacle_check_radius_ of odom (XY ring samples).
+    bool isObstacleNearOdom(double radius) const;
+
+    /// Hard collision scan of local B-spline (inflate); used as publish gate.
+    bool isLocalTrajCollisionFree(double skip_start_m);
+
     /// Tier-2: after replan escape fails, decide EMERGENCY_STOP vs REPLAN_TRAJ.
     bool shouldEmergencyStopOnTrajHit(double dt_to_hit, const Eigen::Vector3d &hit_pos) const;
+
+    void handleOdomAnomalyHold(const char *reason);
 
     /// P0-2: traj forward hit + planFromCurrentTraj failed — hold stop, then REPLAN or estop.
     void handleTrajHitAfterReplanFailed(double dt_to_hit, const Eigen::Vector3d &hit_pos);

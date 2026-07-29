@@ -42,7 +42,7 @@ planner:
   tag_stop_dist: 0.25   # AprilTag 追踪：距检测点 XY 距离 ≤ 此值则停车 (m)
   thresh_replan_time: 2.5
   collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)
-  obstacles_inflation: 0.10
+  obstacles_inflation: 0.12      # near-obs: slight XY pad (was 0.10)
   optimization_dist0: 0.55
   lambda_fitness: 1.5
 
@@ -50,7 +50,7 @@ fsm:
   thresh_no_replan_meter: 1.0
   planning_horizen_time: 3.0
   emergency_time: 1.0
-  estop_imminent_time: 0.3       # PR-2: inflate-only estop if hit within this (s) and moving toward hit
+  estop_imminent_time: 0.45      # near-obs: earlier estop when hit is close (was 0.3)
   estop_min_approach_speed: 0.05 # PR-2: below this XY speed, prefer REPLAN over estop when only in inflate
   safety_replan_trials: 5        # PR-2: escape attempts in safety callback before tier decision
   global_replan_drift_thresh: 0.25
@@ -61,10 +61,19 @@ fsm:
   local_target_free_step: 0.1
   # P0-2: 轨迹前方撞障且 escape replan 失败 → 发布停车样条；连续失败再 EMERGENCY_STOP
   safety_slowdown_enable: true
-  safety_fail_estop_count: 3
+  safety_fail_estop_count: 2     # near-obs: fail faster to estop (was 3)
   gen_new_traj_max_failures: 8
   gen_new_traj_backoff_base_sec: 0.25
   gen_new_traj_backoff_max_sec: 2.0
+  # docs/08: 近障起步 — 发布前门禁 / 近障行为 / odom 异常刹停
+  publish_collision_gate_enable: true
+  publish_collision_gate_skip_start_m: 0.08
+  near_obstacle_check_radius: 0.6
+  near_obstacle_block_escape: true
+  near_obstacle_stop_before_plan: true
+  odom_anomaly_hold_enable: true
+  odom_z_jump_thresh: 0.15
+  odom_anomaly_implied_v: 1.5
   tag_pose_topic: "/apriltag/target_pose_global"
   tag_detected_topic: "/apriltag/target_detected"
   tag_update_min_dist: 0.08
@@ -119,7 +128,7 @@ grid_map:
   robot_footprint_radius: 0.0   # 旧圆形模型；>0 且 box 全 0 时才启用圆形
   # 机身不当膨胀种子、膨胀结果不写回；清洞=物理 box ⊕ clear_margin（消洞边假墙）
   robot_footprint_no_inflate: true
-  robot_footprint_clear_margin: 0.10  # 建议 ≈ obstacles_inflation；贴身真障被抹可再降
+  robot_footprint_clear_margin: 0.12  # ≈ obstacles_inflation
 
 manager:
   max_jerk: 4.0
@@ -143,6 +152,9 @@ manager:
   hybrid_use_odom_start_yaw: true
   hybrid_blend_start_yaw: true
   hybrid_align_yaw_thresh: 0.4      # rad; align with bridge align_heading_thresh
+  # docs/08: 起步圆弧占障则缩 R / 放弃 blend，避免大半径扫入近障
+  hybrid_blend_occ_check: true
+  hybrid_blend_r_shrink_tries: 2
 
 optimization:
   lambda_smooth: 1.0

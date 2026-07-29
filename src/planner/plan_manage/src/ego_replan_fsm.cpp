@@ -1,5 +1,6 @@
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <limits>
 
@@ -79,6 +80,14 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/gen_new_traj_max_failures", 8);
     node_->declare_parameter("fsm/gen_new_traj_backoff_base_sec", 0.25);
     node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
+    node_->declare_parameter("fsm/publish_collision_gate_enable", true);
+    node_->declare_parameter("fsm/publish_collision_gate_skip_start_m", 0.08);
+    node_->declare_parameter("fsm/near_obstacle_check_radius", 0.6);
+    node_->declare_parameter("fsm/near_obstacle_block_escape", true);
+    node_->declare_parameter("fsm/near_obstacle_stop_before_plan", true);
+    node_->declare_parameter("fsm/odom_anomaly_hold_enable", true);
+    node_->declare_parameter("fsm/odom_z_jump_thresh", 0.15);
+    node_->declare_parameter("fsm/odom_anomaly_implied_v", 1.5);
     node_->declare_parameter("fsm/odom_diag_enable", true);
     node_->declare_parameter("fsm/odom_diag_period_ms", 500);
     node_->declare_parameter("fsm/odom_diag_implausible_speed", 0.5);
@@ -118,6 +127,20 @@ double advanceTForArcStep(
     gen_new_traj_backoff_base_sec_ = std::max(gen_new_traj_backoff_base_sec_, 0.05);
     gen_new_traj_backoff_max_sec_ = std::max(
       gen_new_traj_backoff_max_sec_, gen_new_traj_backoff_base_sec_);
+    node_->get_parameter("fsm/publish_collision_gate_enable", publish_collision_gate_enable_);
+    node_->get_parameter("fsm/publish_collision_gate_skip_start_m",
+                         publish_collision_gate_skip_start_m_);
+    node_->get_parameter("fsm/near_obstacle_check_radius", near_obstacle_check_radius_);
+    node_->get_parameter("fsm/near_obstacle_block_escape", near_obstacle_block_escape_);
+    node_->get_parameter("fsm/near_obstacle_stop_before_plan", near_obstacle_stop_before_plan_);
+    node_->get_parameter("fsm/odom_anomaly_hold_enable", odom_anomaly_hold_enable_);
+    node_->get_parameter("fsm/odom_z_jump_thresh", odom_z_jump_thresh_);
+    node_->get_parameter("fsm/odom_anomaly_implied_v", odom_anomaly_implied_v_);
+    publish_collision_gate_skip_start_m_ =
+      std::max(publish_collision_gate_skip_start_m_, 0.0);
+    near_obstacle_check_radius_ = std::max(near_obstacle_check_radius_, 0.1);
+    odom_z_jump_thresh_ = std::max(odom_z_jump_thresh_, 0.05);
+    odom_anomaly_implied_v_ = std::max(odom_anomaly_implied_v_, 0.5);
 
     {
       traj_utils::OdomDiagParams od;
@@ -157,9 +180,12 @@ double advanceTForArcStep(
     RCLCPP_INFO(
       node_->get_logger(),
       "[fsm] local_target_free_search=%d step=%.3f planning_horizon=%.2f "
-      "safety_slowdown=%d fail_estop_count=%d",
+      "safety_slowdown=%d fail_estop_count=%d publish_gate=%d near_obs_r=%.2f "
+      "odom_anomaly_hold=%d",
       local_target_free_search_ ? 1 : 0, local_target_free_step_, planning_horizen_,
-      safety_slowdown_enable_ ? 1 : 0, safety_fail_estop_count_);
+      safety_slowdown_enable_ ? 1 : 0, safety_fail_estop_count_,
+      publish_collision_gate_enable_ ? 1 : 0, near_obstacle_check_radius_,
+      odom_anomaly_hold_enable_ ? 1 : 0);
 
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
@@ -337,6 +363,22 @@ double advanceTForArcStep(
 
     // odom_acc_ = estimateAcc( msg );
 
+    if (odom_anomaly_hold_enable_ && have_odom_z_prev_)
+    {
+      const double dz = std::abs(odom_pos_(2) - odom_z_prev_);
+      if (dz > odom_z_jump_thresh_ &&
+          (exec_state_ == EXEC_TRAJ || exec_state_ == REPLAN_TRAJ))
+      {
+        odom_anomaly_pending_.store(true);
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(), 200,
+          "[odom_anomaly] z jump |dz|=%.3f thresh=%.3f (pending hold)",
+          dz, odom_z_jump_thresh_);
+      }
+    }
+    odom_z_prev_ = odom_pos_(2);
+    have_odom_z_prev_ = true;
+
     if (odom_diag_.params().enable)
     {
       const rclcpp::Time stamp(msg->header.stamp);
@@ -353,6 +395,13 @@ double advanceTForArcStep(
           "stamp_dt=%.3f wall_dt=%.3f implied_v=%.2f age=%.3f",
           sample.kind, odom_pos_(0), odom_pos_(1), sample.pose_step_xy,
           sample.stamp_dt, sample.wall_dt, sample.implied_speed, sample.stamp_age);
+        if (odom_anomaly_hold_enable_ &&
+            strcmp(sample.kind, "SUSPECT_JUMP") == 0 &&
+            sample.implied_speed >= odom_anomaly_implied_v_ &&
+            (exec_state_ == EXEC_TRAJ || exec_state_ == REPLAN_TRAJ))
+        {
+          odom_anomaly_pending_.store(true);
+        }
       }
       uint64_t n_tot = 0, n_lag = 0, n_jump = 0, n_back = 0;
       if (odom_diag_.takeSummary(now, n_tot, n_lag, n_jump, n_back))
@@ -472,6 +521,20 @@ double advanceTForArcStep(
         forceReplanGlobalFromOdom("safety_hold");
       }
 
+      // Near-obstacle: zero cmd first so a failed/escape plan cannot leave residual speed.
+      if (near_obstacle_stop_before_plan_ && have_odom_ &&
+          (isOdomBodyInObstacle() || isObstacleNearOdom(near_obstacle_check_radius_)))
+      {
+        if (odom_vel_.head<2>().norm() > 0.05)
+        {
+          RCLCPP_WARN_THROTTLE(
+            node_->get_logger(), *node_->get_clock(),
+            std::max(log_trace_period_ms_, 500),
+            "[near_obs] body/nearby occupied before GEN_NEW — stop then plan");
+          callEmergencyStop(odom_pos_);
+        }
+      }
+
       bool success = planFromGlobalTraj(10); // zx-todo
       if (success)
       {
@@ -583,7 +646,19 @@ double advanceTForArcStep(
         return true;
     }
 
-    // Random poly escape: always try, even when odom is in inflation margin.
+    // Random poly escape: skip when body is in inflate and near-obstacle gate is on
+    // (escape often yields formalsuccess but still clips obstacles).
+    const bool skip_escape =
+      near_obstacle_block_escape_ && isOdomBodyInObstacle();
+    if (skip_escape)
+    {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(), *node_->get_clock(),
+        std::max(log_trace_period_ms_, 500),
+        "[near_obs] body occupied — skip random poly escape");
+      return false;
+    }
+
     for (int i = 0; i < trial_times; ++i)
     {
       if (callReboundReplan(true, true))
@@ -610,6 +685,102 @@ double advanceTForArcStep(
     const auto map = planner_manager_->grid_map_;
     Eigen::Vector3d p = odom_pos_;
     return map->getInflateOccupancyNoFootprint(p) > 0;
+  }
+
+  bool EGOReplanFSM::isObstacleNearOdom(double radius) const
+  {
+    if (!have_odom_ || !planner_manager_ || !planner_manager_->grid_map_)
+      return false;
+
+    const auto map = planner_manager_->grid_map_;
+    const double z = odom_pos_(2);
+    constexpr int kN = 8;
+    for (int i = 0; i < kN; ++i)
+    {
+      const double a = 2.0 * M_PI * static_cast<double>(i) / static_cast<double>(kN);
+      Eigen::Vector3d p(
+        odom_pos_(0) + radius * std::cos(a),
+        odom_pos_(1) + radius * std::sin(a),
+        z);
+      const int occ = map->getInflateOccupancy(p);
+      if (occ > 0)
+        return true;
+    }
+    // Also check a closer ring so thin walls near the body are not missed.
+    const double r2 = 0.5 * radius;
+    for (int i = 0; i < kN; ++i)
+    {
+      const double a = 2.0 * M_PI * static_cast<double>(i) / static_cast<double>(kN);
+      Eigen::Vector3d p(
+        odom_pos_(0) + r2 * std::cos(a),
+        odom_pos_(1) + r2 * std::sin(a),
+        z);
+      if (map->getInflateOccupancy(p) > 0)
+        return true;
+    }
+    return false;
+  }
+
+  bool EGOReplanFSM::isLocalTrajCollisionFree(double skip_start_m)
+  {
+    if (!planner_manager_ || !planner_manager_->grid_map_)
+      return false;
+
+    LocalTrajData *info = &planner_manager_->local_data_;
+    if (info->duration_ < 1e-3 || info->start_time_.seconds() < 1e-5)
+      return false;
+
+    auto map = planner_manager_->grid_map_;
+    const double planning_z = have_odom_ ? odom_pos_(2) : info->position_traj_.evaluateDeBoorT(0.0)(2);
+    const double step = collision_check_step_;
+
+    Eigen::Vector3d p_prev = info->position_traj_.evaluateDeBoorT(0.0);
+    p_prev(2) = planning_z;
+
+    // Advance past skip_start_m along the curve so footprint-clear start is ignored.
+    double t_seg = 0.0;
+    double skipped = 0.0;
+    while (skipped < skip_start_m - 1e-6 && t_seg < info->duration_ - 1e-6)
+    {
+      Eigen::Vector3d p_next;
+      const double t_next = advanceTForArcStep(
+        info->position_traj_, t_seg, info->duration_, p_prev, step, planning_z, p_next);
+      skipped += (p_next.head<2>() - p_prev.head<2>()).norm();
+      p_prev = p_next;
+      t_seg = t_next;
+      if (t_next >= info->duration_ - 1e-6)
+        return true;
+    }
+
+    while (t_seg < info->duration_ - 1e-6)
+    {
+      Eigen::Vector3d p_next;
+      const double t_next = advanceTForArcStep(
+        info->position_traj_, t_seg, info->duration_, p_prev, step, planning_z, p_next);
+
+      if (map->checkSegmentInflateOccupied(p_prev, p_next))
+        return false;
+
+      if (t_next >= info->duration_ - 1e-6)
+        break;
+
+      p_prev = p_next;
+      t_seg = t_next;
+    }
+    return true;
+  }
+
+  void EGOReplanFSM::handleOdomAnomalyHold(const char *reason)
+  {
+    if (exec_state_ != EXEC_TRAJ && exec_state_ != REPLAN_TRAJ)
+      return;
+
+    RCLCPP_ERROR(
+      node_->get_logger(),
+      "[SAFETY_TIER] odom_anomaly (%s) -> EMERGENCY_STOP (hold bspline)",
+      reason ? reason : "?");
+    odom_anomaly_pending_.store(false);
+    enterEmergencyStop("ODOM_ANOMALY");
   }
 
   bool EGOReplanFSM::shouldEmergencyStopOnTrajHit(
@@ -716,6 +887,12 @@ double advanceTForArcStep(
         info->start_time_.seconds() < 1e-5)
       return;
 
+    if (odom_anomaly_hold_enable_ && odom_anomaly_pending_.load())
+    {
+      handleOdomAnomalyHold("pending_flag");
+      return;
+    }
+
     /* ---------- check lost of depth ---------- */
     if (map->getOdomDepthTimeout())
     {
@@ -817,6 +994,15 @@ double advanceTForArcStep(
 
     if (plan_and_refine_success)
     {
+      if (publish_collision_gate_enable_ &&
+          !isLocalTrajCollisionFree(publish_collision_gate_skip_start_m_))
+      {
+        RCLCPP_WARN(
+          node_->get_logger(),
+          "[publish_gate] B-spline collides on inflate map — treat as plan failure");
+        return false;
+      }
+
       resetSafetyTrajFailStreak();
 
       auto info = &planner_manager_->local_data_;

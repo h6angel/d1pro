@@ -173,6 +173,8 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
     node->declare_parameter("manager/hybrid_use_odom_start_yaw", true);
     node->declare_parameter("manager/hybrid_blend_start_yaw", true);
     node->declare_parameter("manager/hybrid_align_yaw_thresh", 0.4);
+    node->declare_parameter("manager/hybrid_blend_occ_check", true);
+    node->declare_parameter("manager/hybrid_blend_r_shrink_tries", 2);
 
     node->get_parameter("manager/max_vel", pp_.max_vel_);
     node->get_parameter("manager/max_acc", pp_.max_acc_);
@@ -195,6 +197,8 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
     node->get_parameter("manager/hybrid_use_odom_start_yaw", hybrid_use_odom_start_yaw_);
     node->get_parameter("manager/hybrid_blend_start_yaw", hybrid_blend_start_yaw_);
     node->get_parameter("manager/hybrid_align_yaw_thresh", hybrid_align_yaw_thresh_);
+    node->get_parameter("manager/hybrid_blend_occ_check", hybrid_blend_occ_check_);
+    node->get_parameter("manager/hybrid_blend_r_shrink_tries", hybrid_blend_r_shrink_tries_);
 
     global_astar_step_ = std::max(global_astar_step_, 0.05);
     global_astar_timeout_ = std::max(global_astar_timeout_, 0.05);
@@ -205,6 +209,7 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
     hybrid_arc_sample_step_ = std::max(hybrid_arc_sample_step_, 0.05);
     hybrid_max_arc_points_ = std::max(hybrid_max_arc_points_, 4);
     hybrid_align_yaw_thresh_ = std::max(hybrid_align_yaw_thresh_, 0.05);
+    hybrid_blend_r_shrink_tries_ = std::clamp(hybrid_blend_r_shrink_tries_, 0, 4);
 
     local_data_.traj_id_ = 0;
     grid_map_.reset(new GridMap);
@@ -234,10 +239,11 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
     RCLCPP_INFO(
         node_->get_logger(),
         "[hybrid_L] enable=%d kappa_max=%.3f corner_thresh=%.2f arc_step=%.2f "
-        "use_odom_yaw=%d blend_start=%d align_thresh=%.2f",
+        "use_odom_yaw=%d blend_start=%d align_thresh=%.2f occ_check=%d r_shrink=%d",
         hybrid_enable_ ? 1 : 0, hybrid_max_curvature_, hybrid_corner_angle_thresh_,
         hybrid_arc_sample_step_, hybrid_use_odom_start_yaw_ ? 1 : 0,
-        hybrid_blend_start_yaw_ ? 1 : 0, hybrid_align_yaw_thresh_);
+        hybrid_blend_start_yaw_ ? 1 : 0, hybrid_align_yaw_thresh_,
+        hybrid_blend_occ_check_ ? 1 : 0, hybrid_blend_r_shrink_tries_);
 
     visualization_ = vis;
   }
@@ -767,33 +773,75 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
         const double dyaw = wrapPi(path_yaw - robot_yaw_);
         if (std::abs(dyaw) > hybrid_align_yaw_thresh_)
         {
-          const double R = R_nom;
           const Eigen::Vector2d p0 = waypoints[0].head<2>();
           const Eigen::Vector2d dir(std::cos(robot_yaw_), std::sin(robot_yaw_));
           Eigen::Vector2d n(-dir.y(), dir.x());
           if (dyaw < 0.0)
             n = -n;
-          const Eigen::Vector2d center = p0 + n * R;
-          const double a0 = std::atan2((p0 - center).y(), (p0 - center).x());
           const double sweep = dyaw;
-          const int n_samp = std::clamp(
-              static_cast<int>(std::ceil(R * std::abs(sweep) / hybrid_arc_sample_step_)),
-              2, hybrid_max_arc_points_);
 
-          std::vector<Eigen::Vector3d> blended;
-          blended.reserve(waypoints.size() + static_cast<size_t>(n_samp) + 2);
-          for (int k = 0; k <= n_samp; ++k)
+          auto arcFree = [&](double R, int n_samp) -> bool {
+            if (!hybrid_blend_occ_check_ || !grid_map_)
+              return true;
+            const Eigen::Vector2d center = p0 + n * R;
+            const double a0 = std::atan2((p0 - center).y(), (p0 - center).x());
+            for (int k = 0; k <= n_samp; ++k)
+            {
+              const double a = a0 + sweep * static_cast<double>(k) / static_cast<double>(n_samp);
+              Eigen::Vector3d p(center.x() + R * std::cos(a), center.y() + R * std::sin(a), z_ref);
+              const int occ = grid_map_->getInflateOccupancy(p);
+              if (occ != 0)
+                return false;
+            }
+            return true;
+          };
+
+          // Try nominal R, then progressively smaller radii; skip blend if all collide.
+          const double shrink_factors[] = {1.0, 0.7, 0.45};
+          const int n_try = 1 + std::min(hybrid_blend_r_shrink_tries_, 2);
+          bool applied = false;
+          for (int ti = 0; ti < n_try; ++ti)
           {
-            const double a = a0 + sweep * static_cast<double>(k) / static_cast<double>(n_samp);
-            Eigen::Vector3d p(center.x() + R * std::cos(a), center.y() + R * std::sin(a), z_ref);
-            appendIfFar(blended, p, min_keep);
+            const double R = R_nom * shrink_factors[ti];
+            if (R < 0.15)
+              continue;
+            const int n_samp = std::clamp(
+                static_cast<int>(std::ceil(R * std::abs(sweep) / hybrid_arc_sample_step_)),
+                2, hybrid_max_arc_points_);
+            if (!arcFree(R, n_samp))
+            {
+              RCLCPP_WARN(
+                  node_->get_logger(),
+                  "[hybrid_L] start_yaw_blend R=%.2f occupied, try shrink/skip", R);
+              continue;
+            }
+
+            const Eigen::Vector2d center = p0 + n * R;
+            const double a0 = std::atan2((p0 - center).y(), (p0 - center).x());
+            std::vector<Eigen::Vector3d> blended;
+            blended.reserve(waypoints.size() + static_cast<size_t>(n_samp) + 2);
+            for (int k = 0; k <= n_samp; ++k)
+            {
+              const double a = a0 + sweep * static_cast<double>(k) / static_cast<double>(n_samp);
+              Eigen::Vector3d p(center.x() + R * std::cos(a), center.y() + R * std::sin(a), z_ref);
+              appendIfFar(blended, p, min_keep);
+            }
+            for (size_t i = 1; i < waypoints.size(); ++i)
+              appendIfFar(blended, waypoints[i], min_keep);
+            waypoints.swap(blended);
+            RCLCPP_INFO(node_->get_logger(),
+                        "[hybrid_L] start_yaw_blend dyaw=%.2f rad R=%.2f samples=%d",
+                        dyaw, R, n_samp);
+            applied = true;
+            break;
           }
-          for (size_t i = 1; i < waypoints.size(); ++i)
-            appendIfFar(blended, waypoints[i], min_keep);
-          waypoints.swap(blended);
-          RCLCPP_INFO(node_->get_logger(),
-                      "[hybrid_L] start_yaw_blend dyaw=%.2f rad R=%.2f samples=%d",
-                      dyaw, R, n_samp);
+          if (!applied)
+          {
+            RCLCPP_WARN(
+                node_->get_logger(),
+                "[hybrid_L] start_yaw_blend skipped (arc occupied) dyaw=%.2f — keep polyline",
+                dyaw);
+          }
         }
       }
     }
