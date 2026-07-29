@@ -254,6 +254,10 @@ namespace ego_planner
 
     rclcpp::Publisher<traj_utils::msg::Bspline>::SharedPtr bspline_pub_;
 
+    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr stop_traj_pub_;
+
+    void publishStopTraj();
+
 
 
     /* helper functions */

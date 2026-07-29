@@ -42,6 +42,9 @@ double odom_lookahead_time_ = 0.4;
 /// XY distance to traj end at/below which vel is zeroed (align with fsm goal_reach_thresh).
 double endpoint_stop_dist_ = 0.3;
 double max_yaw_dot_ = 0.5;
+/// Sticky finish latch: once set, keep vel=0 until a new bspline arrives.
+bool traj_hold_stop_ = false;
+const char * traj_hold_reason_ = "";
 
 rclcpp::Node::SharedPtr g_node;
 int g_log_trace_period_ms_ = 500;
@@ -312,6 +315,27 @@ void publishExecBsplinePath(const rclcpp::Time & stamp)
   exec_bspline_path_pub->publish(path);
 }
 
+void latchHoldStop(const char * reason)
+{
+  if (traj_hold_stop_)
+    return;
+  traj_hold_stop_ = true;
+  traj_hold_reason_ = reason ? reason : "unknown";
+  if (g_node) {
+    RCLCPP_INFO(
+      g_node->get_logger(),
+      "[traj_hold_stop] traj_id=%d reason=%s (vel latched to 0 until new bspline)",
+      traj_id_, traj_hold_reason_);
+  }
+}
+
+void stopTrajCallback(const std_msgs::msg::Empty::SharedPtr /*msg*/)
+{
+  if (!receive_traj_)
+    return;
+  latchHoldStop("force");
+}
+
 void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
 {
   Eigen::MatrixXd pos_pts(3, msg->pos_pts.size());
@@ -363,6 +387,8 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
     }
   }
 
+  traj_hold_stop_ = false;
+  traj_hold_reason_ = "";
   receive_traj_ = true;
   publishExecBsplinePath(rclcpp::Time(msg->start_time.sec, msg->start_time.nanosec));
 
@@ -454,8 +480,15 @@ void cmdCallback()
     ? (odom_pos_.head<2>() - traj_end.head<2>()).norm()
     : (pos.head<2>() - traj_end.head<2>()).norm();
 
-  if (dist_odom_end_xy <= endpoint_stop_dist_)
-  {
+  // Sticky finish: do not re-emit non-zero end velocity after leaving the stop radius.
+  if (!traj_hold_stop_) {
+    if (dist_odom_end_xy <= endpoint_stop_dist_)
+      latchHoldStop("endpoint");
+    else if (t_cur >= traj_duration_ - 1e-3)
+      latchHoldStop("time");
+  }
+
+  if (traj_hold_stop_) {
     pos = traj_end;
     vel.setZero();
     acc.setZero();
@@ -476,6 +509,8 @@ void cmdCallback()
       yawdot = wrapPi(yaw_vel - last_yaw_) / dt;
     yawdot = std::clamp(yawdot, -max_yaw_dot_, max_yaw_dot_);
   }
+  if (traj_hold_stop_)
+    yawdot = 0.0;
   if (!std::isfinite(yaw))
     yaw = std::isfinite(last_yaw_) ? last_yaw_ : 0.0;
   if (!std::isfinite(yawdot))
@@ -527,12 +562,22 @@ void cmdCallback()
     RCLCPP_INFO_THROTTLE(
       g_node->get_logger(), *g_node->get_clock(),
       std::max(g_log_trace_period_ms_, 1),
-      "[pos_cmd_pub] traj_id=%d t=%.2f/%.2f odom=%s cmd_pos=%s vel=%s dist_odom_cmd=%.3f",
+      "[pos_cmd_pub] traj_id=%d t=%.2f/%.2f odom=%s cmd_pos=%s vel=%s dist_odom_cmd=%.3f hold=%d",
       traj_id_, t_cur, traj_duration_,
       traj_utils::formatVec3(odom_pos_).c_str(),
       traj_utils::formatVec3(pos).c_str(),
       traj_utils::formatXYZ(vel(0), vel(1), vel(2)).c_str(),
-      dist_odom_cmd);
+      dist_odom_cmd,
+      traj_hold_stop_ ? 1 : 0);
+    if (traj_hold_stop_) {
+      RCLCPP_INFO_THROTTLE(
+        g_node->get_logger(), *g_node->get_clock(),
+        std::max(g_log_trace_period_ms_, 1),
+        "[traj_hold_stop] traj_id=%d reason=%s dist_end=%.3f (sticky vel=0)",
+        traj_id_,
+        traj_hold_reason_[0] ? traj_hold_reason_ : "latched",
+        dist_odom_end_xy);
+    }
 
     const double t_closest_log = closestTimeOnTrajXY(
       odom_pos_.head<2>(), use_odom_progress_ ? t_progress_ : -1.0);
@@ -623,6 +668,11 @@ int main(int argc, char **argv)
       "planning/bspline",
       10,
       bsplineCallback);
+
+  auto stop_traj_sub = node->create_subscription<std_msgs::msg::Empty>(
+      "planning/stop_traj",
+      10,
+      stopTrajCallback);
 
   // High-rate VIO odom: best_effort + keep_last(1) (latest-sample-wins, no backlog).
   auto odom_sub = node->create_subscription<nav_msgs::msg::Odometry>(

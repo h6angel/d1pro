@@ -187,6 +187,7 @@ double advanceTForArcStep(
     // std::bind(&EGOReplanFSM::odometryCallback, this, std::placeholders::_1));
 
     bspline_pub_ = node_->create_publisher<traj_utils::msg::Bspline>("planning/bspline", 10);
+    stop_traj_pub_ = node_->create_publisher<std_msgs::msg::Empty>("planning/stop_traj", 10);
 
     if (!enable_tag_tracking_)
     {
@@ -375,6 +376,15 @@ double advanceTForArcStep(
     planner_manager_->updateRobotPose(odom_pos_, odom_orient_);
   }
 
+  void EGOReplanFSM::publishStopTraj()
+  {
+    if (!stop_traj_pub_)
+      return;
+    std_msgs::msg::Empty msg;
+    stop_traj_pub_->publish(msg);
+    RCLCPP_INFO(node_->get_logger(), "[stop_traj] published (force traj_server hold stop)");
+  }
+
   void EGOReplanFSM::changeFSMExecState(FSM_EXEC_STATE new_state, string pos_call)
   {
 
@@ -488,6 +498,7 @@ double advanceTForArcStep(
         if (!isTagFollowing() && dist_to_goal < goal_reach_thresh_)
         {
           have_target_ = false;
+          publishStopTraj();
           changeFSMExecState(WAIT_TARGET, "FSM");
         }
         else
@@ -514,6 +525,7 @@ double advanceTForArcStep(
           traj_utils::formatVec3(end_pt_).c_str(),
           dist_to_goal_xy);
         have_target_ = false;
+        publishStopTraj();
         changeFSMExecState(WAIT_TARGET, "FSM");
         break;
       }
