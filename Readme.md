@@ -1,15 +1,17 @@
-# EGO Planner（D1 实机）
+# D1 实机规划与控制（ego_control）
 
-ROS 2 下的 EGO 避障规划，经 `d1_planner_bridge` 转成 D1 的 `cmd_vel`。感知建图使用 OpenVINS + RealSense 深度。
+ROS 2 下的在线避障规划（动态 A\* + B 样条 L-BFGS）与差速执行：经 `d1_planner_bridge` 转成 D1 的 `cmd_vel`。感知建图使用 OpenVINS + RealSense 深度。
 
 **文档**（建议按顺序阅读）：
 
-- [Demo 指南](docs/05_demo.md) — 架构、流程、关键技术点与实机演示（图文并茂）
+- [Demo 指南](docs/05_demo.md) — 架构、流程、实机演示
 - [系统总览](docs/00_overview.md) — 感知、规划 FSM、控制数据流
-- [规划数学原理](docs/01_planning_math.md) — B 样条优化、2D/odom 改动
+- [规划数学原理](docs/01_planning_math.md) — B 样条优化、2.5D / odom 改动
 - [控制数学原理](docs/02_control_math.md) — 轨迹采样与差速跟踪
-- [AprilTag 感知接入](docs/04_apriltag_integration.md) — 检测迁入 ego_control、与规划对接
-- [AprilTag 跟随 FSM](APRILTAG_TRACKING_INTEGRATION.md) — 规划侧追踪状态机与参数
+- [地面障碍建模](docs/06_ground_obstacle_modeling.md) — 地面滤波与高度柱
+- [改进路线图](docs/todo.md) — 算法学习与落地顺序
+- [AprilTag 感知接入](docs/04_apriltag_integration.md)
+- [AprilTag 跟随 FSM](APRILTAG_TRACKING_INTEGRATION.md)
 
 ## 依赖
 
@@ -35,13 +37,11 @@ source ~/.bashrc
 
 ## 运行（推荐）
 
-实机默认使用仓库根目录一键脚本（RealSense + OpenVINS + 规划 + D1 桥接 + 可选 RViz / AprilTag）：
-
 ```bash
 cd ego_control
 ./start_ego_stack.sh                        # 默认：RViz 手动 2D Goal
 ./start_ego_stack.sh enable_tag_tracking=true  # AprilTag 追踪模式
-./start_ego_stack.sh --no-rviz              # 不启动 RViz
+./start_ego_stack.sh --no-rviz
 ./start_ego_stack.sh --skip-wait              # 跳过话题就绪检测（调试用）
 ```
 
@@ -50,52 +50,26 @@ cd ego_control
 1. `realsense2_camera`（`rs_launch.py`）
 2. OpenVINS（`ov_msckf subscribe.launch.py config:=rs_d435i use_stereo:=true max_cameras:=2`）
 3. [可选] `apriltag_detect`（`enable_tag_tracking=true` 时）
-4. `ego_planner single_run.launch.py`
+4. 规划栈（`src/planner/plan_manage/launch/single_run.launch.py`）
 5. `d1_planner_bridge`
 6. [可选] RViz（Fixed Frame 选 `global`）
 
-日志目录：`ego_log/stack_YYYYMMDD_HHMMSS/`（各节点独立 `.log`）。
+日志目录：`ego_log/stack_YYYYMMDD_HHMMSS/`。
 
 ## 手动分终端（调试）
 
-需要单独重启某一环时，与脚本等价的手动顺序：
+需要单独重启某一环时，按 `start_ego_stack.sh` 内顺序分别启动 RealSense、OpenVINS、规划 launch、桥接、可选 RViz。AprilTag 追踪时额外：`ros2 launch apriltag_detect apriltag.launch.py`，并给规划传 `enable_tag_tracking:=true`。
 
-```bash
-# 终端 1：RealSense
-ros2 launch realsense2_camera rs_launch.py
+深度内参请用 `ros2 topic echo /camera/camera/depth/camera_info --once` 核对后写入 `d1_robot.yaml` 的 `camera` 段。
 
-# 终端 2：OpenVINS（需已 source ../openvins/install/setup.bash）
-ros2 launch ov_msckf subscribe.launch.py config:=rs_d435i use_stereo:=true max_cameras:=2
-
-# 终端 3：规划
-ros2 launch ego_planner single_run.launch.py
-
-# 终端 4：底盘桥接
-ros2 launch d1_planner_bridge d1_planner_bridge.launch.py
-
-# 可选 RViz
-ros2 launch ego_planner rviz.launch.py
-```
-
-AprilTag 追踪时，在规划前增加：`ros2 launch apriltag_detect apriltag.launch.py`，并给规划传 `enable_tag_tracking:=true`。
-
-深度内参请用 `ros2 topic echo /camera/camera/depth/camera_info --once` 核对后覆盖 launch 的 `cx/cy/fx/fy`。
-
-**D1 话题与速度上限**（规划、traj_server、bridge 共用）统一在：
+**统一配置源：**
 
 `src/planner/plan_manage/config/d1_robot.yaml`
 
-改 `max_vel` / `max_wz` / `max_acc` 或话题名时只改此文件；launch 仍可用 `max_vel:=0.5` 等临时覆盖。
+含话题、限速、FSM、GridMap、优化权重、traj_server 等；由 `d1_robot_config.py` 注入节点。launch CLI 可临时覆盖部分项（如 `max_vel:=0.5`）。
 
-**GridMap、FSM 细项、优化器权重**（如 `grid_map/resolution`、`optimization/lambda_*`）仍在 `single_run.launch.py` 硬编码，调参需改 launch 或后续迁入 yaml。
+桥接调参见 `src/d1_planner_bridge/config/d1_bridge.yaml`（航向增益、看门狗超时等）。
 
-桥接控制调参见 `src/d1_planner_bridge/config/d1_bridge.yaml`（含 `hard_stop_plan_speed`，默认 0.005 m/s）。
+后续工程项见 [REMAINING_PRS.md](REMAINING_PRS.md)。
 
-后续 PR 与文档进度见 [REMAINING_PRS.md](REMAINING_PRS.md)。
-
-若使用自定义 VIO，通过 launch 参数覆盖：
-
-```bash
-ros2 launch ego_planner single_run.launch.py odom_topic:=/your_vio/odom pose_topic:=/your_vio/pose_stamped
-ros2 launch d1_planner_bridge d1_planner_bridge.launch.py odom_topic:=/your_vio/odom
-```
+若使用自定义 VIO，通过 launch 参数覆盖 `odom_topic` / `pose_topic`（写法见 `start_ego_stack.sh` 与各 launch 的 DeclareLaunchArgument）。

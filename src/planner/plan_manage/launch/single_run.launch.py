@@ -120,6 +120,7 @@ def _launch_setup(context, *args, **kwargs):
         remappings=[
             ('odom_world', odom_topic),
             ('planning/bspline', 'drone_0_planning/bspline'),
+            ('planning/stop_traj', 'drone_0_planning/stop_traj'),
             ('goal_point', 'drone_0_plan_vis/goal_point'),
             ('global_list', 'drone_0_plan_vis/global_list'),
             ('init_list', 'drone_0_plan_vis/init_list'),
@@ -128,6 +129,7 @@ def _launch_setup(context, *args, **kwargs):
             ('grid_map/odom', odom_topic),
             ('grid_map/pose', pose_topic),
             ('grid_map/depth', depth_topic),
+            ('grid_map/occupancy', 'drone_0_grid/grid_map/occupancy'),
             ('grid_map/occupancy_inflate', 'drone_0_grid/grid_map/occupancy_inflate'),
         ],
         parameters=[build_ego_planner_params(cfg, ego_overrides)],
@@ -141,6 +143,7 @@ def _launch_setup(context, *args, **kwargs):
         remappings=[
             ('position_cmd', pos_cmd_topic),
             ('planning/bspline', 'drone_0_planning/bspline'),
+            ('planning/stop_traj', 'drone_0_planning/stop_traj'),
             ('planning/exec_bspline_path', 'drone_0_planning/exec_bspline_path'),
             ('odom', odom_topic),
         ],

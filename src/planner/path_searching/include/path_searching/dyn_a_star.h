@@ -84,8 +84,13 @@ public:
 	void initGridMap(GridMap::Ptr occ_map, const Eigen::Vector3i pool_size);
 
 	bool AstarSearch(const double step_size, Eigen::Vector3d start_pt, Eigen::Vector3d end_pt);
+	/// Global / long searches may pass a larger timeout (seconds).
+	bool AstarSearch(const double step_size, Eigen::Vector3d start_pt, Eigen::Vector3d end_pt,
+					 double max_search_time);
 
 	std::vector<Eigen::Vector3d> getPath();
+
+	Eigen::Vector3i poolSize() const { return POOL_SIZE_; }
 };
 
 inline double AStar::getHeu(GridNodePtr node1, GridNodePtr node2)
