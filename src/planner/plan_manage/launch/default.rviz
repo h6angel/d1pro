@@ -51,7 +51,7 @@ Visualization Manager:
       Plane Cell Count: 1000
       Reference Frame: <Fixed Frame>
       Value: true
-    - Alpha: 0.15000000596046448
+    - Alpha: 0.85
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
         Max Value: 2.9000000953674316
@@ -60,7 +60,7 @@ Visualization Manager:
       Axis: Z
       Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
-      Color: 85; 170; 255
+      Color: 64; 64; 64
       Color Transformer: FlatColor
       Decay Time: 0
       Enabled: true
@@ -83,7 +83,7 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /drone_0_grid/grid_map/occupancy_inflate
       Use Fixed Frame: true
-      Use rainbow: true
+      Use rainbow: false
       Value: true
     - Class: rviz_common/Group
       Displays:
@@ -214,7 +214,7 @@ Visualization Manager:
           Name: Planning
         - Class: rviz_common/Group
           Displays:
-            - Alpha: 1
+            - Alpha: 0.85
               Autocompute Intensity Bounds: true
               Autocompute Value Bounds:
                 Max Value: 10
@@ -223,7 +223,7 @@ Visualization Manager:
               Axis: Z
               Channel Name: intensity
               Class: rviz_default_plugins/PointCloud2
-              Color: 29; 108; 212
+              Color: 64; 64; 64
               Color Transformer: FlatColor
               Decay Time: 0
               Enabled: true

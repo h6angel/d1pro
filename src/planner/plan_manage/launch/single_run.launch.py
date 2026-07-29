@@ -128,6 +128,7 @@ def _launch_setup(context, *args, **kwargs):
             ('grid_map/odom', odom_topic),
             ('grid_map/pose', pose_topic),
             ('grid_map/depth', depth_topic),
+            ('grid_map/occupancy', 'drone_0_grid/grid_map/occupancy'),
             ('grid_map/occupancy_inflate', 'drone_0_grid/grid_map/occupancy_inflate'),
         ],
         parameters=[build_ego_planner_params(cfg, ego_overrides)],

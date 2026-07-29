@@ -42,7 +42,7 @@ planner:
   tag_stop_dist: 0.25   # AprilTag 追踪：距检测点 XY 距离 ≤ 此值则停车 (m)
   thresh_replan_time: 2.5
   collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)
-  obstacles_inflation: 0.20
+  obstacles_inflation: 0.10
   optimization_dist0: 0.55
   lambda_fitness: 1.5
 
@@ -119,7 +119,7 @@ grid_map:
   robot_footprint_radius: 0.0   # 旧圆形模型；>0 且 box 全 0 时才启用圆形
   # 机身不当膨胀种子、膨胀结果不写回；清洞=物理 box ⊕ clear_margin（消洞边假墙）
   robot_footprint_no_inflate: true
-  robot_footprint_clear_margin: 0.20  # 建议 ≈ obstacles_inflation；贴身真障被抹可再降到 0.10
+  robot_footprint_clear_margin: 0.10  # 建议 ≈ obstacles_inflation；贴身真障被抹可再降
 
 manager:
   max_jerk: 4.0
