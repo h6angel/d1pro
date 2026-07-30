@@ -82,6 +82,7 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/gen_new_traj_backoff_max_sec", 2.0);
     node_->declare_parameter("fsm/publish_collision_gate_enable", true);
     node_->declare_parameter("fsm/publish_collision_gate_skip_start_m", 0.08);
+    node_->declare_parameter("fsm/publish_gate_stop_old_traj_near_obs", true);
     node_->declare_parameter("fsm/near_obstacle_check_radius", 0.6);
     node_->declare_parameter("fsm/near_obstacle_block_escape", true);
     node_->declare_parameter("fsm/near_obstacle_stop_before_plan", true);
@@ -130,6 +131,8 @@ double advanceTForArcStep(
     node_->get_parameter("fsm/publish_collision_gate_enable", publish_collision_gate_enable_);
     node_->get_parameter("fsm/publish_collision_gate_skip_start_m",
                          publish_collision_gate_skip_start_m_);
+    node_->get_parameter("fsm/publish_gate_stop_old_traj_near_obs",
+                         publish_gate_stop_old_traj_near_obs_);
     node_->get_parameter("fsm/near_obstacle_check_radius", near_obstacle_check_radius_);
     node_->get_parameter("fsm/near_obstacle_block_escape", near_obstacle_block_escape_);
     node_->get_parameter("fsm/near_obstacle_stop_before_plan", near_obstacle_stop_before_plan_);
@@ -180,12 +183,13 @@ double advanceTForArcStep(
     RCLCPP_INFO(
       node_->get_logger(),
       "[fsm] local_target_free_search=%d step=%.3f planning_horizon=%.2f "
-      "safety_slowdown=%d fail_estop_count=%d publish_gate=%d near_obs_r=%.2f "
-      "odom_anomaly_hold=%d",
+      "safety_slowdown=%d fail_estop_count=%d publish_gate=%d gate_stop_old=%d "
+      "near_obs_r=%.2f near_obs_stop_plan=%d odom_anomaly_hold=%d",
       local_target_free_search_ ? 1 : 0, local_target_free_step_, planning_horizen_,
       safety_slowdown_enable_ ? 1 : 0, safety_fail_estop_count_,
-      publish_collision_gate_enable_ ? 1 : 0, near_obstacle_check_radius_,
-      odom_anomaly_hold_enable_ ? 1 : 0);
+      publish_collision_gate_enable_ ? 1 : 0,
+      publish_gate_stop_old_traj_near_obs_ ? 1 : 0, near_obstacle_check_radius_,
+      near_obstacle_stop_before_plan_ ? 1 : 0, odom_anomaly_hold_enable_ ? 1 : 0);
 
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
@@ -866,13 +870,29 @@ double advanceTForArcStep(
     if (!have_odom_)
       return false;
 
-    LocalTrajData *info = &planner_manager_->local_data_;
-    if (info->start_time_.seconds() < 1e-5 || info->duration_ < 1e-3)
-      return planFromGlobalTraj(trial_times);
-
     start_pt_ = odom_pos_;
     start_vel_ = odom_vel_;
     start_acc_.setZero();
+
+    // docs/09 §6.1 0-B: align with GEN_NEW — zero residual speed before near-obs replan.
+    if (near_obstacle_stop_before_plan_ &&
+        (isOdomBodyInObstacle() || isObstacleNearOdom(near_obstacle_check_radius_)))
+    {
+      if (odom_vel_.head<2>().norm() > 0.05)
+      {
+        RCLCPP_WARN_THROTTLE(
+          node_->get_logger(), *node_->get_clock(),
+          std::max(log_trace_period_ms_, 500),
+          "[near_obs] body/nearby occupied before REPLAN/SAFETY plan — stop then plan");
+        callEmergencyStop(odom_pos_);
+      }
+      start_vel_.setZero();
+    }
+
+    LocalTrajData *info = &planner_manager_->local_data_;
+    // No warm-start traj: same escape path as planFromGlobalTraj, keep clamped start_vel_.
+    if (info->start_time_.seconds() < 1e-5 || info->duration_ < 1e-3)
+      return callReboundReplanWithEscape(trial_times, false);
 
     return callReboundReplanWithEscape(trial_times, true);
   }
@@ -1000,6 +1020,16 @@ double advanceTForArcStep(
         RCLCPP_WARN(
           node_->get_logger(),
           "[publish_gate] B-spline collides on inflate map — treat as plan failure");
+        // docs/09 §6.1 0-A: reject alone leaves old traj running; stop when near obstacle.
+        if (publish_gate_stop_old_traj_near_obs_ && have_odom_ &&
+            (isOdomBodyInObstacle() ||
+             isObstacleNearOdom(near_obstacle_check_radius_)))
+        {
+          RCLCPP_WARN(
+            node_->get_logger(),
+            "[publish_gate] near_obs — stop old traj");
+          callEmergencyStop(odom_pos_);
+        }
         return false;
       }
 

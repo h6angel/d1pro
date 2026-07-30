@@ -258,6 +258,7 @@ flowchart LR
 | [06_ground_obstacle_modeling.md](06_ground_obstacle_modeling.md) | 地面矮障 / 高度柱（已落地） |
 | [07_astar_hybrid_fusion.md](07_astar_hybrid_fusion.md) | 全局 A\* 避障 × Hybrid 非完整约束融合 |
 | [08_near_obstacle_start_collision.md](08_near_obstacle_start_collision.md) | 近障起步规划失效与撞障分析（含实机 log） |
+| [09_near_obstacle_dwell.md](09_near_obstacle_dwell.md) | 近障贴障时间过长：原因与解决思路（门禁落地后） |
 | [todo.md](todo.md) | 算法学习与改进路线 |
 | [APRILTAG_TRACKING_INTEGRATION.md](../APRILTAG_TRACKING_INTEGRATION.md) | Tag 跟随 FSM |
 | [REMAINING_PRS.md](../REMAINING_PRS.md) | 急停/安全后续项 |

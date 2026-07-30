@@ -68,8 +68,11 @@ fsm:
   # docs/08: 近障起步 — 发布前门禁 / 近障行为 / odom 异常刹停
   publish_collision_gate_enable: true
   publish_collision_gate_skip_start_m: 0.08
+  # docs/09 阶段 0-A: gate 拒发且近障时停旧轨（防蹭障）
+  publish_gate_stop_old_traj_near_obs: true
   near_obstacle_check_radius: 0.6
   near_obstacle_block_escape: true
+  # docs/09 阶段 0-B: GEN_NEW / REPLAN / SAFETY 近障先停再规划
   near_obstacle_stop_before_plan: true
   odom_anomaly_hold_enable: true
   odom_z_jump_thresh: 0.15

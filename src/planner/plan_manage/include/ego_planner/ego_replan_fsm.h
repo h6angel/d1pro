@@ -139,13 +139,16 @@ namespace ego_planner
     /// Skip first this much arc length (m) at traj start (footprint / start noise).
     double publish_collision_gate_skip_start_m_{0.08};
 
+    /// docs/09 §6.1: on publish_gate reject while near obstacle, also stop old traj.
+    bool publish_gate_stop_old_traj_near_obs_{true};
+
     /// Near-obstacle: sample inflate occupancy within this XY radius of odom (m).
     double near_obstacle_check_radius_{0.6};
 
     /// If body in inflate, skip random-poly escape stage (avoid "fake success").
     bool near_obstacle_block_escape_{true};
 
-    /// If body in inflate at GEN_NEW start, publish stop before planning.
+    /// Near-obstacle: publish stop before GEN_NEW / REPLAN / SAFETY plan (docs/09 §6.1).
     bool near_obstacle_stop_before_plan_{true};
 
     /// EXEC/REPLAN: |Δz| between odom samples above this → hold/estop.

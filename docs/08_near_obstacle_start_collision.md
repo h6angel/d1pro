@@ -3,7 +3,7 @@
 本文结合当前 FSM / 建图 / hybrid 初值 / rebound / 安全层逻辑，说明：**到点停速闩锁已修好之后**，为何在「障碍离起点很近」时给新目标仍会撞上。  
 实机证据来自 `ego_log/stack_20260729_145142`。
 
-相关文档：[系统总览](00_overview.md)、[地面障碍建模](06_ground_obstacle_modeling.md)、[A\* + Hybrid 融合](07_astar_hybrid_fusion.md)、[规划数学](01_planning_math.md)。
+相关文档：[系统总览](00_overview.md)、[地面障碍建模](06_ground_obstacle_modeling.md)、[A\* + Hybrid 融合](07_astar_hybrid_fusion.md)、[规划数学](01_planning_math.md)、[近障贴障时间过长](09_near_obstacle_dwell.md)（门禁落地后的通行侧效应）。
 
 ---
 
