@@ -96,18 +96,18 @@ grid_map:
   depth_filter_margin: 2
   k_depth_scaling_factor: 1000.0
   skip_pixel: 1                # B: 2 → 1，深度采样更密（算力紧时再退回 2）
-  p_hit: 0.70                  # A: 0.65 → 0.70，障碍命中涨更快
+  p_hit: 0.75                  # 灵敏度试参：0.70 → 0.75，单次命中涨更快
   p_miss: 0.30                 # A: 0.35 → 0.30，清除更慢
   p_min: 0.12
   p_max: 0.90
-  p_occ: 0.80
+  p_occ: 0.75                  # 灵敏度试参：0.80 → 0.75，更早判为占据
   min_ray_length: 0.1
   max_ray_length: 4.5
   virtual_ceil_height: 2.9
   visualization_truncate_height: 1.8
   show_occ_time: false
   pose_type: 1
-  occ_confirm_frames: 2        # A: 3 → 2，更快确认有障碍
+  occ_confirm_frames: 2       # 灵敏度试参：2 → 1，首帧 hit 即可更新
   occ_clear_frames: 10         # A: 5 → 10，更慢清除（须慢于 confirm）
   use_fixed_publish_window: true
   map_vis_rate: 10.0
@@ -116,7 +116,7 @@ grid_map:
   ground_filter_enable: true
   ground_filter_margin: 0.04   # 仅当 camera_to_ground<=0 时的旧逻辑备用
   camera_to_ground: 0.40       # 相机离地估计 (m)；过大易把矮障当地板滤掉
-  obstacle_min_height: 0.10    # 离地低于此值当地板；脚边矮障约 0.10~0.20 会保留
+  obstacle_min_height: 0.05    # 离地低于此值当地板；脚边矮障约 0.10~0.20 会保留
   inflate_xy_only: true
   # 方案A：查询时对 (x,y) 做高度柱检查 [ground_height+z_eps, query_z]
   column_collision_enable: true
