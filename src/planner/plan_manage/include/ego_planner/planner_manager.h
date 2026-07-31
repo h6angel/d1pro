@@ -78,6 +78,10 @@ namespace ego_planner
     bool hybrid_use_odom_start_yaw_{true};
     bool hybrid_blend_start_yaw_{true};
     double hybrid_align_yaw_thresh_{0.4};
+    /// If true, start_yaw_blend arc samples must be inflate-free; else shrink R / skip.
+    bool hybrid_blend_occ_check_{true};
+    /// Extra R shrink attempts after nominal (factors 0.7, 0.45 hardcoded).
+    int hybrid_blend_r_shrink_tries_{2};
 
     bool have_robot_yaw_{false};
     double robot_yaw_{0.0};

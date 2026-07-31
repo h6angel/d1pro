@@ -8,6 +8,8 @@
 
 #include <algorithm>
 
+#include <atomic>
+
 #include <iostream>
 
 #include "nav_msgs/msg/path.hpp"
@@ -130,6 +132,49 @@ namespace ego_planner
     int safety_traj_fail_streak_{0};
 
     bool enable_fail_safe_;
+
+    /// Publish gate: reject B-spline that collides on inflate map before bspline_pub.
+    bool publish_collision_gate_enable_{true};
+
+    /// Skip first this much arc length (m) at traj start (footprint / start noise).
+    double publish_collision_gate_skip_start_m_{0.08};
+
+    /// docs/09 §6.1: on publish_gate reject while near obstacle, also stop old traj.
+    bool publish_gate_stop_old_traj_near_obs_{true};
+
+    /// Near-obstacle: sample inflate occupancy within this XY radius of odom (m).
+    double near_obstacle_check_radius_{0.6};
+
+    /// If body in inflate, skip random-poly escape stage (avoid "fake success").
+    bool near_obstacle_block_escape_{true};
+
+    /// Near-obstacle: publish stop before GEN_NEW / REPLAN / SAFETY plan (docs/09 §6.1).
+    bool near_obstacle_stop_before_plan_{true};
+
+    /// docs/09 §6.4 3-B: after near-obs stop, temp goal to inflate-free lateral point.
+    bool near_obs_free_retreat_enable_{true};
+    double near_obs_free_retreat_min_r_{0.35};
+    double near_obs_free_retreat_max_r_{1.20};
+    double near_obs_free_retreat_step_{0.15};
+    double near_obs_free_retreat_reach_thresh_{0.20};
+    double near_obs_free_retreat_cooldown_{1.0};
+    int near_obs_free_retreat_max_tries_{3};
+
+    bool in_near_obs_retreat_{false};
+    Eigen::Vector3d near_obs_retreat_saved_end_pt_{0.0, 0.0, 0.0};
+    int near_obs_retreat_tries_{0};
+    rclcpp::Time near_obs_retreat_last_start_{0, 0, RCL_ROS_TIME};
+
+    /// EXEC/REPLAN: |Δz| between odom samples above this → hold/estop.
+    bool odom_anomaly_hold_enable_{true};
+    double odom_z_jump_thresh_{0.15};
+    /// Also hold when odom_diag SUSPECT_JUMP and implied_v above this (m/s).
+    double odom_anomaly_implied_v_{1.5};
+
+    bool have_odom_z_prev_{false};
+    double odom_z_prev_{0.0};
+    /// Set from odom callback; consumed in checkCollisionCallback (thread-safe flag).
+    std::atomic<bool> odom_anomaly_pending_{false};
 
 
 
@@ -281,8 +326,31 @@ namespace ego_planner
 
     bool isOdomBodyInObstacle() const;
 
+    /// True if inflate occupancy within near_obstacle_check_radius_ of odom (XY ring samples).
+    bool isObstacleNearOdom(double radius) const;
+
+    /// Ring-search inflate-free retreat point near odom; segment odom→pt must be free.
+    bool findNearObsFreeRetreatPoint(Eigen::Vector3d &out_pt) const;
+
+    /// After EmergencyStop near obs: temp end_pt_ = free, GEN_NEW. Returns true if started.
+    bool maybeStartNearObsFreeRetreat(const char *reason);
+
+    /// Clear retreat flags; optionally restore saved goal.
+    void clearNearObsFreeRetreat(bool restore_goal);
+
+    /// EXEC: if retreat goal reached, restore original goal and GEN_NEW. True if handled.
+    bool tryFinishNearObsFreeRetreat();
+
+    /// True if local B-spline is a hold/stop (near-zero XY length) — unsafe to warm-start.
+    bool isLocalTrajDegenerate() const;
+
+    /// Hard collision scan of local B-spline (inflate); used as publish gate.
+    bool isLocalTrajCollisionFree(double skip_start_m);
+
     /// Tier-2: after replan escape fails, decide EMERGENCY_STOP vs REPLAN_TRAJ.
     bool shouldEmergencyStopOnTrajHit(double dt_to_hit, const Eigen::Vector3d &hit_pos) const;
+
+    void handleOdomAnomalyHold(const char *reason);
 
     /// P0-2: traj forward hit + planFromCurrentTraj failed — hold stop, then REPLAN or estop.
     void handleTrajHitAfterReplanFailed(double dt_to_hit, const Eigen::Vector3d &hit_pos);

@@ -12,7 +12,7 @@ topics:
 
 limits:
   max_vel: 0.6   # 规划 + traj_server 终点引导速度上限 (m/s)
-  max_wz: 0.5    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
+  max_wz: 0.7    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
   max_acc: 1.0   # 规划加速度上限 (m/s^2)
 
 # odom 接收诊断（仅日志，不停车）。注入 fsm/ + traj_server/
@@ -42,7 +42,7 @@ planner:
   tag_stop_dist: 0.25   # AprilTag 追踪：距检测点 XY 距离 ≤ 此值则停车 (m)
   thresh_replan_time: 2.5
   collision_check_step: 0.05   # FSM 轨迹安全：段间 raycast 空间步长 (m)
-  obstacles_inflation: 0.10
+  obstacles_inflation: 0.12      # near-obs: slight XY pad (was 0.10)
   optimization_dist0: 0.55
   lambda_fitness: 1.5
 
@@ -50,7 +50,7 @@ fsm:
   thresh_no_replan_meter: 1.0
   planning_horizen_time: 3.0
   emergency_time: 1.0
-  estop_imminent_time: 0.3       # PR-2: inflate-only estop if hit within this (s) and moving toward hit
+  estop_imminent_time: 0.45      # near-obs: earlier estop when hit is close (was 0.3)
   estop_min_approach_speed: 0.05 # PR-2: below this XY speed, prefer REPLAN over estop when only in inflate
   safety_replan_trials: 5        # PR-2: escape attempts in safety callback before tier decision
   global_replan_drift_thresh: 0.25
@@ -61,10 +61,31 @@ fsm:
   local_target_free_step: 0.1
   # P0-2: 轨迹前方撞障且 escape replan 失败 → 发布停车样条；连续失败再 EMERGENCY_STOP
   safety_slowdown_enable: true
-  safety_fail_estop_count: 3
+  safety_fail_estop_count: 2     # near-obs: fail faster to estop (was 3)
   gen_new_traj_max_failures: 8
   gen_new_traj_backoff_base_sec: 0.25
   gen_new_traj_backoff_max_sec: 2.0
+  # docs/08: 近障起步 — 发布前门禁 / 近障行为 / odom 异常刹停
+  publish_collision_gate_enable: true
+  # 与 footprint 尺度对齐：起点清洞/豁免区约 0.2m，过小易把机身边沿误杀
+  publish_collision_gate_skip_start_m: 0.20
+  # docs/09 阶段 0-A: gate 拒发且近障时停旧轨（防蹭障）
+  publish_gate_stop_old_traj_near_obs: true
+  near_obstacle_check_radius: 0.4
+  near_obstacle_block_escape: true
+  # docs/09 阶段 0-B: GEN_NEW / REPLAN / SAFETY 近障先停再规划
+  near_obstacle_stop_before_plan: true
+  # docs/09 §6.4 3-B: 停轨后侧向 inflate free 临时目标脱出（仍过 publish_gate）
+  near_obs_free_retreat_enable: true
+  near_obs_free_retreat_min_r: 0.35
+  near_obs_free_retreat_max_r: 1.20
+  near_obs_free_retreat_step: 0.15
+  near_obs_free_retreat_reach_thresh: 0.20
+  near_obs_free_retreat_cooldown: 1.0
+  near_obs_free_retreat_max_tries: 3
+  odom_anomaly_hold_enable: true
+  odom_z_jump_thresh: 0.15
+  odom_anomaly_implied_v: 1.5
   tag_pose_topic: "/apriltag/target_pose_global"
   tag_detected_topic: "/apriltag/target_detected"
   tag_update_min_dist: 0.08
@@ -119,7 +140,7 @@ grid_map:
   robot_footprint_radius: 0.0   # 旧圆形模型；>0 且 box 全 0 时才启用圆形
   # 机身不当膨胀种子、膨胀结果不写回；清洞=物理 box ⊕ clear_margin（消洞边假墙）
   robot_footprint_no_inflate: true
-  robot_footprint_clear_margin: 0.10  # 建议 ≈ obstacles_inflation；贴身真障被抹可再降
+  robot_footprint_clear_margin: 0.12  # ≈ obstacles_inflation
 
 manager:
   max_jerk: 4.0
@@ -134,15 +155,18 @@ manager:
   global_astar_simplify_eps: 0.25 # RDP simplify on XY (m)
   global_astar_insert_dist: 4.0   # densify for min-snap segments (m)
   # Scheme L: curvature fillets on A* polyline (non-holonomic soft constraint)
-  # kappa_max ≈ max_wz / max_vel = 0.5/0.6
+  # kappa_max ≈ max_wz / max_vel = 0.7/0.6
   hybrid_enable: true
-  hybrid_max_curvature: 0.83
+  hybrid_max_curvature: 1.17
   hybrid_corner_angle_thresh: 0.5   # rad; sharper corners get filleted
   hybrid_arc_sample_step: 0.2
   hybrid_max_arc_points: 30
   hybrid_use_odom_start_yaw: true
   hybrid_blend_start_yaw: true
   hybrid_align_yaw_thresh: 0.4      # rad; align with bridge align_heading_thresh
+  # docs/08: 起步圆弧占障则缩 R / 放弃 blend，避免大半径扫入近障
+  hybrid_blend_occ_check: true
+  hybrid_blend_r_shrink_tries: 2
 
 optimization:
   lambda_smooth: 1.0
