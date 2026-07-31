@@ -12,7 +12,7 @@ topics:
 
 limits:
   max_vel: 0.6   # 规划 + traj_server 终点引导速度上限 (m/s)
-  max_wz: 0.5    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
+  max_wz: 0.7    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
   max_acc: 1.0   # 规划加速度上限 (m/s^2)
 
 # odom 接收诊断（仅日志，不停车）。注入 fsm/ + traj_server/
@@ -67,13 +67,22 @@ fsm:
   gen_new_traj_backoff_max_sec: 2.0
   # docs/08: 近障起步 — 发布前门禁 / 近障行为 / odom 异常刹停
   publish_collision_gate_enable: true
-  publish_collision_gate_skip_start_m: 0.08
+  # 与 footprint 尺度对齐：起点清洞/豁免区约 0.2m，过小易把机身边沿误杀
+  publish_collision_gate_skip_start_m: 0.20
   # docs/09 阶段 0-A: gate 拒发且近障时停旧轨（防蹭障）
   publish_gate_stop_old_traj_near_obs: true
-  near_obstacle_check_radius: 0.6
+  near_obstacle_check_radius: 0.4
   near_obstacle_block_escape: true
   # docs/09 阶段 0-B: GEN_NEW / REPLAN / SAFETY 近障先停再规划
   near_obstacle_stop_before_plan: true
+  # docs/09 §6.4 3-B: 停轨后侧向 inflate free 临时目标脱出（仍过 publish_gate）
+  near_obs_free_retreat_enable: true
+  near_obs_free_retreat_min_r: 0.35
+  near_obs_free_retreat_max_r: 1.20
+  near_obs_free_retreat_step: 0.15
+  near_obs_free_retreat_reach_thresh: 0.20
+  near_obs_free_retreat_cooldown: 1.0
+  near_obs_free_retreat_max_tries: 3
   odom_anomaly_hold_enable: true
   odom_z_jump_thresh: 0.15
   odom_anomaly_implied_v: 1.5
@@ -146,9 +155,9 @@ manager:
   global_astar_simplify_eps: 0.25 # RDP simplify on XY (m)
   global_astar_insert_dist: 4.0   # densify for min-snap segments (m)
   # Scheme L: curvature fillets on A* polyline (non-holonomic soft constraint)
-  # kappa_max ≈ max_wz / max_vel = 0.5/0.6
+  # kappa_max ≈ max_wz / max_vel = 0.7/0.6
   hybrid_enable: true
-  hybrid_max_curvature: 0.83
+  hybrid_max_curvature: 1.17
   hybrid_corner_angle_thresh: 0.5   # rad; sharper corners get filleted
   hybrid_arc_sample_step: 0.2
   hybrid_max_arc_points: 30

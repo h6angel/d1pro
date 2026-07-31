@@ -1,4 +1,6 @@
 #include "bspline_opt/bspline_optimizer.h"
+#include <algorithm>
+#include <cmath>
 // using namespace std;
 
 namespace ego_planner
@@ -1127,18 +1129,37 @@ namespace ego_planner
         traj.getTimeSpan(tm, tmp);
         // 计算时间步长
         double t_step = (tmp - tm) / ((traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm)).norm() / grid_map_->getResolution());
-        // 遍历轨迹的前2/3部分进行障碍物检测
-        for (double t = tm; t < tmp * 2 / 3; t += t_step) // Only check the closest 2/3 partition of the whole trajectory.
+        if (!(t_step > 1e-6) || !std::isfinite(t_step))
+          t_step = std::max(1e-3, (tmp - tm) / 20.0);
+        // Align with publish_gate: hard-scan the full trajectory (was only first 2/3).
+        // Skip a short start arc so footprint-clear near odom is not treated as failure.
+        constexpr double kSkipStartM = 0.20;
+        Eigen::Vector3d p_prev = traj.evaluateDeBoorT(tm);
+        if (use_planning_z_)
+          p_prev(2) = planning_z_;
+        double skipped = 0.0;
+        double t = tm;
+        while (skipped < kSkipStartM - 1e-6 && t < tmp - 1e-6)
         {
-          flag_occ = checkOccupancy(traj.evaluateDeBoorT(t));
+          t += t_step;
+          if (t > tmp)
+            t = tmp;
+          Eigen::Vector3d p_next = traj.evaluateDeBoorT(t);
+          if (use_planning_z_)
+            p_next(2) = planning_z_;
+          skipped += (p_next.head<2>() - p_prev.head<2>()).norm();
+          p_prev = p_next;
+        }
+        for (; t < tmp - 1e-9; t += t_step)
+        {
+          const double t_chk = std::min(t, tmp);
+          flag_occ = checkOccupancy(traj.evaluateDeBoorT(t_chk));
           if (flag_occ)
           {
-            // cout << "hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
-
             // Near-start collision: abort only if robot body is actually occupied.
-            if (t <= bspline_interval_)
+            if (t_chk <= tm + bspline_interval_)
             {
-              Eigen::Vector3d start_pt = traj.evaluateDeBoorT(0.0);
+              Eigen::Vector3d start_pt = traj.evaluateDeBoorT(tm);
               if (use_planning_z_)
                 start_pt(2) = planning_z_;
               const bool body_in_obs =
@@ -1147,12 +1168,12 @@ namespace ego_planner
               {
                 RCLCPP_WARN(
                   rclcpp::get_logger("rebound_optimize"),
-                  "Start in obstacles (body occupied), abort. t=%f", t);
+                  "Start in obstacles (body occupied), abort. t=%f", t_chk);
                 return false;
               }
               RCLCPP_WARN(
                 rclcpp::get_logger("rebound_optimize"),
-                "First 3 cps near obstacle but body free, restart. t=%f", t);
+                "First 3 cps near obstacle but body free, restart. t=%f", t_chk);
               flag_occ = true;
               break;
             }
@@ -1160,6 +1181,9 @@ namespace ego_planner
             break;
           }
         }
+        // Ensure the terminal sample is checked when the loop stepped past it.
+        if (!flag_occ && tmp > tm)
+          flag_occ = checkOccupancy(traj.evaluateDeBoorT(tmp));
 
         // cout << "XXXXXX" << ((cps_.points.col(cps_.points.cols()-1) + 4*cps_.points.col(cps_.points.cols()-2) + cps_.points.col(cps_.points.cols()-3))/6 - local_target_pt_).norm() << endl;
 
@@ -1292,23 +1316,37 @@ namespace ego_planner
       double tm, tmp;
       traj.getTimeSpan(tm, tmp);
       double t_step = (tmp - tm) / ((traj.evaluateDeBoorT(tmp) - traj.evaluateDeBoorT(tm)).norm() / grid_map_->getResolution()); // Step size is defined as the maximum size that can passes throgth every gird.
-      for (double t = tm; t < tmp * 2 / 3; t += t_step)
+      if (!(t_step > 1e-6) || !std::isfinite(t_step))
+        t_step = std::max(1e-3, (tmp - tm) / 20.0);
+      // Align with publish_gate / rebound phase-2: full trajectory, skip short start arc.
+      constexpr double kSkipStartM = 0.20;
+      Eigen::Vector3d p_prev = traj.evaluateDeBoorT(tm);
+      if (use_planning_z_)
+        p_prev(2) = planning_z_;
+      double skipped = 0.0;
+      double t = tm;
+      while (skipped < kSkipStartM - 1e-6 && t < tmp - 1e-6)
       {
-        if (checkOccupancy(traj.evaluateDeBoorT(t)))
+        t += t_step;
+        if (t > tmp)
+          t = tmp;
+        Eigen::Vector3d p_next = traj.evaluateDeBoorT(t);
+        if (use_planning_z_)
+          p_next(2) = planning_z_;
+        skipped += (p_next.head<2>() - p_prev.head<2>()).norm();
+        p_prev = p_next;
+      }
+      for (; t < tmp - 1e-9; t += t_step)
+      {
+        const double t_chk = std::min(t, tmp);
+        if (checkOccupancy(traj.evaluateDeBoorT(t_chk)))
         {
-          // cout << "Refined traj hit_obs, t=" << t << " P=" << traj.evaluateDeBoorT(t).transpose() << endl;
-
-          // 将ref_pts存储为矩阵形式
-          Eigen::MatrixXd ref_pts(ref_pts_.size(), 3);
-          for (size_t i = 0; i < ref_pts_.size(); i++)
-          {
-            ref_pts.row(i) = ref_pts_[i].transpose();
-          }
-
           flag_safe = false;
           break;
         }
       }
+      if (flag_safe && tmp > tm && checkOccupancy(traj.evaluateDeBoorT(tmp)))
+        flag_safe = false;
 
       // 如果存在碰撞则调整参数并重新迭代
       if (!flag_safe)

@@ -151,6 +151,20 @@ namespace ego_planner
     /// Near-obstacle: publish stop before GEN_NEW / REPLAN / SAFETY plan (docs/09 §6.1).
     bool near_obstacle_stop_before_plan_{true};
 
+    /// docs/09 §6.4 3-B: after near-obs stop, temp goal to inflate-free lateral point.
+    bool near_obs_free_retreat_enable_{true};
+    double near_obs_free_retreat_min_r_{0.35};
+    double near_obs_free_retreat_max_r_{1.20};
+    double near_obs_free_retreat_step_{0.15};
+    double near_obs_free_retreat_reach_thresh_{0.20};
+    double near_obs_free_retreat_cooldown_{1.0};
+    int near_obs_free_retreat_max_tries_{3};
+
+    bool in_near_obs_retreat_{false};
+    Eigen::Vector3d near_obs_retreat_saved_end_pt_{0.0, 0.0, 0.0};
+    int near_obs_retreat_tries_{0};
+    rclcpp::Time near_obs_retreat_last_start_{0, 0, RCL_ROS_TIME};
+
     /// EXEC/REPLAN: |Δz| between odom samples above this → hold/estop.
     bool odom_anomaly_hold_enable_{true};
     double odom_z_jump_thresh_{0.15};
@@ -314,6 +328,18 @@ namespace ego_planner
 
     /// True if inflate occupancy within near_obstacle_check_radius_ of odom (XY ring samples).
     bool isObstacleNearOdom(double radius) const;
+
+    /// Ring-search inflate-free retreat point near odom; segment odom→pt must be free.
+    bool findNearObsFreeRetreatPoint(Eigen::Vector3d &out_pt) const;
+
+    /// After EmergencyStop near obs: temp end_pt_ = free, GEN_NEW. Returns true if started.
+    bool maybeStartNearObsFreeRetreat(const char *reason);
+
+    /// Clear retreat flags; optionally restore saved goal.
+    void clearNearObsFreeRetreat(bool restore_goal);
+
+    /// EXEC: if retreat goal reached, restore original goal and GEN_NEW. True if handled.
+    bool tryFinishNearObsFreeRetreat();
 
     /// True if local B-spline is a hold/stop (near-zero XY length) — unsafe to warm-start.
     bool isLocalTrajDegenerate() const;

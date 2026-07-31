@@ -86,6 +86,13 @@ double advanceTForArcStep(
     node_->declare_parameter("fsm/near_obstacle_check_radius", 0.6);
     node_->declare_parameter("fsm/near_obstacle_block_escape", true);
     node_->declare_parameter("fsm/near_obstacle_stop_before_plan", true);
+    node_->declare_parameter("fsm/near_obs_free_retreat_enable", true);
+    node_->declare_parameter("fsm/near_obs_free_retreat_min_r", 0.35);
+    node_->declare_parameter("fsm/near_obs_free_retreat_max_r", 1.20);
+    node_->declare_parameter("fsm/near_obs_free_retreat_step", 0.15);
+    node_->declare_parameter("fsm/near_obs_free_retreat_reach_thresh", 0.20);
+    node_->declare_parameter("fsm/near_obs_free_retreat_cooldown", 1.0);
+    node_->declare_parameter("fsm/near_obs_free_retreat_max_tries", 3);
     node_->declare_parameter("fsm/odom_anomaly_hold_enable", true);
     node_->declare_parameter("fsm/odom_z_jump_thresh", 0.15);
     node_->declare_parameter("fsm/odom_anomaly_implied_v", 1.5);
@@ -136,12 +143,28 @@ double advanceTForArcStep(
     node_->get_parameter("fsm/near_obstacle_check_radius", near_obstacle_check_radius_);
     node_->get_parameter("fsm/near_obstacle_block_escape", near_obstacle_block_escape_);
     node_->get_parameter("fsm/near_obstacle_stop_before_plan", near_obstacle_stop_before_plan_);
+    node_->get_parameter("fsm/near_obs_free_retreat_enable", near_obs_free_retreat_enable_);
+    node_->get_parameter("fsm/near_obs_free_retreat_min_r", near_obs_free_retreat_min_r_);
+    node_->get_parameter("fsm/near_obs_free_retreat_max_r", near_obs_free_retreat_max_r_);
+    node_->get_parameter("fsm/near_obs_free_retreat_step", near_obs_free_retreat_step_);
+    node_->get_parameter("fsm/near_obs_free_retreat_reach_thresh",
+                         near_obs_free_retreat_reach_thresh_);
+    node_->get_parameter("fsm/near_obs_free_retreat_cooldown", near_obs_free_retreat_cooldown_);
+    node_->get_parameter("fsm/near_obs_free_retreat_max_tries", near_obs_free_retreat_max_tries_);
     node_->get_parameter("fsm/odom_anomaly_hold_enable", odom_anomaly_hold_enable_);
     node_->get_parameter("fsm/odom_z_jump_thresh", odom_z_jump_thresh_);
     node_->get_parameter("fsm/odom_anomaly_implied_v", odom_anomaly_implied_v_);
     publish_collision_gate_skip_start_m_ =
       std::max(publish_collision_gate_skip_start_m_, 0.0);
     near_obstacle_check_radius_ = std::max(near_obstacle_check_radius_, 0.1);
+    near_obs_free_retreat_min_r_ = std::max(near_obs_free_retreat_min_r_, 0.1);
+    near_obs_free_retreat_max_r_ =
+      std::max(near_obs_free_retreat_max_r_, near_obs_free_retreat_min_r_);
+    near_obs_free_retreat_step_ = std::max(near_obs_free_retreat_step_, 0.05);
+    near_obs_free_retreat_reach_thresh_ =
+      std::max(near_obs_free_retreat_reach_thresh_, 0.05);
+    near_obs_free_retreat_cooldown_ = std::max(near_obs_free_retreat_cooldown_, 0.0);
+    near_obs_free_retreat_max_tries_ = std::max(near_obs_free_retreat_max_tries_, 1);
     odom_z_jump_thresh_ = std::max(odom_z_jump_thresh_, 0.05);
     odom_anomaly_implied_v_ = std::max(odom_anomaly_implied_v_, 0.5);
 
@@ -184,12 +207,16 @@ double advanceTForArcStep(
       node_->get_logger(),
       "[fsm] local_target_free_search=%d step=%.3f planning_horizon=%.2f "
       "safety_slowdown=%d fail_estop_count=%d publish_gate=%d gate_stop_old=%d "
-      "near_obs_r=%.2f near_obs_stop_plan=%d odom_anomaly_hold=%d",
+      "near_obs_r=%.2f near_obs_stop_plan=%d free_retreat=%d "
+      "retreat_r=[%.2f,%.2f] odom_anomaly_hold=%d",
       local_target_free_search_ ? 1 : 0, local_target_free_step_, planning_horizen_,
       safety_slowdown_enable_ ? 1 : 0, safety_fail_estop_count_,
       publish_collision_gate_enable_ ? 1 : 0,
       publish_gate_stop_old_traj_near_obs_ ? 1 : 0, near_obstacle_check_radius_,
-      near_obstacle_stop_before_plan_ ? 1 : 0, odom_anomaly_hold_enable_ ? 1 : 0);
+      near_obstacle_stop_before_plan_ ? 1 : 0,
+      near_obs_free_retreat_enable_ ? 1 : 0,
+      near_obs_free_retreat_min_r_, near_obs_free_retreat_max_r_,
+      odom_anomaly_hold_enable_ ? 1 : 0);
 
     /* initialize main modules */
     visualization_.reset(new PlanningVisualization(node_));
@@ -280,7 +307,11 @@ double advanceTForArcStep(
       /*** FSM: schedule replan on next exec tick (never spin node from a callback) ***/
       resetGenNewTrajRetry();
       if (exec_state_ == WAIT_TARGET)
+      {
+        near_obs_retreat_tries_ = 0;
+        clearNearObsFreeRetreat(false);
         changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
+      }
       else
         changeFSMExecState(REPLAN_TRAJ, "TRIG");
 
@@ -314,6 +345,7 @@ double advanceTForArcStep(
         "Holding stop; fix depth/VIO and re-send goal.",
         gen_new_traj_fail_count_);
       resetGenNewTrajRetry();
+      clearNearObsFreeRetreat(true);
       have_target_ = false;
       if (have_odom_)
         callEmergencyStop(odom_pos_);
@@ -536,9 +568,11 @@ double advanceTForArcStep(
             std::max(log_trace_period_ms_, 500),
             "[near_obs] body/nearby occupied before GEN_NEW — stop then plan");
           callEmergencyStop(odom_pos_);
+          maybeStartNearObsFreeRetreat("near_obs_gen_new");
         }
       }
 
+      // Retreat start may have switched target; still attempt plan this tick.
       bool success = planFromGlobalTraj(10); // zx-todo
       if (success)
       {
@@ -559,11 +593,18 @@ double advanceTForArcStep(
       {
         changeFSMExecState(EXEC_TRAJ, "FSM");
       }
+      else if (in_near_obs_retreat_)
+      {
+        // publish_gate stop may have started free retreat → do not overwrite GEN_NEW.
+        changeFSMExecState(GEN_NEW_TRAJ, "NEAR_OBS_RETREAT");
+      }
       else
       {
         const double dist_to_goal = (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
         if (!isTagFollowing() && dist_to_goal < goal_reach_thresh_)
         {
+          clearNearObsFreeRetreat(false);
+          near_obs_retreat_tries_ = 0;
           have_target_ = false;
           publishStopTraj();
           changeFSMExecState(WAIT_TARGET, "FSM");
@@ -579,11 +620,15 @@ double advanceTForArcStep(
 
     case EXEC_TRAJ:
     {
+      if (tryFinishNearObsFreeRetreat())
+        break;
+
       LocalTrajData *info = &planner_manager_->local_data_;
       const double dist_to_goal_xy =
         (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
 
-      if (dist_to_goal_xy < goal_reach_thresh_ && !isTagFollowing())
+      if (dist_to_goal_xy < goal_reach_thresh_ && !isTagFollowing() &&
+          !in_near_obs_retreat_)
       {
         RCLCPP_INFO(
           node_->get_logger(),
@@ -591,6 +636,8 @@ double advanceTForArcStep(
           traj_utils::formatVec3(odom_pos_).c_str(),
           traj_utils::formatVec3(end_pt_).c_str(),
           dist_to_goal_xy);
+        clearNearObsFreeRetreat(false);
+        near_obs_retreat_tries_ = 0;
         have_target_ = false;
         publishStopTraj();
         changeFSMExecState(WAIT_TARGET, "FSM");
@@ -730,6 +777,202 @@ double advanceTForArcStep(
         return true;
     }
     return false;
+  }
+
+  bool EGOReplanFSM::findNearObsFreeRetreatPoint(Eigen::Vector3d &out_pt) const
+  {
+    if (!have_odom_ || !planner_manager_ || !planner_manager_->grid_map_)
+      return false;
+
+    auto map = planner_manager_->grid_map_;
+    const double z = odom_pos_(2);
+
+    // Prefer away from nearest inflate occupancy on the near-obs rings.
+    double away_x = 0.0;
+    double away_y = 0.0;
+    bool have_away = false;
+    {
+      double best_d2 = 1e9;
+      const double radii[2] = {
+        near_obstacle_check_radius_, 0.5 * near_obstacle_check_radius_};
+      constexpr int kN = 16;
+      for (double radius : radii)
+      {
+        for (int i = 0; i < kN; ++i)
+        {
+          const double a = 2.0 * M_PI * static_cast<double>(i) / static_cast<double>(kN);
+          const double dx = radius * std::cos(a);
+          const double dy = radius * std::sin(a);
+          Eigen::Vector3d p(odom_pos_(0) + dx, odom_pos_(1) + dy, z);
+          if (map->getInflateOccupancy(p) <= 0)
+            continue;
+          const double d2 = dx * dx + dy * dy;
+          if (d2 < best_d2)
+          {
+            best_d2 = d2;
+            away_x = -dx;
+            away_y = -dy;
+            have_away = true;
+          }
+        }
+      }
+    }
+
+    // Secondary: opposite body +Z (OpenVINS / camera forward) for differential drive.
+    double back_x = 0.0;
+    double back_y = 0.0;
+    {
+      const Eigen::Vector3d fwd = odom_orient_ * Eigen::Vector3d(0.0, 0.0, 1.0);
+      const double nh = std::hypot(fwd.x(), fwd.y());
+      if (nh > 1e-6)
+      {
+        back_x = -fwd.x() / nh;
+        back_y = -fwd.y() / nh;
+      }
+    }
+
+    struct Cand
+    {
+      Eigen::Vector3d pt;
+      double score;
+    };
+    std::vector<Cand> cands;
+    cands.reserve(64);
+
+    constexpr int kAngles = 16;
+    for (double r = near_obs_free_retreat_min_r_;
+         r <= near_obs_free_retreat_max_r_ + 1e-9;
+         r += near_obs_free_retreat_step_)
+    {
+      for (int i = 0; i < kAngles; ++i)
+      {
+        const double a = 2.0 * M_PI * static_cast<double>(i) / static_cast<double>(kAngles);
+        Eigen::Vector3d pt(
+          odom_pos_(0) + r * std::cos(a),
+          odom_pos_(1) + r * std::sin(a),
+          z);
+        if (!isPlanningPointFree(pt))
+          continue;
+
+        Eigen::Vector3d p0 = odom_pos_;
+        p0(2) = z;
+        if (map->checkSegmentInflateOccupied(p0, pt))
+          continue;
+
+        const double ux = pt.x() - odom_pos_(0);
+        const double uy = pt.y() - odom_pos_(1);
+        const double un = std::hypot(ux, uy);
+        if (un < 1e-6)
+          continue;
+
+        double score = 0.0;
+        if (have_away)
+        {
+          const double an = std::hypot(away_x, away_y);
+          if (an > 1e-6)
+            score += (ux * away_x + uy * away_y) / (un * an);
+        }
+        if (std::hypot(back_x, back_y) > 1e-6)
+          score += 0.35 * (ux * back_x + uy * back_y) / un;
+        // Prefer closer free points among equal alignment.
+        score -= 0.05 * r;
+        cands.push_back(Cand{pt, score});
+      }
+    }
+
+    if (cands.empty())
+      return false;
+
+    std::sort(cands.begin(), cands.end(),
+              [](const Cand &a, const Cand &b) { return a.score > b.score; });
+    out_pt = cands.front().pt;
+    if (have_odom_)
+      out_pt(2) = odom_pos_(2);
+    return true;
+  }
+
+  bool EGOReplanFSM::maybeStartNearObsFreeRetreat(const char *reason)
+  {
+    if (!near_obs_free_retreat_enable_ || !have_target_ || !have_odom_)
+      return false;
+    if (in_near_obs_retreat_)
+      return false;
+    if (near_obs_retreat_tries_ >= near_obs_free_retreat_max_tries_)
+      return false;
+    if (near_obs_retreat_last_start_.nanoseconds() > 0 &&
+        (node_->now() - near_obs_retreat_last_start_).seconds() <
+          near_obs_free_retreat_cooldown_)
+      return false;
+
+    Eigen::Vector3d free_pt;
+    if (!findNearObsFreeRetreatPoint(free_pt))
+    {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(), *node_->get_clock(),
+        std::max(log_trace_period_ms_, 500),
+        "[near_obs_retreat] no free point odom=%s reason=%s tries=%d/%d",
+        traj_utils::formatVec3(odom_pos_).c_str(),
+        reason ? reason : "?",
+        near_obs_retreat_tries_, near_obs_free_retreat_max_tries_);
+      return false;
+    }
+
+    near_obs_retreat_saved_end_pt_ = end_pt_;
+    end_pt_ = free_pt;
+    end_vel_.setZero();
+    in_near_obs_retreat_ = true;
+    near_obs_retreat_tries_++;
+    near_obs_retreat_last_start_ = node_->now();
+
+    forceReplanGlobalFromOdom("near_obs_retreat");
+    resetGenNewTrajRetry();
+    changeFSMExecState(GEN_NEW_TRAJ, "NEAR_OBS_RETREAT");
+
+    RCLCPP_WARN(
+      node_->get_logger(),
+      "[near_obs_retreat] start odom=%s free=%s saved_goal=%s reason=%s try=%d/%d",
+      traj_utils::formatVec3(odom_pos_).c_str(),
+      traj_utils::formatVec3(end_pt_).c_str(),
+      traj_utils::formatVec3(near_obs_retreat_saved_end_pt_).c_str(),
+      reason ? reason : "?",
+      near_obs_retreat_tries_, near_obs_free_retreat_max_tries_);
+    return true;
+  }
+
+  void EGOReplanFSM::clearNearObsFreeRetreat(bool restore_goal)
+  {
+    if (restore_goal && in_near_obs_retreat_)
+      end_pt_ = near_obs_retreat_saved_end_pt_;
+    in_near_obs_retreat_ = false;
+  }
+
+  bool EGOReplanFSM::tryFinishNearObsFreeRetreat()
+  {
+    if (!in_near_obs_retreat_ || !have_odom_ || !have_target_)
+      return false;
+
+    const double dist =
+      (end_pt_.head<2>() - odom_pos_.head<2>()).norm();
+    if (dist > near_obs_free_retreat_reach_thresh_)
+      return false;
+
+    const Eigen::Vector3d free_pt = end_pt_;
+    end_pt_ = near_obs_retreat_saved_end_pt_;
+    end_vel_.setZero();
+    in_near_obs_retreat_ = false;
+
+    forceReplanGlobalFromOdom("near_obs_retreat_done");
+    resetGenNewTrajRetry();
+    changeFSMExecState(GEN_NEW_TRAJ, "NEAR_OBS_RETREAT");
+
+    RCLCPP_INFO(
+      node_->get_logger(),
+      "[near_obs_retreat] done free=%s restored_goal=%s dist_free=%.3f odom=%s",
+      traj_utils::formatVec3(free_pt).c_str(),
+      traj_utils::formatVec3(end_pt_).c_str(),
+      dist,
+      traj_utils::formatVec3(odom_pos_).c_str());
+    return true;
   }
 
   bool EGOReplanFSM::isLocalTrajCollisionFree(double skip_start_m)
@@ -910,15 +1153,16 @@ double advanceTForArcStep(
     if (near_obstacle_stop_before_plan_ &&
         (isOdomBodyInObstacle() || isObstacleNearOdom(near_obstacle_check_radius_)))
     {
-      if (odom_vel_.head<2>().norm() > 0.05 && !isLocalTrajDegenerate())
-      {
-        RCLCPP_WARN_THROTTLE(
-          node_->get_logger(), *node_->get_clock(),
-          std::max(log_trace_period_ms_, 500),
-          "[near_obs] body/nearby occupied before REPLAN/SAFETY plan — stop then plan");
-        callEmergencyStop(odom_pos_);
-        wrote_stop_traj = true;
-      }
+        if (odom_vel_.head<2>().norm() > 0.05 && !isLocalTrajDegenerate())
+        {
+          RCLCPP_WARN_THROTTLE(
+            node_->get_logger(), *node_->get_clock(),
+            std::max(log_trace_period_ms_, 500),
+            "[near_obs] body/nearby occupied before REPLAN/SAFETY plan — stop then plan");
+          callEmergencyStop(odom_pos_);
+          wrote_stop_traj = true;
+          maybeStartNearObsFreeRetreat("near_obs_replan");
+        }
       start_vel_.setZero();
     }
 
@@ -1063,6 +1307,7 @@ double advanceTForArcStep(
             node_->get_logger(),
             "[publish_gate] near_obs — stop old traj");
           callEmergencyStop(odom_pos_);
+          maybeStartNearObsFreeRetreat("publish_gate");
         }
         return false;
       }
@@ -1430,6 +1675,15 @@ double advanceTForArcStep(
 
   void EGOReplanFSM::applyTagGoal(const Eigen::Vector3d &goal_wp)
   {
+    // Keep escape end_pt_; refresh resume goal when tag moves during retreat.
+    if (in_near_obs_retreat_)
+    {
+      near_obs_retreat_saved_end_pt_ = goal_wp;
+      last_tag_replan_time_ = node_->now();
+      tag_force_replan_ = false;
+      return;
+    }
+
     init_pt_ = odom_pos_;
     planNextWaypoint(goal_wp);
     visualization_->displayGoalPoint(goal_wp, Eigen::Vector4d(0.0, 0.8, 0.2, 1.0), 0.35, 0);
@@ -1453,6 +1707,8 @@ double advanceTForArcStep(
         traj_utils::formatVec3(odom_pos_).c_str(),
         traj_utils::formatVec3(tag_pos_last_).c_str(),
         dist_tag);
+    clearNearObsFreeRetreat(false);
+    near_obs_retreat_tries_ = 0;
     tag_track_state_ = TagTrackState::DONE;
     have_target_ = false;
     pending_tag_estop_to_wait_target_ = true;
