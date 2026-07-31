@@ -24,6 +24,7 @@ D1PlannerBridgeNode::D1PlannerBridgeNode(const rclcpp::NodeOptions & options)
   log_cmd_vel_period_ms_ = declare_parameter<int>("log_cmd_vel_period_ms", 500);
   cmd_timeout_sec_ = declare_parameter<double>("cmd_timeout_sec", 0.3);
   odom_timeout_sec_ = declare_parameter<double>("odom_timeout_sec", 0.5);
+  max_wz_accel_ = declare_parameter<double>("max_wz_accel", 2.5);
 
   pos_cmd_sub_ = create_subscription<quadrotor_msgs::msg::PositionCommand>(
     pos_cmd_topic_, rclcpp::QoS(10),
@@ -56,7 +57,7 @@ TrackerParams D1PlannerBridgeNode::loadTrackerParams()
 {
   TrackerParams p;
   p.max_vx = declare_parameter<double>("max_vx", 0.6);
-  p.max_wz = declare_parameter<double>("max_wz", 0.5);
+  p.max_wz = declare_parameter<double>("max_wz", 0.7);
   p.yaw_kp = declare_parameter<double>("yaw_kp", 1.2);
   p.yaw_rate_ff = declare_parameter<double>("yaw_rate_ff", 1.0);
   p.align_heading_thresh_rad = declare_parameter<double>("align_heading_thresh_rad", 0.4);
@@ -108,6 +109,9 @@ void D1PlannerBridgeNode::controlTimerCallback()
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 2000,
       "No pos_cmd on '%s' yet", pos_cmd_topic_.c_str());
+    last_wz_ = 0.0;
+    have_last_wz_ = true;
+    last_control_time_ = now();
     cmd_vel_pub_->publish(twist);
     return;
   }
@@ -122,6 +126,9 @@ void D1PlannerBridgeNode::controlTimerCallback()
   if (cmd_stale || odom_stale) {
     twist.linear.x = 0.0;
     twist.angular.z = 0.0;
+    last_wz_ = 0.0;
+    have_last_wz_ = true;
+    last_control_time_ = t_now;
     cmd_vel_pub_->publish(twist);
     RCLCPP_WARN_THROTTLE(
       get_logger(), *get_clock(), 1000,
@@ -135,6 +142,29 @@ void D1PlannerBridgeNode::controlTimerCallback()
   if (ground.valid) {
     twist.linear.x = std::isfinite(ground.vx) ? ground.vx : 0.0;
     twist.angular.z = std::isfinite(ground.wz) ? ground.wz : 0.0;
+  } else {
+    last_wz_ = 0.0;
+    have_last_wz_ = true;
+  }
+
+  // Rate-limit angular.z (defense against heading-reference flips on replan).
+  {
+    double dt = 0.01;
+    if (have_last_wz_ && last_control_time_.nanoseconds() > 0) {
+      dt = std::max((t_now - last_control_time_).seconds(), 1e-3);
+    }
+    last_control_time_ = t_now;
+    if (!have_last_wz_) {
+      last_wz_ = twist.angular.z;
+      have_last_wz_ = true;
+    } else if (max_wz_accel_ > 0.0) {
+      const double max_dw = max_wz_accel_ * dt;
+      const double dw = twist.angular.z - last_wz_;
+      twist.angular.z = last_wz_ + std::clamp(dw, -max_dw, max_dw);
+      last_wz_ = twist.angular.z;
+    } else {
+      last_wz_ = twist.angular.z;
+    }
   }
 
   cmd_vel_pub_->publish(twist);

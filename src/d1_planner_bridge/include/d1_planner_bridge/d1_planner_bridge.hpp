@@ -53,6 +53,12 @@ private:
   double cmd_timeout_sec_{0.3};
   double odom_timeout_sec_{0.5};
   bool need_odom_{true};
+
+  /// Soft-limit |d(wz)/dt| so replan yaw snaps cannot bang ±max_wz in one tick.
+  double max_wz_accel_{2.5};
+  double last_wz_{0.0};
+  bool have_last_wz_{false};
+  rclcpp::Time last_control_time_{0, 0, RCL_ROS_TIME};
 };
 
 }  // namespace d1_planner_bridge

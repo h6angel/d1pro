@@ -14,6 +14,8 @@ d1_planner_bridge_node:
     yaw_rate_ff: 1.0
     align_heading_thresh_rad: 0.4
     min_turn_wz: 0.15
+    # 角速度加速度上限 (rad/s^2)：抑制重规划航向突变导致的 ±max_wz 对抽
+    max_wz_accel: 2.5
 
     # 看门狗：超过该时长未收到新的 pos_cmd / odom 则强制 cmd_vel=(0,0)
     cmd_timeout_sec: 0.3

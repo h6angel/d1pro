@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstring>
 #include <fstream>
+#include <limits>
 #include <mutex>
 #include <rclcpp/rclcpp.hpp>
 
@@ -41,7 +42,7 @@ double t_progress_ = 0.0;
 double odom_lookahead_time_ = 0.4;
 /// XY distance to traj end at/below which vel is zeroed (align with fsm goal_reach_thresh).
 double endpoint_stop_dist_ = 0.3;
-double max_yaw_dot_ = 0.5;
+double max_yaw_dot_ = 0.7;
 /// Sticky finish latch: once set, keep vel=0 until a new bspline arrives.
 bool traj_hold_stop_ = false;
 const char * traj_hold_reason_ = "";
@@ -371,19 +372,27 @@ void bsplineCallback(traj_utils::msg::Bspline::ConstPtr msg)
     t_progress_ = std::max(0.0, std::min(t_progress_, traj_duration_));
   }
 
-  last_yaw_ = 0.0;
+  // Keep last_yaw_ across replan. Zeroing it (old behavior) snapped cmd.yaw → 0 and
+  // made bridge h_err flip sign vs the next traj's velocity heading (±max_wz chatter).
   last_yaw_dot_ = 0.0;
   if (have_odom_ && traj_duration_ > 1e-6) {
     const double t_yaw = std::min(t_progress_ + time_forward_, traj_duration_);
     const Eigen::Vector3d v_ref = traj_[1].evaluateDeBoorT(t_yaw);
+    double yaw_new = std::numeric_limits<double>::quiet_NaN();
     if (v_ref.head<2>().norm() > 0.05) {
-      last_yaw_ = std::atan2(v_ref(1), v_ref(0));
+      yaw_new = std::atan2(v_ref(1), v_ref(0));
     } else {
       const Eigen::Vector3d p_ref = traj_[0].evaluateDeBoorT(t_yaw);
       const Eigen::Vector2d diff = (p_ref.head<2>() - odom_pos_.head<2>());
       if (diff.norm() > 0.05) {
-        last_yaw_ = std::atan2(diff.y(), diff.x());
+        yaw_new = std::atan2(diff.y(), diff.x());
       }
+    }
+    if (std::isfinite(yaw_new)) {
+      if (!std::isfinite(last_yaw_) || std::abs(wrapPi(yaw_new - last_yaw_)) <= M_PI / 2.0) {
+        last_yaw_ = yaw_new;
+      }
+      // else keep previous last_yaw_ — reject ~180° snaps from reverse-looking init
     }
   }
 
@@ -626,7 +635,7 @@ int main(int argc, char **argv)
   node->declare_parameter("traj_server/tracking_trace_csv", std::string(""));
   node->declare_parameter("traj_server/tracking_trace_period_ms", 50);
   node->declare_parameter("traj_server/endpoint_stop_dist", 0.3);
-  node->declare_parameter("traj_server/max_yaw_dot", 0.5);
+  node->declare_parameter("traj_server/max_yaw_dot", 0.7);
   node->declare_parameter("traj_server/odom_diag_enable", true);
   node->declare_parameter("traj_server/odom_diag_period_ms", 500);
   node->declare_parameter("traj_server/odom_diag_implausible_speed", 0.5);

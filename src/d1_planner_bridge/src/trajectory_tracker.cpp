@@ -78,10 +78,17 @@ GroundTwist TrajectoryTracker::compute(
   const double yaw_dot = std::isfinite(cmd.yaw_dot) ? cmd.yaw_dot : 0.0;
   const double v_plan = std::hypot(vel_x, vel_y);
 
+  // Continuity base = cmd.yaw (traj_server last_yaw). Old logic used atan2(vel)
+  // whenever v>0.05 else track_yaw; near stops/replans that chatter across 0.05
+  // (or reverse-looking B-spline vel) flipped path_yaw by ~180° → ±max_wz bang-bang.
   double path_yaw = std::isfinite(cmd.yaw) ? cmd.yaw : 0.0;
   if (v_plan > 0.05) {
-    path_yaw = std::atan2(vel_y, vel_x);
-  } else if (std::isfinite(cmd.track_yaw)) {
+    const double vel_yaw = std::atan2(vel_y, vel_x);
+    if (std::abs(wrapPi(vel_yaw - path_yaw)) <= M_PI / 2.0) {
+      path_yaw = vel_yaw;
+    }
+  } else if (std::isfinite(cmd.track_yaw) &&
+             std::abs(wrapPi(cmd.track_yaw - path_yaw)) <= M_PI / 2.0) {
     path_yaw = cmd.track_yaw;
   }
 

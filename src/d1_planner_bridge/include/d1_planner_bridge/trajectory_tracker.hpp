@@ -11,7 +11,7 @@ namespace d1_planner_bridge
 struct TrackerParams
 {
   double max_vx{0.6};
-  double max_wz{0.5};
+  double max_wz{0.7};
   double yaw_kp{1.2};
   double yaw_rate_ff{1.0};
   /// |heading_err| above this: vx=0, turn in place toward path tangent.

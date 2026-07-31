@@ -98,7 +98,7 @@ $$
 \dot\psi = \mathrm{clamp}\bigl(\mathrm{wrap\_pi}(\psi - \psi_{\mathrm{last}})/\Delta t,\; \pm \dot\psi_{\max}\bigr)
 $$
 
-$\dot\psi_{\max} =$ `max_yaw_dot`（= `limits.max_wz`，默认 0.5）。低速时保持 `last_yaw`。  
+$\dot\psi_{\max} =$ `max_yaw_dot`（= `limits.max_wz`，默认 0.7）。低速时保持 `last_yaw`。  
 （空间前瞻 `time_forward` 仍用于新轨迹到达时初始化 `last_yaw`。）
 
 ---
@@ -114,7 +114,7 @@ $\dot\psi_{\max} =$ `max_yaw_dot`（= `limits.max_wz`，默认 0.5）。低速�
 | 符号 | 含义 |
 |------|------|
 | $\psi_r$ | 车体前进方向 yaw：odom 四元数下 body **+Z** 轴在水平面投影（与 OpenVINS 相机光轴约定一致） |
-| $\psi_p$ | 路径切向：$\|\mathbf{v}^{xy}\|>0.05$ 时用规划速度，否则 `cmd.yaw` / `cmd.track_yaw` |
+| $\psi_p$ | 路径切向：以 `cmd.yaw` 为连续基准；仅当速度/track 与其夹角 $\le 90^\circ$ 时才切换（抑制近停/重规划 180° 翻转） |
 | $\mathbf{v}_w$ | 世界系规划速度 |
 
 ### 3.2 纵向速度
@@ -156,7 +156,7 @@ v_x \leftarrow \mathrm{clamp}(v_x,\, \pm v_{\max}), \quad
 \omega_z \leftarrow \mathrm{clamp}(\omega_z,\, \pm \omega_{\max})
 $$
 
-$v_{\max}=0.6$，$\omega_{\max}=0.5$（`d1_robot.yaml` → launch 注入）。
+$v_{\max}=0.6$，$\omega_{\max}=0.7$（`d1_robot.yaml` → launch 注入）。发布前再按 `max_wz_accel`（默认 2.5 rad/s²）做角速度斜率限制。
 
 ### 3.6 看门狗（节点层）
 
@@ -197,13 +197,14 @@ $$
 | `odom_lookahead_time` | 0.5 | $\tau_{\mathrm{la}}$ |
 | `time_forward` | 0.7 | 新轨迹 yaw 初始化前瞻 |
 | `endpoint_stop_dist` | 0.3 | 距终点 XY 内速度清零（= `goal_reach_thresh`） |
-| `max_yaw_dot` | 0.5 | yaw 角速度上限（= `max_wz`） |
+| `max_yaw_dot` | 0.7 | yaw 角速度上限（= `max_wz`） |
 
 ### 5.2 `d1_bridge.yaml`
 
 | 参数 | 默认 | 含义 |
 |------|------|------|
-| `max_vx` / `max_wz` | 0.6 / 0.5 | launch 注入限速 |
+| `max_vx` / `max_wz` | 0.6 / 0.7 | launch 注入限速 |
+| `max_wz_accel` | 2.5 | `|dωz/dt|` 上限，抑制航向参考突变对抽 |
 | `yaw_kp` | 1.2 | 航向 P |
 | `yaw_rate_ff` | 1.0 | $\dot\psi$ 前馈 |
 | `align_heading_thresh_rad` | 0.4 | 原地转阈值 |

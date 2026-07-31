@@ -12,7 +12,7 @@ topics:
 
 limits:
   max_vel: 0.6   # 规划 + traj_server 终点引导速度上限 (m/s)
-  max_wz: 0.5    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
+  max_wz: 0.7    # traj_server yaw_dot + bridge 角速度上限 (rad/s)
   max_acc: 1.0   # 规划加速度上限 (m/s^2)
 
 # odom 接收诊断（仅日志，不停车）。注入 fsm/ + traj_server/
@@ -146,9 +146,9 @@ manager:
   global_astar_simplify_eps: 0.25 # RDP simplify on XY (m)
   global_astar_insert_dist: 4.0   # densify for min-snap segments (m)
   # Scheme L: curvature fillets on A* polyline (non-holonomic soft constraint)
-  # kappa_max ≈ max_wz / max_vel = 0.5/0.6
+  # kappa_max ≈ max_wz / max_vel = 0.7/0.6
   hybrid_enable: true
-  hybrid_max_curvature: 0.83
+  hybrid_max_curvature: 1.17
   hybrid_corner_angle_thresh: 0.5   # rad; sharper corners get filleted
   hybrid_arc_sample_step: 0.2
   hybrid_max_arc_points: 30
