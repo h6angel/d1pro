@@ -315,6 +315,9 @@ namespace ego_planner
     /// True if inflate occupancy within near_obstacle_check_radius_ of odom (XY ring samples).
     bool isObstacleNearOdom(double radius) const;
 
+    /// True if local B-spline is a hold/stop (near-zero XY length) — unsafe to warm-start.
+    bool isLocalTrajDegenerate() const;
+
     /// Hard collision scan of local B-spline (inflate); used as publish gate.
     bool isLocalTrajCollisionFree(double skip_start_m);
 

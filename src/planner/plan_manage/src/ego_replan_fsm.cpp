@@ -529,7 +529,7 @@ double advanceTForArcStep(
       if (near_obstacle_stop_before_plan_ && have_odom_ &&
           (isOdomBodyInObstacle() || isObstacleNearOdom(near_obstacle_check_radius_)))
       {
-        if (odom_vel_.head<2>().norm() > 0.05)
+        if (odom_vel_.head<2>().norm() > 0.05 && !isLocalTrajDegenerate())
         {
           RCLCPP_WARN_THROTTLE(
             node_->get_logger(), *node_->get_clock(),
@@ -677,6 +677,13 @@ double advanceTForArcStep(
     start_pt_ = odom_pos_;
     start_vel_ = odom_vel_;
     start_acc_.setZero();
+
+    // Match REPLAN near-obs: after stop, do not seed residual speed into poly init.
+    if (near_obstacle_stop_before_plan_ && have_odom_ &&
+        (isOdomBodyInObstacle() || isObstacleNearOdom(near_obstacle_check_radius_)))
+    {
+      start_vel_.setZero();
+    }
 
     return callReboundReplanWithEscape(trial_times, false);
   }
@@ -865,6 +872,28 @@ double advanceTForArcStep(
     changeFSMExecState(GEN_NEW_TRAJ, "SAFETY");
   }
 
+  bool EGOReplanFSM::isLocalTrajDegenerate() const
+  {
+    if (!planner_manager_)
+      return true;
+
+    // evaluateDeBoorT is non-const; local_data_ is mutable planning state.
+    LocalTrajData *info = &planner_manager_->local_data_;
+    if (info->start_time_.seconds() < 1e-5 || info->duration_ < 1e-3)
+      return true;
+
+    // EmergencyStop / hold traj: all samples collapse to one point → warm-start
+    // arc length is ~0 and can infinite-loop in reboundReplan sampling.
+    const Eigen::Vector3d p0 = info->position_traj_.evaluateDeBoorT(0.0);
+    const Eigen::Vector3d p1 = info->position_traj_.evaluateDeBoorT(info->duration_);
+    if ((p0.head<2>() - p1.head<2>()).norm() < 1e-3)
+      return true;
+
+    const Eigen::Vector3d pm =
+      info->position_traj_.evaluateDeBoorT(0.5 * info->duration_);
+    return (pm.head<2>() - p0.head<2>()).norm() < 1e-3;
+  }
+
   bool EGOReplanFSM::planFromCurrentTraj(const int trial_times /*=1*/)
   {
     if (!have_odom_)
@@ -874,27 +903,32 @@ double advanceTForArcStep(
     start_vel_ = odom_vel_;
     start_acc_.setZero();
 
+    bool wrote_stop_traj = false;
+
     // docs/09 §6.1 0-B: align with GEN_NEW — zero residual speed before near-obs replan.
+    // Do not warm-start from the EmergencyStop hold traj (zero arc → reboundReplan hang).
     if (near_obstacle_stop_before_plan_ &&
         (isOdomBodyInObstacle() || isObstacleNearOdom(near_obstacle_check_radius_)))
     {
-      if (odom_vel_.head<2>().norm() > 0.05)
+      if (odom_vel_.head<2>().norm() > 0.05 && !isLocalTrajDegenerate())
       {
         RCLCPP_WARN_THROTTLE(
           node_->get_logger(), *node_->get_clock(),
           std::max(log_trace_period_ms_, 500),
           "[near_obs] body/nearby occupied before REPLAN/SAFETY plan — stop then plan");
         callEmergencyStop(odom_pos_);
+        wrote_stop_traj = true;
       }
       start_vel_.setZero();
     }
 
     LocalTrajData *info = &planner_manager_->local_data_;
-    // No warm-start traj: same escape path as planFromGlobalTraj, keep clamped start_vel_.
-    if (info->start_time_.seconds() < 1e-5 || info->duration_ < 1e-3)
-      return callReboundReplanWithEscape(trial_times, false);
+    const bool use_warm_start =
+      !wrote_stop_traj && !isLocalTrajDegenerate() &&
+      info->start_time_.seconds() >= 1e-5 && info->duration_ >= 1e-3;
 
-    return callReboundReplanWithEscape(trial_times, true);
+    // Poly init after stop / degenerate hold traj; warm-start only from real motion traj.
+    return callReboundReplanWithEscape(trial_times, use_warm_start);
   }
 
   void EGOReplanFSM::checkCollisionCallback()

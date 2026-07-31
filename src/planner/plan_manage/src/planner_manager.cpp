@@ -324,8 +324,17 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
     vector<Eigen::Vector3d> point_set, start_end_derivatives;
     static bool flag_first_call = true, flag_force_polynomial = false;
     bool flag_regenerate = false;
+    int regenerate_count = 0;
+    constexpr int kMaxRegenerate = 4;
     do
     {
+      if (++regenerate_count > kMaxRegenerate)
+      {
+        RCLCPP_ERROR(rclcpp::get_logger("ego_planner"),
+                     "reboundReplan init regenerate exceeded %d — fail", kMaxRegenerate);
+        continous_failures_count_++;
+        return false;
+      }
       point_set.clear();
       start_end_derivatives.clear();
       flag_regenerate = false;
@@ -373,6 +382,8 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
         double t;
         bool flag_too_far;
         ts *= 1.5; // ts will be divided by 1.5 in the next
+        int poly_sample_iters = 0;
+        constexpr int kMaxPolySampleIters = 64;
         do
         {
           ts /= 1.5;
@@ -389,6 +400,14 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
             }
             last_pt = pt;
             point_set.push_back(pt);
+          }
+          if (++poly_sample_iters >= kMaxPolySampleIters)
+          {
+            RCLCPP_ERROR(rclcpp::get_logger("ego_planner"),
+                         "poly init sample loop exceeded %d iters (time=%.3f ts=%.4f) — fail",
+                         kMaxPolySampleIters, time, ts);
+            continous_failures_count_++;
+            return false;
           }
         } while (flag_too_far || point_set.size() < 7); // To make sure the initial path has enough points.
         t -= ts;
@@ -418,7 +437,9 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
         t -= ts;
 
         // Need >=2 samples for arc-length interpolation; otherwise size()-2 underflows and segfaults.
-        if (pseudo_arc_length.size() < 2 || segment_point.size() < 2)
+        // EmergencyStop hold traj has ~0 remaining arc — warm-start sampling would spin forever.
+        if (pseudo_arc_length.size() < 2 || segment_point.size() < 2 ||
+            pseudo_arc_length.back() < 1e-3)
         {
           flag_force_polynomial = true;
           flag_regenerate = true;
@@ -449,12 +470,29 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
           }
         }
 
+        // Still near-zero after optional poly stitch (e.g. local_target almost at stop pos).
+        if (pseudo_arc_length.back() < 1e-3)
+        {
+          flag_force_polynomial = true;
+          flag_regenerate = true;
+          continue;
+        }
+
         double sample_length = 0;
         double cps_dist = pp_.ctrl_pt_dist * 1.5; // cps_dist will be divided by 1.5 in the next
         size_t id = 0;
+        int sample_iters = 0;
+        constexpr int kMaxWarmSampleIters = 32;
+        bool sample_failed = false;
         do
         {
           cps_dist /= 1.5;
+          // cps_dist→0 with size still <7 would hang the inner while (sample_length += 0).
+          if (cps_dist < 1e-6)
+          {
+            sample_failed = true;
+            break;
+          }
           point_set.clear();
           sample_length = 0;
           id = 0;
@@ -471,7 +509,19 @@ void appendIfFar(std::vector<Eigen::Vector3d> &out, const Eigen::Vector3d &p, do
               id++;
           }
           point_set.push_back(local_target_pt);
+          if (++sample_iters >= kMaxWarmSampleIters)
+          {
+            sample_failed = true;
+            break;
+          }
         } while (point_set.size() < 7); // If the start point is very close to end point, this will help
+
+        if (sample_failed || point_set.size() < 7)
+        {
+          flag_force_polynomial = true;
+          flag_regenerate = true;
+          continue;
+        }
 
         start_end_derivatives.push_back(start_vel);
         start_end_derivatives.push_back(local_target_vel);
